@@ -9309,7 +9309,9 @@
   "ast": {
     "absolutePath": "project:/contracts/IdentityRegistry.sol",
     "exportedSymbols": {
-      "IdentityRegistry": [235]
+      "IdentityRegistry": [
+        235
+      ]
     },
     "id": 236,
     "license": "MIT",
@@ -9317,7 +9319,12 @@
     "nodes": [
       {
         "id": 1,
-        "literals": ["solidity", "^", "0.8", ".0"],
+        "literals": [
+          "solidity",
+          "^",
+          "0.8",
+          ".0"
+        ],
         "nodeType": "PragmaDirective",
         "src": "33:23:0"
       },
@@ -9334,7 +9341,9 @@
         },
         "fullyImplemented": true,
         "id": 235,
-        "linearizedBaseContracts": [235],
+        "linearizedBaseContracts": [
+          235
+        ],
         "name": "IdentityRegistry",
         "nodeType": "ContractDefinition",
         "nodes": [
@@ -9756,7 +9765,10 @@
                       "id": 43,
                       "name": "require",
                       "nodeType": "Identifier",
-                      "overloadedDeclarations": [4294967278, 4294967278],
+                      "overloadedDeclarations": [
+                        4294967278,
+                        4294967278
+                      ],
                       "referencedDeclaration": 4294967278,
                       "src": "1166:7:0",
                       "typeDescriptions": {
@@ -9932,7 +9944,10 @@
                       "id": 52,
                       "name": "require",
                       "nodeType": "Identifier",
-                      "overloadedDeclarations": [4294967278, 4294967278],
+                      "overloadedDeclarations": [
+                        4294967278,
+                        4294967278
+                      ],
                       "referencedDeclaration": 4294967278,
                       "src": "1291:7:0",
                       "typeDescriptions": {
@@ -10097,7 +10112,10 @@
                       "id": 64,
                       "name": "require",
                       "nodeType": "Identifier",
-                      "overloadedDeclarations": [4294967278, 4294967278],
+                      "overloadedDeclarations": [
+                        4294967278,
+                        4294967278
+                      ],
                       "referencedDeclaration": 4294967278,
                       "src": "1435:7:0",
                       "typeDescriptions": {
@@ -10125,7 +10143,9 @@
                   "src": "1435:112:0"
                 },
                 {
-                  "assignments": [76],
+                  "assignments": [
+                    76
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -10289,7 +10309,9 @@
                   "src": "1596:103:0"
                 },
                 {
-                  "assignments": [87],
+                  "assignments": [
+                    87
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -10441,7 +10463,9 @@
                   "src": "1787:131:0"
                 },
                 {
-                  "assignments": [97],
+                  "assignments": [
+                    97
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -10647,7 +10671,10 @@
                       "id": 105,
                       "name": "require",
                       "nodeType": "Identifier",
-                      "overloadedDeclarations": [4294967278, 4294967278],
+                      "overloadedDeclarations": [
+                        4294967278,
+                        4294967278
+                      ],
                       "referencedDeclaration": 4294967278,
                       "src": "2114:7:0",
                       "typeDescriptions": {
@@ -11203,7 +11230,9 @@
               "src": "2857:529:0",
               "statements": [
                 {
-                  "assignments": [154],
+                  "assignments": [
+                    154
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -11335,7 +11364,9 @@
                   "src": "2909:57:0"
                 },
                 {
-                  "assignments": [163],
+                  "assignments": [
+                    163
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -11487,7 +11518,9 @@
                   "src": "3014:131:0"
                 },
                 {
-                  "assignments": [173],
+                  "assignments": [
+                    173
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -11959,7 +11992,10 @@
                       "id": 198,
                       "name": "require",
                       "nodeType": "Identifier",
-                      "overloadedDeclarations": [4294967278, 4294967278],
+                      "overloadedDeclarations": [
+                        4294967278,
+                        4294967278
+                      ],
                       "referencedDeclaration": 4294967278,
                       "src": "3568:7:0",
                       "typeDescriptions": {
@@ -11987,7 +12023,9 @@
                   "src": "3568:65:0"
                 },
                 {
-                  "assignments": [208],
+                  "assignments": [
+                    208
+                  ],
                   "declarations": [
                     {
                       "constant": false,
@@ -12447,12 +12485,12 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x358a2D4c7158C4E68cA22a7ce600544FFBD94c59",
-      "transactionHash": "0x33f1a7b8feb1d29e2f8b8c7cf9a260d9567aa186bb549141e3a41b4761d6eeb3"
+      "address": "0xBE0fFFd09e6De1bAC2759B4f6aAB59a7e5142b26",
+      "transactionHash": "0x28c5755df04c38e39547f80c2dc122e60b41acd23d377c6b51ea790729c027bd"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-02-16T07:10:33.835Z",
+  "updatedAt": "2026-02-17T01:14:37.908Z",
   "networkType": "ethereum",
   "devdoc": {
     "details": "Smart Contract untuk menyimpan identitas pengguna Chat P2P secara terdesentralisasi. Mendukung Gasless Registration & Challenge-Response Login.",
