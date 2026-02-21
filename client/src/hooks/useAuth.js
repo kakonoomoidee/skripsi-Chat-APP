@@ -3,7 +3,7 @@ import axios from "axios";
 import { ethers } from "ethers";
 
 // Ganti sesuai URL Relay Server (cek .env backend)
-const API_URL = "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const useAuth = () => {
   const [loading, setLoading] = useState(false);

@@ -88,15 +88,16 @@ io.use((socket, next) => {
 // SOCKET EVENTS (Messaging Logic)
 // ==========================================
 io.on("connection", (socket) => {
-  const user = socket.userAddress;
-  console.log(`🔌 Client connected: ${user}`);
+  const user = socket.userAddress.toLowerCase();
+  console.log(`Client connected: ${user}`);
 
   // Automatically join a room based on their Wallet Address
   socket.join(user);
 
   // Handle sending messages
   socket.on("send_message", (data) => {
-    const { to, encryptedMessage } = data;
+    const to = data.to.toLowerCase();
+    const { encryptedMessage } = data;
 
     console.log(
       `Message routed: ${user} -> ${to}, Encrypted: ${encryptedMessage}`,
@@ -115,7 +116,8 @@ io.on("connection", (socket) => {
   // ======================================================
   // STEP 1: User A initiates handshake with User B
   socket.on("handshake_init", (data) => {
-    const { to, ephemeralPublicKey } = data;
+    const to = data.to.toLowerCase();
+    const { ephemeralPublicKey } = data;
     console.log(`Handshake Init: ${user} -> ${to}`);
 
     io.to(to).emit("handshake_offer", {
@@ -126,7 +128,8 @@ io.on("connection", (socket) => {
 
   // STEP 2: User B responds to handshake offer
   socket.on("handshake_response", (data) => {
-    const { to, ephemeralPublicKey } = data;
+    const to = data.to.toLowerCase();
+    const { ephemeralPublicKey } = data;
     console.log(`Handshake Response: ${user} -> ${to}`);
 
     io.to(to).emit("handshake_answer", {
@@ -136,7 +139,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`❌ Client disconnected: ${user}`);
+    console.log(`Client disconnected: ${user}`);
   });
 });
 
@@ -182,9 +185,11 @@ app.post("/auth/login", async (req, res) => {
   try {
     const userData = await contract.users(address);
 
-    // Cek property `isRegistered` dari struct User
+    // Verify the isRegistered property from the User struct
     if (!userData || userData.isRegistered === false) {
-      console.warn(`Login ditolak: ${address} berani mencoba tanpa register!`);
+      console.warn(
+        `Login rejected: ${address} attempted to login without registration.`,
+      );
       return res.status(403).json({
         error: "Identity not found on the blockchain. Please register first.",
       });
@@ -263,6 +268,58 @@ app.post("/auth/register", async (req, res) => {
     // Return a cleaner error message if possible
     const errorMessage = error.reason || "Blockchain transaction failed.";
     res.status(500).json({ error: errorMessage });
+  }
+});
+
+/**
+ * 4. Resolve Username to Wallet Address
+ * Endpoint: GET /auth/address/:username
+ */
+app.get("/auth/address/:username", async (req, res) => {
+  const { username } = req.params;
+
+  console.log(`Resolving address for username: ${username}`);
+
+  try {
+    // Query the Blockchain via getAddressByUsername function
+    const resolvedAddress = await contract.getAddressByUsername(username);
+
+    // In Solidity, non-existent data defaults to address(0)
+    if (
+      resolvedAddress === "0x0000000000000000000000000000000000000000" ||
+      resolvedAddress === ethers.ZeroAddress
+    ) {
+      return res.status(404).json({
+        error: "Username not found on the Blockchain network.",
+      });
+    }
+
+    // If found, return the resolved address
+    res.json({
+      username: username,
+      address: resolvedAddress,
+    });
+  } catch (error) {
+    console.error("Failed to resolve username:", error);
+    res.status(500).json({
+      error: "Internal server error occurred while resolving identity.",
+    });
+  }
+});
+
+/**
+ * 5. Resolve Wallet Address to Username (Reverse Lookup)
+ * Endpoint: GET /auth/user/:address
+ */
+app.get("/auth/user/:address", async (req, res) => {
+  try {
+    const userData = await contract.users(req.params.address);
+    if (!userData || !userData.isRegistered) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json({ username: userData.username });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
   }
 });
 

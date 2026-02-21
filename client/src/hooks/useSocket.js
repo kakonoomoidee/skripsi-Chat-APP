@@ -1,40 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { io } from "socket.io-client";
 
-// Sesuaikan dengan URL Relay Server
-const SOCKET_URL = "http://localhost:3001";
+const SOCKET_URL = import.meta.env.VITE_API_URL;
 
 export const useSocket = (token) => {
-  const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  useEffect(() => {
-    if (!token) return;
+  const socket = useMemo(() => {
+    if (!token) return null;
 
-    // Initialize socket connection with JWT token
-    const newSocket = io(SOCKET_URL, {
+    return io(SOCKET_URL, {
       auth: { token },
+      autoConnect: false,
     });
-
-    // Jalankan async pas event sukses konek
-    newSocket.on("connect", () => {
-      console.log("🟢 Socket connected");
-      setIsConnected(true);
-      setSocket(newSocket);
-    });
-
-    // Bersihin state pas disconnect
-    newSocket.on("disconnect", () => {
-      console.log("🔴 Socket disconnected");
-      setIsConnected(false);
-      setSocket(null);
-    });
-
-    // Cleanup on unmount
-    return () => {
-      newSocket.disconnect();
-    };
   }, [token]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.connect();
+
+    const onConnect = () => {
+      console.log("Socket Connected to Relay Server");
+      setIsConnected(true);
+    };
+
+    const onDisconnect = () => {
+      console.log("Socket Disconnected");
+      setIsConnected(false);
+    };
+
+    const onError = (err) => {
+      console.error("Socket Connection Error:", err.message);
+      setIsConnected(false);
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onError);
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onError);
+      socket.disconnect();
+    };
+  }, [socket]);
 
   return { socket, isConnected };
 };

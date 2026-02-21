@@ -6,22 +6,42 @@ import { useAuth } from "../../hooks/useAuth";
 import { useWallet } from "../../hooks/useWallet";
 import { useCrypto } from "../../hooks/useCrypto";
 import { useSocket } from "../../hooks/useSocket";
+import { useChatLogic } from "../../hooks/useChatLogic"; // FIX: Import Custom Hook
 import { shortenAddress, formatTime } from "../../utils/format";
+import CryptoJS from "crypto-js";
+import { ethers } from "ethers";
 
 export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
-  const { address } = useWallet();
+  const { address, wallet } = useWallet();
   const { socket, isConnected } = useSocket(token);
   const { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret } =
     useCrypto();
 
-  const [targetAddress, setTargetAddress] = useState("");
-  const [activeChat, setActiveChat] = useState(null);
-  const [messageInput, setMessageInput] = useState("");
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [isCopied, setIsCopied] = useState(false);
+  // FIX: Tarik semua state dan logic dari custom hook
+  const {
+    targetUsername,
+    setTargetUsername,
+    activeChat,
+    activeUsername,
+    myUsername,
+    pendingRequests,
+    isSearching,
+    handleConnectPeer,
+    handleAcceptRequest,
+    handleRejectRequest,
+  } = useChatLogic({
+    address,
+    socket,
+    ephemeralPublicKey,
+    computeSecret,
+    decrypt,
+    hasSecret,
+  });
 
+  const [messageInput, setMessageInput] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
   const messagesEndRef = useRef(null);
 
   const messages = useLiveQuery(
@@ -34,82 +54,12 @@ export default function ChatDashboard() {
   );
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login");
-    }
+    if (!isAuthenticated) navigate("/login");
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const onHandshakeOffer = (data) => {
-      console.log("Incoming Handshake Offer from:", data.from);
-      setPendingRequests((prev) => {
-        if (prev.find((req) => req.from === data.from)) return prev;
-        return [...prev, data];
-      });
-    };
-
-    const onHandshakeAnswer = (data) => {
-      console.log("Handshake Answer received from:", data.from);
-      computeSecret(data.from, data.ephemeralPublicKey);
-    };
-
-    const onReceiveMessage = async (data) => {
-      console.log("Encrypted message received");
-      const decryptedText = decrypt(data.from, data.message);
-
-      await db.messages.add({
-        chatId: data.from,
-        text: decryptedText,
-        isMine: false,
-        timestamp: data.timestamp,
-      });
-    };
-
-    socket.on("handshake_offer", onHandshakeOffer);
-    socket.on("handshake_answer", onHandshakeAnswer);
-    socket.on("receive_message", onReceiveMessage);
-
-    return () => {
-      socket.off("handshake_offer", onHandshakeOffer);
-      socket.off("handshake_answer", onHandshakeAnswer);
-      socket.off("receive_message", onReceiveMessage);
-    };
-  }, [socket, computeSecret, decrypt]);
-
-  const handleConnectPeer = () => {
-    if (!targetAddress || targetAddress === address) return;
-    setActiveChat(targetAddress);
-    if (!hasSecret(targetAddress)) {
-      socket.emit("handshake_init", {
-        to: targetAddress,
-        ephemeralPublicKey: ephemeralPublicKey,
-      });
-    }
-  };
-
-  const handleAcceptRequest = (request) => {
-    computeSecret(request.from, request.ephemeralPublicKey);
-    socket.emit("handshake_response", {
-      to: request.from,
-      ephemeralPublicKey: ephemeralPublicKey,
-    });
-    setPendingRequests((prev) =>
-      prev.filter((req) => req.from !== request.from),
-    );
-    setActiveChat(request.from);
-  };
-
-  const handleRejectRequest = (requestAddress) => {
-    setPendingRequests((prev) =>
-      prev.filter((req) => req.from !== requestAddress),
-    );
-  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -130,11 +80,51 @@ export default function ChatDashboard() {
         isMine: true,
         timestamp: timestamp,
       });
-
       setMessageInput("");
-    } catch (error) {
-      console.error("Failed to send message:", error);
+    } catch {
       alert("Failed to encrypt message. Is handshake complete?");
+    }
+  };
+
+  const handleExportChat = async () => {
+    try {
+      let backupKey = wallet?.privateKey;
+      if (!backupKey) {
+        const password = prompt(
+          "Enter your encryption password to export chat backup:",
+        );
+        if (!password) return;
+
+        const keystoreJson = localStorage.getItem("chat_app_keystore");
+        if (!keystoreJson) return alert("Local identity not found!");
+
+        const unlockedWallet = await ethers.Wallet.fromEncryptedJson(
+          keystoreJson,
+          password,
+        );
+        backupKey = unlockedWallet.privateKey;
+      }
+
+      const allMessages = await db.messages.toArray();
+      if (allMessages.length === 0) return alert("No chat history to export!");
+
+      const jsonString = JSON.stringify(allMessages);
+      const encryptedData = CryptoJS.AES.encrypt(
+        jsonString,
+        backupKey,
+      ).toString();
+
+      const blob = new Blob([encryptedData], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backup_${shortenAddress(address)}.securep2p`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Export failed! Incorrect password or corrupted data.");
     }
   };
 
@@ -142,14 +132,7 @@ export default function ChatDashboard() {
     if (!address) return;
     navigator.clipboard.writeText(address);
     setIsCopied(true);
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 2000);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
@@ -159,22 +142,26 @@ export default function ChatDashboard() {
           <h2 className="text-xl font-bold text-white tracking-tight">
             Secure<span className="text-blue-400">P2P</span>
           </h2>
-          <div className="mt-4 bg-slate-800 p-3 rounded-lg border border-slate-700">
-            <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
-              My Address
+          <div className="mt-4 bg-slate-800 p-4 rounded-lg border border-slate-700">
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">
+              My Profile
             </p>
-            <div className="flex justify-between items-center">
-              <p className="font-mono text-sm text-green-400">
-                {shortenAddress(address)}
+            <div className="flex justify-between items-center mb-1">
+              <p className="font-bold text-sm text-white capitalize">
+                {myUsername}
               </p>
               <button
                 onClick={handleCopyAddress}
-                className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors"
+                className="text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors"
               >
-                {isCopied ? "Copied!" : "Copy"}
+                {isCopied ? "Copied!" : "Copy Address"}
               </button>
             </div>
-            <div className="flex items-center mt-3 gap-2 text-xs">
+            <p className="font-mono text-xs text-green-400">
+              {shortenAddress(address)}
+            </p>
+
+            <div className="flex items-center mt-4 pt-3 border-t border-slate-700 gap-2 text-xs">
               <span
                 className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
               ></span>
@@ -187,27 +174,27 @@ export default function ChatDashboard() {
 
         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Start Chat with Address:
+            Start Chat with Username:
           </label>
           <input
             type="text"
-            placeholder="0x..."
-            value={targetAddress}
-            onChange={(e) => setTargetAddress(e.target.value)}
-            className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-colors mb-3 font-mono"
+            placeholder="e.g. satoshi"
+            value={targetUsername}
+            onChange={(e) => setTargetUsername(e.target.value)}
+            className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-colors mb-3"
           />
           <button
             onClick={handleConnectPeer}
-            disabled={!targetAddress}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            disabled={!targetUsername || isSearching}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 flex justify-center items-center"
           >
-            Connect & Handshake
+            {isSearching ? "Searching..." : "Connect & Handshake"}
           </button>
 
           {pendingRequests.length > 0 && (
             <div className="mt-6 border-t border-slate-700 pt-4">
               <p className="text-xs font-semibold text-yellow-500 uppercase tracking-wider mb-3">
-                Incoming Connections ({pendingRequests.length})
+                Incoming Requests ({pendingRequests.length})
               </p>
               <div className="space-y-2">
                 {pendingRequests.map((req, index) => (
@@ -215,7 +202,10 @@ export default function ChatDashboard() {
                     key={index}
                     className="bg-slate-800 p-3 rounded-lg border border-yellow-500/30"
                   >
-                    <p className="font-mono text-xs text-slate-300 mb-2 truncate">
+                    <p className="font-bold text-sm text-white capitalize truncate">
+                      {req.username}
+                    </p>
+                    <p className="font-mono text-[10px] text-slate-400 mb-2 truncate">
                       {shortenAddress(req.from)}
                     </p>
                     <div className="flex gap-2">
@@ -241,7 +231,10 @@ export default function ChatDashboard() {
           {activeChat && (
             <div className="mt-6 p-3 bg-slate-800 rounded-lg border border-slate-700">
               <p className="text-xs text-slate-400">Active Session:</p>
-              <p className="font-mono text-sm text-blue-400 mt-1">
+              <p className="font-semibold text-sm text-white mt-1 capitalize">
+                {activeUsername || "Unknown"}
+              </p>
+              <p className="font-mono text-xs text-blue-400 mt-1">
                 {shortenAddress(activeChat)}
               </p>
               <p className="text-xs mt-2 flex items-center gap-1">
@@ -258,12 +251,47 @@ export default function ChatDashboard() {
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 space-y-2">
           <button
-            onClick={handleLogout}
-            className="w-full text-sm text-slate-400 hover:text-white flex items-center justify-center gap-2 transition-colors"
+            onClick={handleExportChat}
+            className="w-full text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors border border-slate-700"
           >
-            Sign Out Session
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+              />
+            </svg>
+            Export Backup
+          </button>
+          <button
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
+            className="w-full text-sm text-red-400 hover:text-red-300 hover:bg-slate-800 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Sign Out
           </button>
         </div>
       </div>
@@ -272,13 +300,14 @@ export default function ChatDashboard() {
         <div className="h-16 border-b border-gray-200 flex items-center px-6 bg-slate-50">
           {activeChat ? (
             <div>
-              <h3 className="font-semibold text-gray-800 font-mono">
-                {activeChat}
+              <h3 className="font-bold text-gray-800 text-lg capitalize">
+                {activeUsername || "Unknown User"}
               </h3>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 font-mono">
+                {activeChat} •{" "}
                 {hasSecret(activeChat)
                   ? "End-to-End Encrypted"
-                  : "Waiting for peer to come online..."}
+                  : "Waiting for peer..."}
               </p>
             </div>
           ) : (
@@ -291,7 +320,7 @@ export default function ChatDashboard() {
             <div className="h-full flex items-center justify-center flex-col text-gray-400">
               <p className="font-medium text-lg mb-2">Welcome to SecureP2P</p>
               <p className="text-sm">
-                Enter a wallet address on the left to start chatting securely.
+                Enter a username on the left to start chatting securely.
               </p>
             </div>
           ) : (

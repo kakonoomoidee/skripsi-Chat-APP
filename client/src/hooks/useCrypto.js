@@ -51,7 +51,7 @@ export const useCrypto = () => {
   const decrypt = useCallback(
     (peerAddress, cipherText) => {
       const secret = sharedSecrets[peerAddress];
-      if (!secret) return "🔒 Encrypted (Waiting Handshake...)";
+      if (!secret) return "Encrypted (Waiting Handshake...)";
 
       return decryptAES(cipherText, secret);
     },

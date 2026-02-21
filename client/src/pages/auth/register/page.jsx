@@ -7,11 +7,19 @@ import WalletDisplay from "../components/WalletDisplay";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { address, wallet, resetWallet } = useWallet();
-  const { register, login, loading, isAuthenticated } = useAuth();
+  const {
+    address,
+    createAndEncryptWallet,
+    resetWallet,
+    loading: walletLoading,
+  } = useWallet();
+  const { register, login, loading: authLoading, isAuthenticated } = useAuth();
 
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState("");
+
+  const isLoading = walletLoading || authLoading;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -23,14 +31,26 @@ export default function RegisterPage() {
     e.preventDefault();
     setLocalError("");
 
-    if (!username.trim()) {
-      setLocalError("Username cannot be empty.");
+    if (!username.trim() || !password) {
+      setLocalError("Username and Password are required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setLocalError("Password must be at least 6 characters.");
       return;
     }
 
     try {
-      await register(wallet, username);
-      await login(wallet); // Auto login after register
+      // 1. Generate & Encrypt Wallet locally
+      const newWallet = await createAndEncryptWallet(password);
+
+      // 2. Register to Blockchain
+      await register(newWallet, username);
+
+      // 3. Auto Login
+      await login(newWallet);
+
       navigate("/chat");
     } catch (err) {
       setLocalError(err.message || "Registration failed.");
@@ -40,7 +60,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create Identity"
-      subtitle="Register your wallet to the blockchain."
+      subtitle="Register and secure your identity."
     >
       <WalletDisplay address={address} onReset={resetWallet} />
 
@@ -52,38 +72,51 @@ export default function RegisterPage() {
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
-          <label
-            htmlFor="username"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Choose a Username
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Username
           </label>
           <input
-            id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="e.g. Satoshi"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            disabled={loading}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Encryption Password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="To secure your private key"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            disabled={isLoading}
           />
         </div>
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isLoading}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
         >
-          {loading ? "Registering..." : "Register & Login"}
+          {walletLoading
+            ? "Encrypting Key..."
+            : authLoading
+              ? "Registering..."
+              : "Create & Encrypt"}
         </button>
 
         <div className="text-center text-sm text-gray-500 mt-4">
-          Already registered?{" "}
+          Already registered on this device?{" "}
           <Link
             to="/login"
             className="text-slate-900 hover:underline font-medium"
           >
-            Back to Login
+            Go to Login
           </Link>
         </div>
       </form>
