@@ -3,7 +3,7 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
-# --- RAHASIA NEGARA (JANGAN DIHAPUS BARIS INI!) ---
+# --- Enviroment Variable ---
 .env
 .env.local
 .env.*.local
@@ -27,3 +27,6 @@ yarn-error.log*
 
 # --- Testing ---
 coverage/
+
+# --- json files ---
+*.json

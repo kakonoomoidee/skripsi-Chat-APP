@@ -12485,12 +12485,12 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0xBE0fFFd09e6De1bAC2759B4f6aAB59a7e5142b26",
-      "transactionHash": "0x28c5755df04c38e39547f80c2dc122e60b41acd23d377c6b51ea790729c027bd"
+      "address": "0x82a9CE100Ea09995DB48A1d6980C458D9cb6F0B5",
+      "transactionHash": "0xfade4ec705f2fe67d964b761349d88216d2dd3c731dbba95453a453594a87474"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-02-17T01:14:37.908Z",
+  "updatedAt": "2026-02-20T05:25:47.214Z",
   "networkType": "ethereum",
   "devdoc": {
     "details": "Smart Contract untuk menyimpan identitas pengguna Chat P2P secara terdesentralisasi. Mendukung Gasless Registration & Challenge-Response Login.",

@@ -54,9 +54,8 @@ export const useAuth = () => {
       const { nonce } = resNonce.data;
 
       // Step B: Sign Nonce
-      // Note: Relay expects signature of the nonce string
-      // Ethers.js 'signMessage' automatically adds the Ethereum prefix
-      const signature = await wallet.signMessage(nonce);
+      const nonceHash = ethers.solidityPackedKeccak256(["string"], [nonce]);
+      const signature = await wallet.signMessage(ethers.getBytes(nonceHash));
 
       // Step C: Verify & Get Token
       const resLogin = await axios.post(`${API_URL}/auth/login`, {
