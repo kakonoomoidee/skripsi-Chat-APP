@@ -11,7 +11,7 @@ const { ethers } = require("ethers");
 const jwt = require("jsonwebtoken");
 
 // Load ABI
-const IdentityRegistryABI = require("./identity_abi.json").abi;
+const IdentityRegistryABI = require("./identity_abi.json");
 
 // Setup Express
 const app = express();
@@ -98,7 +98,9 @@ io.on("connection", (socket) => {
   socket.on("send_message", (data) => {
     const { to, encryptedMessage } = data;
 
-    console.log(`Message routed: ${user} -> ${to}`);
+    console.log(
+      `Message routed: ${user} -> ${to}, Encrypted: ${encryptedMessage}`,
+    );
 
     // Relay the message to the target room
     io.to(to).emit("receive_message", {
@@ -129,7 +131,7 @@ io.on("connection", (socket) => {
 
     io.to(to).emit("handshake_answer", {
       from: user,
-      ephemeralPublicKey: ephemeralPublicKey
+      ephemeralPublicKey: ephemeralPublicKey,
     });
   });
 
@@ -163,7 +165,7 @@ app.post("/auth/challenge", (req, res) => {
 });
 
 /**
- * 2. Login (Verify Signature)
+ * 2. Login (Verify Signature & Check Blockchain Identity)
  * Payload: { address: "0x...", signature: "0x..." }
  */
 app.post("/auth/login", async (req, res) => {
@@ -178,6 +180,16 @@ app.post("/auth/login", async (req, res) => {
   }
 
   try {
+    const userData = await contract.users(address);
+
+    // Cek property `isRegistered` dari struct User
+    if (!userData || userData.isRegistered === false) {
+      console.warn(`Login ditolak: ${address} berani mencoba tanpa register!`);
+      return res.status(403).json({
+        error: "Identity not found on the blockchain. Please register first.",
+      });
+    }
+
     const sig = ethers.Signature.from(signature);
 
     const isValid = await contract.verifyLoginSignature(
