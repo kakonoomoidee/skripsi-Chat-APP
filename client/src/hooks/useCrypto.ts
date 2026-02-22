@@ -4,7 +4,7 @@ import {
   deriveSharedSecret,
   encryptMessage as encryptAES,
   decryptMessage as decryptAES,
-} from "../utils/crypto";
+} from "@/utils/crypto";
 
 /**
  * Custom hook for handling cryptographic operations including ephemeral keys, shared secrets, and AES encryption.

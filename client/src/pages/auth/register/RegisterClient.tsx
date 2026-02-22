@@ -24,13 +24,15 @@ export default function RegisterPage() {
   const [password, setPassword] = useState<string>("");
   const [localError, setLocalError] = useState<string>("");
 
+  const [seedPhrase, setSeedPhrase] = useState<string | null>(null);
+
   const isLoading = walletLoading || authLoading;
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !seedPhrase) {
       navigate("/chat");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, seedPhrase]);
 
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,15 +49,15 @@ export default function RegisterPage() {
     }
 
     try {
-      const newWallet = await createAndEncryptWallet(password);
+      const { wallet: newWallet, seedPhrase: generatedSeed } =
+        await createAndEncryptWallet(password);
 
-      // Type casting to bypass ethers HDNodeWallet vs Wallet strictness
       const walletInstance = newWallet as unknown as ethers.Wallet;
 
       await register(walletInstance, username);
       await login(walletInstance);
 
-      navigate("/chat");
+      setSeedPhrase(generatedSeed);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setLocalError(err.message || "Registration failed.");
@@ -64,6 +66,49 @@ export default function RegisterPage() {
       }
     }
   };
+
+  const handleCopyAndProceed = () => {
+    if (seedPhrase) {
+      navigator.clipboard.writeText(seedPhrase);
+      alert("Seed phrase copied! Please store it securely.");
+      navigate("/chat");
+    }
+  };
+
+  if (seedPhrase) {
+    return (
+      <AuthLayout
+        title="Save Your Backup Phrase"
+        subtitle="This is the ONLY way to recover your account if you lose your device."
+      >
+        <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-xl mb-6">
+          <p className="text-amber-400 text-sm font-medium mb-4 text-center">
+            Write down these 12 words in order. Do not share them with anyone!
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {seedPhrase.split(" ").map((word, index) => (
+              <div
+                key={index}
+                className="bg-zinc-900/50 px-2 py-2 rounded-lg border border-zinc-800 text-sm text-center font-mono text-zinc-300"
+              >
+                <span className="text-zinc-600 mr-2 text-xs select-none">
+                  {index + 1}.
+                </span>
+                {word}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={handleCopyAndProceed}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
+        >
+          I Saved It, Continue
+        </button>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

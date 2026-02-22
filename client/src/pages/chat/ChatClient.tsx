@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../../utils/db";
-import { useAuth } from "../../hooks/useAuth";
-import { useWallet } from "../../hooks/useWallet";
-import { useCrypto } from "../../hooks/useCrypto";
-import { useSocket } from "../../hooks/useSocket";
-import { useChatLogic } from "../../hooks/useChatLogic";
-import { shortenAddress, formatTime } from "../../utils/format";
+import { db } from "@/utils/db";
+import { useAuth } from "@/hooks/useAuth";
+import { useWallet } from "@/hooks/useWallet";
+import { useCrypto } from "@/hooks/useCrypto";
+import { useSocket } from "@/hooks/useSocket";
+import { useChatLogic } from "@/hooks/useChatLogic";
+import { shortenAddress, formatTime } from "@/utils/format";
 import CryptoJS from "crypto-js";
 import { ethers } from "ethers";
 
@@ -19,7 +19,7 @@ import { ethers } from "ethers";
 export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
-  const { address, wallet } = useWallet();
+  const { address } = useWallet();
   const { socket, isConnected } = useSocket(token);
   const { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret } =
     useCrypto();
@@ -102,26 +102,50 @@ export default function ChatDashboard() {
   };
 
   /**
-   * 3. Export encrypted chat history to a local file
+   * 3. Export encrypted chat history with double validation (Password + Seed Phrase)
    * @returns {Promise<void>}
    */
   const handleExportChat = async () => {
     try {
-      let backupKey = wallet?.privateKey;
-      if (!backupKey) {
-        const password = prompt(
-          "Enter your encryption password to export chat backup:",
-        );
-        if (!password) return;
+      const password = prompt(
+        "Step 1: Enter your Keystore password to authorize export:",
+      );
+      if (!password) return;
 
-        const keystoreJson = localStorage.getItem("chat_app_keystore");
-        if (!keystoreJson) return alert("Local identity not found!");
+      const keystoreJson = localStorage.getItem("chat_app_keystore");
+      if (!keystoreJson) return alert("Local identity not found!");
 
-        const unlockedWallet = await ethers.Wallet.fromEncryptedJson(
+      let unlockedWallet: ethers.Wallet | ethers.HDNodeWallet;
+      try {
+        unlockedWallet = await ethers.Wallet.fromEncryptedJson(
           keystoreJson,
           password,
         );
-        backupKey = unlockedWallet.privateKey;
+      } catch {
+        return alert("Export failed: Incorrect Keystore password!");
+      }
+
+      const seedPhraseInput = prompt(
+        "Step 2: Enter your 12-word Seed Phrase to encrypt the backup:",
+      );
+      if (!seedPhraseInput) return;
+
+      const words = seedPhraseInput.trim().split(/\s+/);
+      if (words.length !== 12) {
+        return alert(
+          `Invalid! You entered ${words.length} words. A Seed Phrase must be exactly 12 words.`,
+        );
+      }
+
+      try {
+        const validationWallet = ethers.Wallet.fromPhrase(seedPhraseInput);
+        if (validationWallet.address !== unlockedWallet.address) {
+          return alert(
+            "Security Alert: The Seed Phrase you entered does not match your current account!",
+          );
+        }
+      } catch {
+        return alert("Invalid Seed Phrase format or misspelled words!");
       }
 
       const allMessages = await db.messages.toArray();
@@ -130,20 +154,20 @@ export default function ChatDashboard() {
       const jsonString = JSON.stringify(allMessages);
       const encryptedData = CryptoJS.AES.encrypt(
         jsonString,
-        backupKey,
+        seedPhraseInput,
       ).toString();
 
       const blob = new Blob([encryptedData], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `backup_${shortenAddress(address)}.securep2p`;
+      link.download = `backup_${shortenAddress(address || "")}.securep2p`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch {
-      alert("Export failed! Incorrect password or corrupted data.");
+      alert("Export failed! An unexpected error occurred.");
     }
   };
 
@@ -364,7 +388,7 @@ export default function ChatDashboard() {
         <div className="h-16 border-b border-zinc-800 flex items-center px-8 bg-zinc-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
           {activeChat ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-inner">
+              <div className="h-10 w-10 rounded-full bg-linear-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-inner">
                 {activeUsername ? activeUsername.charAt(0).toUpperCase() : "?"}
               </div>
               <div>
@@ -422,7 +446,7 @@ export default function ChatDashboard() {
                         : "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-2xl rounded-tl-sm"
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap warp-break-words">
                       {msg.text}
                     </p>
                     <p
