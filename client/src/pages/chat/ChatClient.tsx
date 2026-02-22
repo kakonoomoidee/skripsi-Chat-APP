@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/utils/db";
@@ -9,7 +9,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useChatLogic } from "@/hooks/useChatLogic";
 import { shortenAddress, formatTime } from "@/utils/format";
 import CryptoJS from "crypto-js";
-import { ethers } from "ethers";
+import { ethers, Wallet } from "ethers";
 
 /**
  * 1. Main Chat Dashboard Component
@@ -48,6 +48,9 @@ export default function ChatDashboard() {
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // FIX: Ref untuk trigger hidden file input pas klik tombol Import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messages = useLiveQuery(
     () => {
       if (!activeChat) return [];
@@ -67,8 +70,6 @@ export default function ChatDashboard() {
 
   /**
    * 2. Handle sending an encrypted message
-   * @param {FormEvent<HTMLFormElement>} e - The form submission event
-   * @returns {Promise<void>}
    */
   const handleSendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,7 +104,6 @@ export default function ChatDashboard() {
 
   /**
    * 3. Export encrypted chat history with double validation (Password + Seed Phrase)
-   * @returns {Promise<void>}
    */
   const handleExportChat = async () => {
     try {
@@ -117,10 +117,7 @@ export default function ChatDashboard() {
 
       let unlockedWallet: ethers.Wallet | ethers.HDNodeWallet;
       try {
-        unlockedWallet = await ethers.Wallet.fromEncryptedJson(
-          keystoreJson,
-          password,
-        );
+        unlockedWallet = await Wallet.fromEncryptedJson(keystoreJson, password);
       } catch {
         return alert("Export failed: Incorrect Keystore password!");
       }
@@ -138,7 +135,7 @@ export default function ChatDashboard() {
       }
 
       try {
-        const validationWallet = ethers.Wallet.fromPhrase(seedPhraseInput);
+        const validationWallet = Wallet.fromPhrase(seedPhraseInput);
         if (validationWallet.address !== unlockedWallet.address) {
           return alert(
             "Security Alert: The Seed Phrase you entered does not match your current account!",
@@ -172,8 +169,83 @@ export default function ChatDashboard() {
   };
 
   /**
-   * 4. Copy local wallet address to clipboard
-   * @returns {void}
+   * 4. Import encrypted chat history using Seed Phrase validation
+   */
+  const handleImportChat = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input biar bisa upload file yang sama berkali-kali
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const seedPhraseInput = prompt(
+      "Enter your 12-word Seed Phrase to decrypt this backup file:",
+    );
+    if (!seedPhraseInput) return;
+
+    try {
+      // Validasi receh format kata
+      const words = seedPhraseInput.trim().split(/\s+/);
+      if (words.length !== 12) {
+        return alert("Invalid! Seed Phrase must be exactly 12 words.");
+      }
+
+      // Validasi address memastikan seed phrase ini emang beneran punya akun yang lagi login
+      try {
+        const validationWallet = Wallet.fromPhrase(seedPhraseInput);
+        if (validationWallet.address.toLowerCase() !== address?.toLowerCase()) {
+          return alert(
+            "Security Alert: This Seed Phrase does not belong to your currently active account!",
+          );
+        }
+      } catch {
+        return alert("Invalid Seed Phrase format or misspelled words!");
+      }
+
+      // Baca isi file-nya
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const encryptedText = event.target?.result as string;
+
+          // Dekripsi file pakai seed phrase
+          const decryptedBytes = CryptoJS.AES.decrypt(
+            encryptedText,
+            seedPhraseInput,
+          );
+          const decryptedString = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+          if (!decryptedString) {
+            throw new Error("Decryption resulted in empty string");
+          }
+
+          const parsedMessages = JSON.parse(decryptedString);
+
+          if (!Array.isArray(parsedMessages)) {
+            throw new Error("Invalid backup format");
+          }
+
+          // Kosongin DB lama, trus masukin semua pesan yang berhasil didekripsi
+          await db.messages.clear();
+          await db.messages.bulkAdd(parsedMessages);
+
+          alert("Success! Chat history imported securely.");
+        } catch (err) {
+          alert(
+            "Import failed! Wrong Seed Phrase, corrupted file, or it does not belong to you.",
+          );
+        }
+      };
+
+      // Execute pembacaan file
+      reader.readAsText(file);
+    } catch {
+      alert("An unexpected error occurred during import.");
+    }
+  };
+
+  /**
+   * 5. Copy local wallet address to clipboard
    */
   const handleCopyAddress = () => {
     if (!address) return;
@@ -339,26 +411,57 @@ export default function ChatDashboard() {
           )}
         </div>
 
-        <div className="p-5 border-t border-zinc-800 space-y-2.5">
-          <button
-            onClick={handleExportChat}
-            className="w-full text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors border border-zinc-800/80"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        <div className="p-5 border-t border-zinc-800 flex flex-col gap-2.5">
+          <input
+            type="file"
+            accept=".securep2p"
+            ref={fileInputRef}
+            onChange={handleImportChat}
+            className="hidden"
+          />
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-indigo-400 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-zinc-800/80"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-              />
-            </svg>
-            Export Backup
-          </button>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Import
+            </button>
+
+            <button
+              onClick={handleExportChat}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-zinc-800/80"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>
+              Export
+            </button>
+          </div>
+
           <button
             onClick={() => {
               logout();

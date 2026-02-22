@@ -43,7 +43,6 @@ export default function LoginPage() {
     try {
       const unlockedWallet = await decryptWallet(password);
 
-      // Type casting to bypass ethers HDNodeWallet vs Wallet strictness
       await login(unlockedWallet as unknown as ethers.Wallet);
 
       navigate("/chat");
@@ -93,14 +92,25 @@ export default function LoginPage() {
               : "Decrypt & Login"}
         </button>
 
-        <div className="text-center text-sm text-zinc-500 mt-4">
-          Want to create a new identity?{" "}
-          <Link
-            to="/register"
-            className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
-          >
-            Register Now
-          </Link>
+        <div className="text-center text-sm text-zinc-500 mt-4 flex flex-col gap-2">
+          <div>
+            Want to create a new identity?{" "}
+            <Link
+              to="/register"
+              className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
+            >
+              Register Now
+            </Link>
+          </div>
+          <div>
+            Moving to a new device?{" "}
+            <Link
+              to="/import"
+              className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
+            >
+              Import Identity
+            </Link>
+          </div>
         </div>
       </form>
     </AuthLayout>

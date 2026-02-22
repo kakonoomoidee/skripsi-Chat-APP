@@ -8,6 +8,7 @@ import {
 // Import komponen dari struktur folder yang baru
 import LoginPage from "@/pages/auth/login/LoginClient";
 import RegisterPage from "@/pages/auth/register/RegisterClient";
+import ImportIdentityPage from "@/pages/auth/import/ImportIdentityClient"; // FIX: Import rute baru
 import ChatDashboard from "@/pages/chat/ChatClient";
 
 function App() {
@@ -17,14 +18,12 @@ function App() {
         <Routes>
           {/* Default Route: Otomatis lempar ke Login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
-
           {/* Auth Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-
+          <Route path="/import" element={<ImportIdentityPage />} />{" "}
           {/* Main Dashboard Route */}
           <Route path="/chat" element={<ChatDashboard />} />
-
           {/* Fallback 404: Kalo user ketik URL ngasal, balikin ke Login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
