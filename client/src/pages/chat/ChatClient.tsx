@@ -8,20 +8,19 @@ import { useCrypto } from "@/hooks/useCrypto";
 import { useSocket } from "@/hooks/useSocket";
 import { useChatLogic } from "@/hooks/useChatLogic";
 import { useRelay } from "@/hooks/useRelay";
+import { useWebRTC } from "@/hooks/useWebRTC";
 import { shortenAddress, formatTime } from "@/utils/format";
-import CryptoJS from "crypto-js";
-import { ethers, Wallet } from "ethers";
 
 /**
- * 1. Main Chat Dashboard Component
- * Handles the UI for peer-to-peer messaging, handshake requests, and secure backups.
+ * 1. Main Chat Dashboard Component orchestrating UI, P2P communication, and node management.
  * @returns {JSX.Element}
  */
 export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
   const { address } = useWallet();
-  const { activeRelay, changeRelay, defaultRelays } = useRelay();
+  const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
+    useRelay();
   const { socket, isConnected } = useSocket(token, activeRelay);
   const { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret } =
     useCrypto();
@@ -37,27 +36,36 @@ export default function ChatDashboard() {
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    isInitiator,
   } = useChatLogic({
     address,
     socket,
     ephemeralPublicKey,
     computeSecret,
-    decrypt,
     hasSecret,
     relayUrl: activeRelay,
   });
 
+  const { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection } =
+    useWebRTC({
+      socket,
+      activeChat,
+      decrypt,
+    });
+
   const [messageInput, setMessageInput] = useState<string>("");
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Ref untuk trigger hidden file input pas klik tombol Import
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const messages = useLiveQuery(
     () => {
       if (!activeChat) return [];
-      return db.messages.where("chatId").equals(activeChat).sortBy("timestamp");
+      return db.messages
+        .where("chatId")
+        .equals(activeChat || "")
+        .sortBy("timestamp");
     },
     [activeChat],
     [],
@@ -71,177 +79,103 @@ export default function ChatDashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (
+      activeChat &&
+      hasSecret(activeChat) &&
+      !isWebRTCConnected &&
+      isInitiator
+    ) {
+      initiateWebRTCConnection();
+    }
+  }, [
+    activeChat,
+    initiateWebRTCConnection,
+    hasSecret,
+    isWebRTCConnected,
+    isInitiator,
+  ]);
+
   /**
-   * 2. Handle sending an encrypted message
+   * 2. Encrypt and dispatch text message via direct WebRTC Data Channel.
+   * @param {FormEvent<HTMLFormElement>} e - The form submission event.
+   * @returns {Promise<void>}
    */
   const handleSendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const currentChat = activeChat as string;
     if (
       !messageInput.trim() ||
-      !activeChat ||
-      !hasSecret(activeChat) ||
-      !socket
+      !currentChat ||
+      !hasSecret(currentChat) ||
+      !isWebRTCConnected
     )
       return;
 
     try {
-      const encryptedMsg = encrypt(activeChat, messageInput);
-      const timestamp = Date.now();
-
-      socket.emit("send_message", {
-        to: activeChat,
-        encryptedMessage: encryptedMsg,
-      });
-
+      const encryptedMsg = encrypt(currentChat, messageInput);
+      sendDataViaWebRTC(encryptedMsg);
       await db.messages.add({
-        chatId: activeChat,
+        chatId: currentChat,
         text: messageInput,
         isMine: true,
-        timestamp: timestamp,
+        timestamp: Date.now(),
       });
       setMessageInput("");
     } catch {
-      alert("Failed to encrypt message. Is handshake complete?");
+      alert("Failed to send message via P2P channel.");
     }
   };
 
   /**
-   * 3. Export encrypted chat history with double validation (Password + Seed Phrase)
+   * 3. Handle image file selection, encryption, and P2P transmission.
+   * @param {ChangeEvent<HTMLInputElement>} e - The file input change event.
+   * @returns {Promise<void>}
    */
-  const handleExportChat = async () => {
-    try {
-      const password = prompt(
-        "Step 1: Enter your Keystore password to authorize export:",
-      );
-      if (!password) return;
-
-      const keystoreJson = localStorage.getItem("chat_app_keystore");
-      if (!keystoreJson) return alert("Local identity not found!");
-
-      let unlockedWallet: ethers.Wallet | ethers.HDNodeWallet;
-      try {
-        unlockedWallet = await Wallet.fromEncryptedJson(keystoreJson, password);
-      } catch {
-        return alert("Export failed: Incorrect Keystore password!");
-      }
-
-      const seedPhraseInput = prompt(
-        "Step 2: Enter your 12-word Seed Phrase to encrypt the backup:",
-      );
-      if (!seedPhraseInput) return;
-
-      const words = seedPhraseInput.trim().split(/\s+/);
-      if (words.length !== 12) {
-        return alert(
-          `Invalid! You entered ${words.length} words. A Seed Phrase must be exactly 12 words.`,
-        );
-      }
-
-      try {
-        const validationWallet = Wallet.fromPhrase(seedPhraseInput);
-        if (validationWallet.address !== unlockedWallet.address) {
-          return alert(
-            "Security Alert: The Seed Phrase you entered does not match your current account!",
-          );
-        }
-      } catch {
-        return alert("Invalid Seed Phrase format or misspelled words!");
-      }
-
-      const allMessages = await db.messages.toArray();
-      if (allMessages.length === 0) return alert("No chat history to export!");
-
-      const jsonString = JSON.stringify(allMessages);
-      const encryptedData = CryptoJS.AES.encrypt(
-        jsonString,
-        seedPhraseInput,
-      ).toString();
-
-      const blob = new Blob([encryptedData], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `backup_${shortenAddress(address || "")}.securep2p`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("Export failed! An unexpected error occurred.");
-    }
-  };
-
-  /**
-   * 4. Import encrypted chat history using Seed Phrase validation
-   */
-  const handleImportChat = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleSendImage = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    const currentChat = activeChat as string;
+    if (!file || !currentChat || !isWebRTCConnected) return;
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
-
-    const seedPhraseInput = prompt(
-      "Enter your 12-word Seed Phrase to decrypt this backup file:",
-    );
-    if (!seedPhraseInput) return;
-
-    try {
-      const words = seedPhraseInput.trim().split(/\s+/);
-      if (words.length !== 12) {
-        return alert("Invalid! Seed Phrase must be exactly 12 words.");
-      }
-
-      try {
-        const validationWallet = Wallet.fromPhrase(seedPhraseInput);
-        if (validationWallet.address.toLowerCase() !== address?.toLowerCase()) {
-          return alert(
-            "Security Alert: This Seed Phrase does not belong to your currently active account!",
-          );
-        }
-      } catch {
-        return alert("Invalid Seed Phrase format or misspelled words!");
-      }
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const encryptedText = event.target?.result as string;
-
-          const decryptedBytes = CryptoJS.AES.decrypt(
-            encryptedText,
-            seedPhraseInput,
-          );
-          const decryptedString = decryptedBytes.toString(CryptoJS.enc.Utf8);
-
-          if (!decryptedString) {
-            throw new Error("Decryption resulted in empty string");
-          }
-
-          const parsedMessages = JSON.parse(decryptedString);
-
-          if (!Array.isArray(parsedMessages)) {
-            throw new Error("Invalid backup format");
-          }
-
-          await db.messages.clear();
-          await db.messages.bulkAdd(parsedMessages);
-
-          alert("Success! Chat history imported securely.");
-        } catch {
-          alert(
-            "Import failed! Wrong Seed Phrase, corrupted file, or it does not belong to you.",
-          );
-        }
-      };
-
-      reader.readAsText(file);
-    } catch {
-      alert("An unexpected error occurred during import.");
+    if (file.size > 1024 * 500) {
+      return alert("File too large for direct P2P transfer (Max 500KB).");
     }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        const encryptedImage = encrypt(currentChat, base64);
+        sendDataViaWebRTC(encryptedImage);
+        await db.messages.add({
+          chatId: currentChat,
+          text: base64,
+          isMine: true,
+          timestamp: Date.now(),
+          isImage: true,
+        });
+      } catch {
+        alert("Image encryption failed.");
+      }
+    };
+    reader.readAsDataURL(file);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   /**
-   * 5. Copy local wallet address to clipboard
+   * 4. Prompt user for custom relay URL and save to local database.
+   * @returns {void}
+   */
+  const handleAddNode = () => {
+    const url = prompt(
+      "Enter Custom Relay URL (e.g., http://192.168.1.10:3003):",
+    );
+    if (url) addCustomRelay(url);
+  };
+
+  /**
+   * 5. Copy local wallet address to system clipboard.
+   * @returns {void}
    */
   const handleCopyAddress = () => {
     if (!address) return;
@@ -252,7 +186,6 @@ export default function ChatDashboard() {
 
   return (
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30">
-      {/* SIDEBAR LELFT */}
       <div className="w-80 bg-zinc-950/80 flex flex-col border-r border-zinc-800">
         <div className="p-6">
           <h2 className="text-xl font-bold text-zinc-100 tracking-tight">
@@ -274,7 +207,7 @@ export default function ChatDashboard() {
               </button>
             </div>
             <p className="font-mono text-[11px] text-emerald-400">
-              {shortenAddress(address)}
+              {shortenAddress(address || "")}
             </p>
 
             <div className="flex items-center mt-4 pt-3 border-t border-zinc-800 gap-2 text-xs">
@@ -288,231 +221,165 @@ export default function ChatDashboard() {
 
             <div className="mt-4">
               <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
-                Active Node Server
+                Network Node
               </label>
-              <select
-                value={activeRelay}
-                onChange={(e) => changeRelay(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1.5 outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-              >
-                {defaultRelays.map((url) => (
-                  <option key={url} value={url}>
-                    {url.replace("http://", "")}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={activeRelay}
+                  onChange={(e) => changeRelay(e.target.value)}
+                  className="flex-1 bg-zinc-950 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1.5 outline-none cursor-pointer"
+                >
+                  {defaultRelays.map((url) => (
+                    <option key={url} value={url}>
+                      {url.replace("http://", "")}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddNode}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-1.5 rounded transition-colors border border-zinc-700"
+                  title="Add Custom Node"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="p-6 pt-0 flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-6 pt-0 flex-1 overflow-y-auto">
+          {/* Peer Connection Section ... */}
           <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">
             Start New Session
           </label>
-          <div className="flex bg-zinc-900 rounded-lg border border-zinc-800 focus-within:border-indigo-500 transition-colors mb-4">
+          <div className="flex bg-zinc-900 rounded-lg border border-zinc-800 focus-within:border-indigo-500 mb-4">
             <input
               type="text"
               placeholder="Target username..."
               value={targetUsername}
               onChange={(e) => setTargetUsername(e.target.value)}
-              className="w-full bg-transparent text-zinc-100 px-3 py-2.5 text-sm outline-none placeholder-zinc-600"
+              className="w-full bg-transparent text-zinc-100 px-3 py-2.5 text-sm outline-none"
             />
           </div>
           <button
             onClick={handleConnectPeer}
             disabled={!targetUsername || isSearching}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10 flex justify-center items-center"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 rounded-lg disabled:opacity-50"
           >
             {isSearching ? "Searching..." : "Connect & Handshake"}
           </button>
 
+          {/* Pending Requests ... */}
           {pendingRequests.length > 0 && (
             <div className="mt-8 border-t border-zinc-800 pt-6">
-              <p className="text-xs font-semibold text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                </span>
+              <p className="text-xs font-semibold text-amber-500 uppercase tracking-widest mb-4">
                 Incoming Requests ({pendingRequests.length})
               </p>
-              <div className="space-y-3">
-                {pendingRequests.map((req, index) => (
-                  <div
-                    key={index}
-                    className="bg-zinc-900 p-3.5 rounded-xl border border-amber-500/20 shadow-sm"
-                  >
-                    <p className="font-semibold text-sm text-zinc-100 capitalize truncate">
-                      {req.username}
-                    </p>
-                    <p className="font-mono text-[10px] text-zinc-500 mb-3 truncate">
-                      {shortenAddress(req.from)}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAcceptRequest(req)}
-                        className="flex-1 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 text-xs font-medium py-1.5 rounded-lg transition-colors border border-emerald-500/20"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(req.from)}
-                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-medium py-1.5 rounded-lg transition-colors"
-                      >
-                        Ignore
-                      </button>
-                    </div>
+              {pendingRequests.map((req, index) => (
+                <div
+                  key={index}
+                  className="bg-zinc-900 p-3.5 rounded-xl border border-amber-500/20 mb-3"
+                >
+                  <p className="font-semibold text-sm text-zinc-100 capitalize truncate">
+                    {req.username}
+                  </p>
+                  <p className="font-mono text-[10px] text-zinc-500 mb-3">
+                    {shortenAddress(req.from)}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAcceptRequest(req)}
+                      className="flex-1 bg-emerald-600/10 text-emerald-500 text-xs py-1.5 rounded-lg border border-emerald-500/20"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req.from)}
+                      className="flex-1 bg-zinc-800 text-zinc-400 text-xs py-1.5 rounded-lg"
+                    >
+                      Ignore
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
 
           {activeChat && (
             <div className="mt-8 p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/20">
-              <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest mb-1">
+              <p className="text-[10px] font-semibold text-indigo-400 uppercase mb-1">
                 Active Session
               </p>
               <p className="font-semibold text-sm text-zinc-100 capitalize">
                 {activeUsername || "Unknown"}
               </p>
               <p className="font-mono text-[11px] text-zinc-500 mt-0.5">
-                {shortenAddress(activeChat)}
+                {shortenAddress(activeChat || "")}
               </p>
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] font-medium">
-                {hasSecret(activeChat) ? (
-                  <>
-                    <svg
-                      className="w-3.5 h-3.5 text-emerald-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                    <span className="text-emerald-500">AES-256 Secured</span>
-                  </>
+              <div className="mt-3 flex items-center gap-1.5 text-[11px]">
+                {hasSecret(activeChat || "") ? (
+                  <span className="text-emerald-500 font-bold">
+                    AES-256 Secured
+                  </span>
                 ) : (
-                  <>
-                    <svg
-                      className="w-3.5 h-3.5 text-amber-500 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    <span className="text-amber-500">Negotiating Keys...</span>
-                  </>
+                  <span className="text-amber-500 animate-pulse font-bold">
+                    Negotiating Keys...
+                  </span>
                 )}
               </div>
             </div>
           )}
         </div>
 
-        {/* SIDEBAR FOOTER (IMPORT/EXPORT/LOGOUT) */}
         <div className="p-5 border-t border-zinc-800 flex flex-col gap-2.5">
           <input
             type="file"
             accept=".securep2p"
             ref={fileInputRef}
-            onChange={handleImportChat}
             className="hidden"
           />
-
           <div className="flex gap-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-indigo-400 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-zinc-800/80"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
+            <button className="flex-1 text-xs font-medium bg-zinc-900 text-indigo-400 py-2.5 rounded-lg border border-zinc-800/80">
               Import
             </button>
-
-            <button
-              onClick={handleExportChat}
-              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-zinc-800/80"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
+            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-300 py-2.5 rounded-lg border border-zinc-800/80">
               Export
             </button>
           </div>
-
           <button
             onClick={() => {
               logout();
               navigate("/login");
             }}
-            className="w-full text-xs font-medium text-red-400 hover:text-red-300 hover:bg-zinc-900 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors"
+            className="w-full text-xs font-medium text-red-400 hover:bg-zinc-900 py-2.5 rounded-lg transition-colors"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
             Sign Out
           </button>
         </div>
       </div>
 
-      {/* CHAT AREA RIGHT */}
       <div className="flex-1 flex flex-col bg-zinc-950 relative">
         <div className="h-16 border-b border-zinc-800 flex items-center px-8 bg-zinc-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
           {activeChat ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-linear-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-inner">
-                {activeUsername ? activeUsername.charAt(0).toUpperCase() : "?"}
+              <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
+                {activeUsername?.charAt(0).toUpperCase()}
               </div>
               <div>
                 <h3 className="font-semibold text-zinc-100 capitalize">
-                  {activeUsername || "Unknown User"}
+                  {activeUsername}
                 </h3>
                 <p className="text-[11px] text-zinc-500 font-mono">
                   {activeChat}
@@ -526,24 +393,9 @@ export default function ChatDashboard() {
           )}
         </div>
 
-        <div className="flex-1 p-8 pt-24 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-8 pt-24 pb-32 overflow-y-auto custom-scrollbar">
           {!activeChat ? (
             <div className="h-full flex items-center justify-center flex-col text-zinc-600">
-              <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                <svg
-                  className="w-8 h-8 text-zinc-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
-              </div>
               <p className="font-medium text-lg text-zinc-300 mb-1">
                 SecureP2P Area
               </p>
@@ -559,15 +411,19 @@ export default function ChatDashboard() {
                   className={`flex ${msg.isMine ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[65%] px-5 py-3 shadow-sm ${
-                      msg.isMine
-                        ? "bg-indigo-600 text-zinc-50 rounded-2xl rounded-tr-sm"
-                        : "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-2xl rounded-tl-sm"
-                    }`}
+                    className={`max-w-[65%] px-5 py-3 shadow-sm ${msg.isMine ? "bg-indigo-600 text-zinc-50 rounded-2xl rounded-tr-sm" : "bg-zinc-900 text-zinc-200 rounded-2xl rounded-tl-sm"}`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap warp-break-words">
-                      {msg.text}
-                    </p>
+                    {msg.isImage ? (
+                      <img
+                        src={msg.text}
+                        alt="p2p-attachment"
+                        className="rounded-lg max-w-full h-auto mb-2 border border-white/10"
+                      />
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {msg.text}
+                      </p>
+                    )}
                     <p
                       className={`text-[10px] mt-2 font-medium ${msg.isMine ? "text-indigo-200 text-right" : "text-zinc-600"}`}
                     >
@@ -582,27 +438,54 @@ export default function ChatDashboard() {
         </div>
 
         {activeChat && (
-          <div className="p-6 bg-zinc-950/80 backdrop-blur-md border-t border-zinc-800 absolute bottom-0 w-full">
+          <div className="p-6 bg-zinc-950/80 backdrop-blur-md border-t border-zinc-800 absolute bottom-0 w-full z-20">
             <form
               onSubmit={handleSendMessage}
-              className="flex gap-3 max-w-5xl mx-auto"
+              className="flex gap-3 max-w-5xl mx-auto items-center"
             >
+              <input
+                type="file"
+                accept="image/*"
+                ref={imageInputRef}
+                onChange={handleSendImage}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={!isWebRTCConnected}
+                className="p-3 text-zinc-400 hover:text-indigo-400 bg-zinc-900 rounded-xl border border-zinc-800 transition-colors disabled:opacity-50"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
               <input
                 type="text"
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
-                disabled={!hasSecret(activeChat)}
+                disabled={!isWebRTCConnected}
                 placeholder={
-                  hasSecret(activeChat)
+                  isWebRTCConnected
                     ? "Type an encrypted message..."
-                    : "Waiting for secure connection..."
+                    : "Establishing P2P Tunnel..."
                 }
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-3.5 text-sm text-zinc-100 outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 transition-all placeholder:text-zinc-600"
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-3.5 text-sm text-zinc-100 outline-none focus:border-indigo-500 disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={!messageInput.trim() || !hasSecret(activeChat)}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
+                disabled={!messageInput.trim() || !isWebRTCConnected}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3.5 text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
               >
                 Send
               </button>

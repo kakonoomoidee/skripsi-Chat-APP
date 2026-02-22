@@ -1,12 +1,16 @@
-import { useState, FormEvent } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
-import { useRelay } from "@/hooks/useRelay"; // FIX: Import Hook
+import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 
+/**
+ * Component for recovering identity via seed phrase with custom relay support
+ * @returns {JSX.Element}
+ */
 export default function ImportIdentityClient() {
   const navigate = useNavigate();
   const {
@@ -16,9 +20,8 @@ export default function ImportIdentityClient() {
     loading: walletLoading,
   } = useWallet();
   const { login, loading: authLoading } = useAuth();
-
-  // FIX: Tarik data Relay
-  const { activeRelay, changeRelay, defaultRelays } = useRelay();
+  const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
+    useRelay();
 
   const [seedPhrase, setSeedPhrase] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -26,7 +29,12 @@ export default function ImportIdentityClient() {
 
   const isLoading = walletLoading || authLoading;
 
-  const handleImport = async (e: FormEvent<HTMLFormElement>) => {
+  /**
+   * Handle the recovery and initial login process
+   * @param {React.FormEvent<HTMLFormElement>} e - Form submission event
+   * @returns {Promise<void>}
+   */
+  const handleImport = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
 
@@ -51,17 +59,12 @@ export default function ImportIdentityClient() {
         password,
       );
       const walletInstance = recoveredWallet as unknown as ethers.Wallet;
-
-      // FIX: Inject activeRelay ke fungsi login
       await login(walletInstance, activeRelay);
-
       navigate("/chat");
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setLocalError(err.message || "Failed to import identity.");
-      } else {
-        setLocalError("An unknown error occurred.");
-      }
+      setLocalError(
+        err instanceof Error ? err.message : "Failed to import identity.",
+      );
     }
   };
 
@@ -106,23 +109,37 @@ export default function ImportIdentityClient() {
           />
         </div>
 
-        {/* FIX: Tambahin Dropdown Relay */}
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-1">
             Select Network Node
           </label>
-          <select
-            value={activeRelay}
-            onChange={(e) => changeRelay(e.target.value)}
-            disabled={isLoading}
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
-          >
-            {defaultRelays.map((url) => (
-              <option key={url} value={url}>
-                {url}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={activeRelay}
+              onChange={(e) => changeRelay(e.target.value)}
+              disabled={isLoading}
+              className="flex-1 w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
+            >
+              {defaultRelays.map((url: string) => (
+                <option key={url} value={url}>
+                  {url}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                const u = prompt(
+                  "Enter Custom Relay URL (e.g., http://192.168.1.10:3003):",
+                );
+                if (u) addCustomRelay(u);
+              }}
+              className="px-4 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 rounded-lg transition-colors disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <button

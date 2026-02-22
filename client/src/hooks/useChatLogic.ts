@@ -2,33 +2,38 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
-import { db } from "@/utils/db";
 
 /**
- * Interface for the properties required by useChatLogic hook
+ * Interface representing the properties required by the useChatLogic hook
  */
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
   ephemeralPublicKey: string | null;
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
-  decrypt: (peerAddress: string, encryptedMessage: string) => string;
   hasSecret: (peerAddress: string) => boolean;
-  relayUrl: string; // TANGKAP URL DISINI
+  relayUrl: string;
 }
 
+/**
+ * Interface representing an incoming WebRTC handshake request
+ */
 export interface HandshakeRequest {
   from: string;
   ephemeralPublicKey: string;
   username?: string;
 }
 
+/**
+ * 1. Manage peer-to-peer connection states, handshakes, and active chat sessions
+ * @param {UseChatLogicProps} props - Dependencies including socket instance and cryptographic handlers
+ * @returns {object} { targetUsername, setTargetUsername, activeChat, activeUsername, myUsername, pendingRequests, isSearching, handleConnectPeer, handleAcceptRequest, handleRejectRequest, isInitiator }
+ */
 export const useChatLogic = ({
   address,
   socket,
   ephemeralPublicKey,
   computeSecret,
-  decrypt,
   hasSecret,
   relayUrl,
 }: UseChatLogicProps) => {
@@ -40,6 +45,7 @@ export const useChatLogic = ({
     [],
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isInitiator, setIsInitiator] = useState<boolean>(false);
 
   useEffect(() => {
     if (address && relayUrl) {
@@ -61,10 +67,8 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          console.error("Failed to fetch peer username:", err.message);
-        }
+      } catch (err) {
+        console.error("Failed to fetch peer username");
       }
 
       setPendingRequests((prev) => {
@@ -80,31 +84,19 @@ export const useChatLogic = ({
       computeSecret(data.from, data.ephemeralPublicKey);
     };
 
-    const onReceiveMessage = async (data: {
-      from: string;
-      message: string;
-      timestamp: number;
-    }) => {
-      const decryptedText = decrypt(data.from, data.message);
-      await db.messages.add({
-        chatId: data.from,
-        text: decryptedText,
-        isMine: false,
-        timestamp: data.timestamp,
-      });
-    };
-
     socket.on("handshake_offer", onHandshakeOffer);
     socket.on("handshake_answer", onHandshakeAnswer);
-    socket.on("receive_message", onReceiveMessage);
 
     return () => {
       socket.off("handshake_offer", onHandshakeOffer);
       socket.off("handshake_answer", onHandshakeAnswer);
-      socket.off("receive_message", onReceiveMessage);
     };
-  }, [socket, computeSecret, decrypt, relayUrl]);
+  }, [socket, computeSecret, relayUrl]);
 
+  /**
+   * 2. Initiate connection to a peer by username via WebSocket signaling
+   * @returns {Promise<void>}
+   */
   const handleConnectPeer = async () => {
     if (!targetUsername.trim()) return;
     setIsSearching(true);
@@ -122,6 +114,7 @@ export const useChatLogic = ({
 
       setActiveChat(peerAddress);
       setActiveUsername(targetUsername.trim());
+      setIsInitiator(true);
 
       if (!hasSecret(peerAddress) && socket) {
         socket.emit("handshake_init", {
@@ -131,26 +124,28 @@ export const useChatLogic = ({
       }
       setTargetUsername("");
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        alert(
-          err.response?.data?.error || "Username not found on the network!",
-        );
-      } else {
-        alert("An unknown error occurred.");
-      }
+      alert("Username not found on the network!");
     } finally {
       setIsSearching(false);
     }
   };
 
+  /**
+   * 3. Accept incoming handshake request and establish shared secret
+   * @param {HandshakeRequest} request - The incoming request payload
+   * @returns {Promise<void>}
+   */
   const handleAcceptRequest = async (request: HandshakeRequest) => {
     computeSecret(request.from, request.ephemeralPublicKey);
+    setIsInitiator(false);
+
     if (socket) {
       socket.emit("handshake_response", {
         to: request.from,
         ephemeralPublicKey: ephemeralPublicKey,
       });
     }
+
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== request.from),
     );
@@ -163,15 +158,17 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${request.from}`);
         setActiveUsername(res.data.username);
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          console.warn("User info fetch failed:", err.message);
-        }
+      } catch (err) {
         setActiveUsername("Unknown User");
       }
     }
   };
 
+  /**
+   * 4. Reject incoming handshake request
+   * @param {string} requestAddress - The wallet address of the peer to reject
+   * @returns {void}
+   */
   const handleRejectRequest = (requestAddress: string) => {
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),
@@ -189,5 +186,6 @@ export const useChatLogic = ({
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    isInitiator,
   };
 };

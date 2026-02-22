@@ -120,7 +120,7 @@ io.on("connection", (socket) => {
     const { ephemeralPublicKey } = data;
     console.log(`Handshake Init: ${user} -> ${to}`);
 
-    io.to(to).emit("handshake_offer", {
+    io.in(to).emit("handshake_offer", {
       from: user,
       ephemeralPublicKey: ephemeralPublicKey,
     });
@@ -132,9 +132,21 @@ io.on("connection", (socket) => {
     const { ephemeralPublicKey } = data;
     console.log(`Handshake Response: ${user} -> ${to}`);
 
-    io.to(to).emit("handshake_answer", {
+    io.in(to).emit("handshake_answer", {
       from: user,
       ephemeralPublicKey: ephemeralPublicKey,
+    });
+  });
+
+  // ======================================================
+  // WEBRTC SIGNALING (For P2P Data Channel)
+  // ======================================================
+  socket.on("webrtc_signal", (data) => {
+    const to = data.to.toLowerCase();
+
+    io.in(to).emit("webrtc_signal", {
+      from: user,
+      signal: data.signal,
     });
   });
 

@@ -10,22 +10,34 @@ export interface Message {
   text: string;
   isMine: boolean;
   timestamp: number;
+  isImage?: boolean;
+}
+
+/**
+ * Represents a custom relay server node.
+ * @interface RelayNode
+ */
+export interface RelayNode {
+  id?: number;
+  url: string;
+  name: string;
 }
 
 /**
  * Database class for SecureP2P Chat leveraging Dexie.js.
- * Manages local storage for end-to-end encrypted messages.
  * @class SecureP2PDatabase
  * @extends {Dexie}
  */
 export class SecureP2PDatabase extends Dexie {
   messages!: Table<Message, number>;
+  relays!: Table<RelayNode, number>;
 
   constructor() {
     super("SecureP2PChatDB");
 
     this.version(1).stores({
-      messages: "++id, chatId, text, isMine, timestamp",
+      messages: "++id, chatId, timestamp",
+      relays: "++id, &url",
     });
   }
 }

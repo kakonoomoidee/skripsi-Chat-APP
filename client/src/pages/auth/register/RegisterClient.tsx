@@ -1,12 +1,16 @@
-import { useState, useEffect, FormEvent } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
-import { useRelay } from "@/hooks/useRelay"; // FIX: Import Hook
+import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 
+/**
+ * Component for creating a new decentralized identity with node selection
+ * @returns {JSX.Element}
+ */
 export default function RegisterPage() {
   const navigate = useNavigate();
   const {
@@ -16,9 +20,8 @@ export default function RegisterPage() {
     loading: walletLoading,
   } = useWallet();
   const { register, login, loading: authLoading, isAuthenticated } = useAuth();
-
-  // FIX: Tarik data Relay
-  const { activeRelay, changeRelay, defaultRelays } = useRelay();
+  const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
+    useRelay();
 
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -31,7 +34,12 @@ export default function RegisterPage() {
     if (isAuthenticated && !seedPhrase) navigate("/chat");
   }, [isAuthenticated, navigate, seedPhrase]);
 
-  const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
+  /**
+   * Create wallet, register on blockchain via selected node, and login
+   * @param {React.FormEvent<HTMLFormElement>} e - Form submission event
+   * @returns {Promise<void>}
+   */
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
 
@@ -50,17 +58,14 @@ export default function RegisterPage() {
         await createAndEncryptWallet(password);
       const walletInstance = newWallet as unknown as ethers.Wallet;
 
-      // FIX: Inject activeRelay ke fungsi register dan login
       await register(walletInstance, username, activeRelay);
       await login(walletInstance, activeRelay);
 
       setSeedPhrase(generatedSeed);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setLocalError(err.message || "Registration failed.");
-      } else {
-        setLocalError("An unknown error occurred.");
-      }
+      setLocalError(
+        err instanceof Error ? err.message : "Registration failed.",
+      );
     }
   };
 
@@ -147,23 +152,37 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* FIX: Tambahin Dropdown Relay */}
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-1">
             Select Network Node
           </label>
-          <select
-            value={activeRelay}
-            onChange={(e) => changeRelay(e.target.value)}
-            disabled={isLoading}
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
-          >
-            {defaultRelays.map((url) => (
-              <option key={url} value={url}>
-                {url}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={activeRelay}
+              onChange={(e) => changeRelay(e.target.value)}
+              disabled={isLoading}
+              className="flex-1 w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
+            >
+              {defaultRelays.map((url: string) => (
+                <option key={url} value={url}>
+                  {url}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                const u = prompt(
+                  "Enter Custom Relay URL (e.g., http://192.168.1.10:3003):",
+                );
+                if (u) addCustomRelay(u);
+              }}
+              className="px-4 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 rounded-lg transition-colors disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <button

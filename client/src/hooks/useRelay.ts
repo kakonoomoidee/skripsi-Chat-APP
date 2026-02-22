@@ -1,32 +1,35 @@
-import { useState, useCallback } from "react";
-
-const RELAY_STORAGE_KEY = "securep2p_active_relay";
-
-// 2 default relay for users to choose from
-export const DEFAULT_RELAYS = [
-  "http://localhost:3001",
-  "http://localhost:3002",
-];
+import { useState } from "react";
+import { db } from "@/utils/db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 /**
- * 1. Manage active relay server connection
- * @returns {object} { activeRelay, changeRelay, defaultRelays }
+ * Manage relay server selection and persistence.
+ * @returns {object} { activeRelay, changeRelay, defaultRelays, addCustomRelay }
  */
 export const useRelay = () => {
-  const [activeRelay, setActiveRelay] = useState<string>(() => {
-    // Cek local storage dulu, kalo kosong pake server pertama
-    const stored = localStorage.getItem(RELAY_STORAGE_KEY);
-    return stored || DEFAULT_RELAYS[0];
-  });
+  const baseUrls = ["http://localhost:3001", "http://localhost:3002"];
+  const [activeRelay, setActiveRelay] = useState<string>(
+    localStorage.getItem("active_relay") || baseUrls[0],
+  );
 
-  /**
-   * 2. Switch to a new relay server
-   * @param {string} url - The new relay server URL
-   */
-  const changeRelay = useCallback((url: string) => {
+  const customRelays = useLiveQuery(() => db.relays.toArray()) || [];
+
+  const defaultRelays = [...baseUrls, ...customRelays.map((r) => r.url)];
+
+  const changeRelay = (url: string) => {
     setActiveRelay(url);
-    localStorage.setItem(RELAY_STORAGE_KEY, url);
-  }, []);
+    localStorage.setItem("active_relay", url);
+  };
 
-  return { activeRelay, changeRelay, defaultRelays: DEFAULT_RELAYS };
+  const addCustomRelay = async (url: string) => {
+    const formattedUrl = url.trim().replace(/\/$/, "");
+    if (!formattedUrl.startsWith("http")) return alert("Invalid URL!");
+    try {
+      await db.relays.add({ url: formattedUrl, name: "Custom Node" });
+    } catch {
+      alert("Relay already exists!");
+    }
+  };
+
+  return { activeRelay, changeRelay, defaultRelays, addCustomRelay };
 };
