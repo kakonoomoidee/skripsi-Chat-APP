@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import CryptoJS from "crypto-js";
 
 /**
- * 1. Generate Pasangan Kunci Sementara (Ephemeral Key)
+ * 1. Generate pair Ephemeral Keys
  * @returns {object} { privateKey, publicKey, signingKey }
  */
 export const generateEphemeralKeys = () => {
@@ -15,46 +15,52 @@ export const generateEphemeralKeys = () => {
 };
 
 /**
- * 2. Hitung Shared Secret (ECDH)
- * Menggabungkan Private Key Kita + Public Key Lawan = Rahasia Bersama
+ * 2. Count Shared Secret (ECDH)
+ * compute between my private key with peer's public key, then hash the result to get a fixed-length AES key
  */
-export const deriveSharedSecret = (mySigningKey, peerPublicKey) => {
+export const deriveSharedSecret = (
+  mySigningKey: ethers.SigningKey,
+  peerPublicKey: string,
+): string | null => {
   try {
-    // ECDH Magic terjadi di sini
     const rawSecret = mySigningKey.computeSharedSecret(peerPublicKey);
 
-    // Hash hasilnya biar jadi format Key AES 256-bit yang valid (32 bytes)
     const aesKey = ethers.sha256(rawSecret);
     return aesKey;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("ECDH Calculation Failed:", error);
     return null;
   }
 };
 
 /**
- * 3. Enkripsi Pesan (AES)
+ * 3. encrypt message with AES using the derived secret key
  */
-export const encryptMessage = (plainText, secretKey) => {
+export const encryptMessage = (
+  plainText: string,
+  secretKey: string,
+): string | null => {
   if (!plainText || !secretKey) return null;
   const encrypted = CryptoJS.AES.encrypt(plainText, secretKey).toString();
   return encrypted;
 };
 
 /**
- * 4. Dekripsi Pesan (AES)
+ * 4. decrypt message with AES using the derived secret key
  */
-export const decryptMessage = (cipherText, secretKey) => {
-  if (!cipherText || !secretKey) return null;
+export const decryptMessage = (
+  cipherText: string,
+  secretKey: string,
+): string => {
+  if (!cipherText || !secretKey) return "[ERROR]";
   try {
     const bytes = CryptoJS.AES.decrypt(cipherText, secretKey);
     const originalText = bytes.toString(CryptoJS.enc.Utf8);
 
-    // Validasi kalau hasil decrypt kosong (berarti key salah/corrupt)
     if (!originalText) return "[DECRYPTION FAILED]";
 
     return originalText;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Decryption Failed:", error);
     return "[ERROR]";
   }

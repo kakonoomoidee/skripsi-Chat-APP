@@ -6,6 +6,10 @@ import {
   decryptMessage as decryptAES,
 } from "../utils/crypto";
 
+/**
+ * Custom hook for handling cryptographic operations including ephemeral keys, shared secrets, and AES encryption.
+ * @returns {object} { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret }
+ */
 export const useCrypto = () => {
   const [ephemeralKeyPair] = useState(() => {
     const keys = generateEphemeralKeys();
@@ -13,11 +17,18 @@ export const useCrypto = () => {
     return keys;
   });
 
-  const [sharedSecrets, setSharedSecrets] = useState({});
+  const [sharedSecrets, setSharedSecrets] = useState<Record<string, string>>(
+    {},
+  );
 
-  // 1. Compute Secret
+  /**
+   * Computes and stores a shared secret using ECDH.
+   * @param {string} peerAddress - The wallet address of the peer
+   * @param {string} peerPublicKey - The public key of the peer
+   * @returns {void}
+   */
   const computeSecret = useCallback(
-    (peerAddress, peerPublicKey) => {
+    (peerAddress: string, peerPublicKey: string) => {
       if (!ephemeralKeyPair) return;
 
       const secret = deriveSharedSecret(
@@ -36,9 +47,14 @@ export const useCrypto = () => {
     [ephemeralKeyPair],
   );
 
-  // 2. Encrypt
+  /**
+   * Encrypts a plaintext message using the stored shared secret.
+   * @param {string} peerAddress - The wallet address of the peer
+   * @param {string} plainText - The message to encrypt
+   * @returns {string | null} The encrypted cipher text
+   */
   const encrypt = useCallback(
-    (peerAddress, plainText) => {
+    (peerAddress: string, plainText: string) => {
       const secret = sharedSecrets[peerAddress];
       if (!secret) throw new Error("Handshake required!");
 
@@ -47,9 +63,14 @@ export const useCrypto = () => {
     [sharedSecrets],
   );
 
-  // 3. Decrypt
+  /**
+   * Decrypts a cipher text message using the stored shared secret.
+   * @param {string} peerAddress - The wallet address of the peer
+   * @param {string} cipherText - The message to decrypt
+   * @returns {string} The decrypted plain text or fallback string
+   */
   const decrypt = useCallback(
-    (peerAddress, cipherText) => {
+    (peerAddress: string, cipherText: string) => {
       const secret = sharedSecrets[peerAddress];
       if (!secret) return "Encrypted (Waiting Handshake...)";
 
@@ -63,6 +84,6 @@ export const useCrypto = () => {
     computeSecret,
     encrypt,
     decrypt,
-    hasSecret: (addr) => !!sharedSecrets[addr],
+    hasSecret: (addr: string) => !!sharedSecrets[addr],
   };
 };

@@ -1,12 +1,18 @@
+/// <reference types="vite/client" />
 import { useState, useEffect, useMemo } from "react";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL;
 
-export const useSocket = (token) => {
-  const [isConnected, setIsConnected] = useState(false);
+/**
+ * 1. Initialize and manage Socket.io connection
+ * @param {string | null} token - The JWT authentication token
+ * @returns {object} { socket, isConnected }
+ */
+export const useSocket = (token: string | null) => {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
 
-  const socket = useMemo(() => {
+  const socket = useMemo<Socket | null>(() => {
     if (!token) return null;
 
     return io(SOCKET_URL, {
@@ -30,7 +36,7 @@ export const useSocket = (token) => {
       setIsConnected(false);
     };
 
-    const onError = (err) => {
+    const onError = (err: Error) => {
       console.error("Socket Connection Error:", err.message);
       setIsConnected(false);
     };
