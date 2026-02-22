@@ -6,6 +6,7 @@ import Dexie, { Table } from "dexie";
  */
 export interface Message {
   id?: number;
+  ownerAddress: string;
   chatId: string;
   text: string;
   isMine: boolean;
@@ -35,8 +36,8 @@ export class SecureP2PDatabase extends Dexie {
   constructor() {
     super("SecureP2PChatDB");
 
-    this.version(1).stores({
-      messages: "++id, chatId, timestamp",
+    this.version(2).stores({
+      messages: "++id, [ownerAddress+chatId], timestamp",
       relays: "++id, &url",
     });
   }

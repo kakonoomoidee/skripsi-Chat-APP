@@ -1,11 +1,7 @@
-/// <reference types="vite/client" />
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
-/**
- * Interface representing the properties required by the useChatLogic hook
- */
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
@@ -15,19 +11,21 @@ interface UseChatLogicProps {
   relayUrl: string;
 }
 
-/**
- * Interface representing an incoming WebRTC handshake request
- */
 export interface HandshakeRequest {
   from: string;
   ephemeralPublicKey: string;
   username?: string;
 }
 
+export interface ActiveSession {
+  address: string;
+  username: string;
+}
+
 /**
- * 1. Manage peer-to-peer connection states, handshakes, and active chat sessions
- * @param {UseChatLogicProps} props - Dependencies including socket instance and cryptographic handlers
- * @returns {object} { targetUsername, setTargetUsername, activeChat, activeUsername, myUsername, pendingRequests, isSearching, handleConnectPeer, handleAcceptRequest, handleRejectRequest, isInitiator }
+ * 1. Manage peer-to-peer connection states, handshakes, and multiple active chat sessions
+ * @param {UseChatLogicProps} props - Dependencies including socket instance, crypto functions, and relay URL
+ * @returns {object} Chat state variables and interactive handler functions
  */
 export const useChatLogic = ({
   address,
@@ -44,8 +42,11 @@ export const useChatLogic = ({
   const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>(
     [],
   );
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [isInitiator, setIsInitiator] = useState<boolean>(false);
+
+  // FIX: State untuk nginget siapa yang Initiator di tiap sesi
+  const [initiators, setInitiators] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (address && relayUrl) {
@@ -93,10 +94,6 @@ export const useChatLogic = ({
     };
   }, [socket, computeSecret, relayUrl]);
 
-  /**
-   * 2. Initiate connection to a peer by username via WebSocket signaling
-   * @returns {Promise<void>}
-   */
   const handleConnectPeer = async () => {
     if (!targetUsername.trim()) return;
     setIsSearching(true);
@@ -112,9 +109,19 @@ export const useChatLogic = ({
         return;
       }
 
+      setActiveSessions((prev) => {
+        if (prev.find((s) => s.address === peerAddress)) return prev;
+        return [
+          ...prev,
+          { address: peerAddress, username: targetUsername.trim() },
+        ];
+      });
+
       setActiveChat(peerAddress);
       setActiveUsername(targetUsername.trim());
-      setIsInitiator(true);
+
+      // FIX: Tandai diri sendiri sebagai Initiator untuk user ini
+      setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {
         socket.emit("handshake_init", {
@@ -130,14 +137,12 @@ export const useChatLogic = ({
     }
   };
 
-  /**
-   * 3. Accept incoming handshake request and establish shared secret
-   * @param {HandshakeRequest} request - The incoming request payload
-   * @returns {Promise<void>}
-   */
   const handleAcceptRequest = async (request: HandshakeRequest) => {
     computeSecret(request.from, request.ephemeralPublicKey);
-    setIsInitiator(false);
+    const peerAddress = request.from.toLowerCase();
+
+    // FIX: Tandai diri sendiri sebagai Receiver (Bukan Initiator)
+    setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
       socket.emit("handshake_response", {
@@ -150,29 +155,29 @@ export const useChatLogic = ({
       prev.filter((req) => req.from !== request.from),
     );
 
-    setActiveChat(request.from);
+    const finalUsername =
+      request.username && request.username !== "Unknown"
+        ? request.username
+        : "Unknown User";
 
-    if (request.username && request.username !== "Unknown") {
-      setActiveUsername(request.username);
-    } else {
-      try {
-        const res = await axios.get(`${relayUrl}/auth/user/${request.from}`);
-        setActiveUsername(res.data.username);
-      } catch (err) {
-        setActiveUsername("Unknown User");
-      }
-    }
+    setActiveSessions((prev) => {
+      if (prev.find((s) => s.address === request.from)) return prev;
+      return [...prev, { address: request.from, username: finalUsername }];
+    });
+
+    setActiveChat(request.from);
+    setActiveUsername(finalUsername);
   };
 
-  /**
-   * 4. Reject incoming handshake request
-   * @param {string} requestAddress - The wallet address of the peer to reject
-   * @returns {void}
-   */
   const handleRejectRequest = (requestAddress: string) => {
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),
     );
+  };
+
+  const switchChat = (session: ActiveSession) => {
+    setActiveChat(session.address);
+    setActiveUsername(session.username);
   };
 
   return {
@@ -182,10 +187,12 @@ export const useChatLogic = ({
     activeUsername,
     myUsername,
     pendingRequests,
+    activeSessions,
+    switchChat,
     isSearching,
+    initiators, // FIX: Ekspor state initiator ke UI
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
-    isInitiator,
   };
 };

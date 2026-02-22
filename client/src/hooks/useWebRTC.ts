@@ -11,108 +11,130 @@ const ICE_SERVERS = {
 
 interface UseWebRTCParams {
   socket: Socket | null;
+  myAddress: string | null;
   activeChat: string | null;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
 }
 
 /**
- * 1. Manage WebRTC Peer-to-Peer connection for direct data sharing
- * @param {UseWebRTCParams} params - Socket instance, target peer address, and decrypt function
- * @returns {object} { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection }
+ * 1. Manage WebRTC Peer-to-Peer connections with ICE candidate queuing and multi-tenant DB support
+ * @param {UseWebRTCParams} params - Socket instance, my address, active chat, and decryption function
+ * @returns {object} { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection, connectedPeers }
  */
-export const useWebRTC = ({ socket, activeChat, decrypt }: UseWebRTCParams) => {
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const [isWebRTCConnected, setIsWebRTCConnected] = useState<boolean>(false);
+export const useWebRTC = ({
+  socket,
+  myAddress,
+  activeChat,
+  decrypt,
+}: UseWebRTCParams) => {
+  const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
+  const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
+  const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
+  const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
 
-  /**
-   * 2. Initialize WebRTC connection, setup Data Channel, and send Offer to peer
-   * @returns {Promise<void>}
-   */
-  const initiateWebRTCConnection = useCallback(async () => {
-    if (!socket || !activeChat) return;
+  const isWebRTCConnected = activeChat
+    ? connectedPeers.includes(activeChat.toLowerCase())
+    : false;
 
-    if (peerConnectionRef.current) peerConnectionRef.current.close();
+  const initiateWebRTCConnection = useCallback(
+    async (targetPeer: string) => {
+      if (!socket || !targetPeer || !myAddress) return;
+      const peerAddress = targetPeer.toLowerCase();
 
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-    peerConnectionRef.current = pc;
-
-    const dc = pc.createDataChannel("secure_p2p_channel", { ordered: true });
-    dataChannelRef.current = dc;
-
-    dc.onopen = () => {
-      console.log("WebRTC Data Channel is OPEN");
-      setIsWebRTCConnected(true);
-    };
-    dc.onclose = () => setIsWebRTCConnected(false);
-
-    dc.onmessage = async (msgEvent) => {
-      try {
-        const decryptedContent = decrypt(activeChat, msgEvent.data);
-
-        // FIX: Detect if the content is an image base64 string
-        const isReceivedImage = decryptedContent.startsWith("data:image");
-
-        await db.messages.add({
-          chatId: activeChat,
-          text: decryptedContent,
-          isMine: false,
-          timestamp: Date.now(),
-          isImage: isReceivedImage,
-        });
-      } catch (error) {
-        console.error("Failed to decrypt WebRTC message");
+      if (peerConnections.current[peerAddress]) {
+        peerConnections.current[peerAddress].close();
       }
-    };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("webrtc_signal", {
-          to: activeChat,
-          signal: { type: "ice-candidate", candidate: event.candidate },
-        });
-      }
-    };
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      peerConnections.current[peerAddress] = pc;
+      iceQueues.current[peerAddress] = [];
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+      const dc = pc.createDataChannel("secure_p2p_channel", { ordered: true });
+      dataChannels.current[peerAddress] = dc;
 
-    socket.emit("webrtc_signal", {
-      to: activeChat,
-      signal: { type: "offer", offer },
-    });
-  }, [socket, activeChat, decrypt]);
+      dc.onopen = () =>
+        setConnectedPeers((prev) => [...new Set([...prev, peerAddress])]);
+      dc.onclose = () =>
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
+
+      dc.onmessage = async (msgEvent) => {
+        try {
+          const decryptedContent = decrypt(peerAddress, msgEvent.data);
+          const isReceivedImage = decryptedContent.startsWith("data:image");
+
+          await db.messages.add({
+            ownerAddress: myAddress.toLowerCase(),
+            chatId: peerAddress,
+            text: decryptedContent,
+            isMine: false,
+            timestamp: Date.now(),
+            isImage: isReceivedImage,
+          });
+        } catch (error) {
+          console.error("Failed to decrypt WebRTC message");
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("webrtc_signal", {
+            to: peerAddress,
+            signal: { type: "ice-candidate", candidate: event.candidate },
+          });
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        if (
+          pc.iceConnectionState === "disconnected" ||
+          pc.iceConnectionState === "failed"
+        ) {
+          setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
+          pc.close();
+          delete peerConnections.current[peerAddress];
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      socket.emit("webrtc_signal", {
+        to: peerAddress,
+        signal: { type: "offer", offer },
+      });
+    },
+    [socket, decrypt, myAddress],
+  );
 
   useEffect(() => {
-    if (!socket || !activeChat) return;
+    if (!socket || !myAddress) return;
 
     const handleWebRTCSignal = async (data: { from: string; signal: any }) => {
-      if (data.from !== activeChat) return;
+      const peerAddress = data.from.toLowerCase();
       const { signal } = data;
 
-      if (!peerConnectionRef.current) {
+      if (!peerConnections.current[peerAddress]) {
         const pc = new RTCPeerConnection(ICE_SERVERS);
-        peerConnectionRef.current = pc;
+        peerConnections.current[peerAddress] = pc;
+        iceQueues.current[peerAddress] = [];
 
         pc.ondatachannel = (event) => {
           const dc = event.channel;
-          dataChannelRef.current = dc;
+          dataChannels.current[peerAddress] = dc;
 
-          dc.onopen = () => {
-            console.log("WebRTC Data Channel RECEIVED & OPEN");
-            setIsWebRTCConnected(true);
-          };
-          dc.onclose = () => setIsWebRTCConnected(false);
+          dc.onopen = () =>
+            setConnectedPeers((prev) => [...new Set([...prev, peerAddress])]);
+          dc.onclose = () =>
+            setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
 
           dc.onmessage = async (msgEvent) => {
             try {
-              const decryptedContent = decrypt(data.from, msgEvent.data);
-
-              // FIX: Detect image in receiver's logic as well
+              const decryptedContent = decrypt(peerAddress, msgEvent.data);
               const isReceivedImage = decryptedContent.startsWith("data:image");
 
               await db.messages.add({
-                chatId: data.from,
+                ownerAddress: myAddress.toLowerCase(),
+                chatId: peerAddress,
                 text: decryptedContent,
                 isMine: false,
                 timestamp: Date.now(),
@@ -127,24 +149,41 @@ export const useWebRTC = ({ socket, activeChat, decrypt }: UseWebRTCParams) => {
         pc.onicecandidate = (event) => {
           if (event.candidate) {
             socket.emit("webrtc_signal", {
-              to: data.from,
+              to: peerAddress,
               signal: { type: "ice-candidate", candidate: event.candidate },
             });
           }
         };
+
+        pc.oniceconnectionstatechange = () => {
+          if (
+            pc.iceConnectionState === "disconnected" ||
+            pc.iceConnectionState === "failed"
+          ) {
+            setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
+            pc.close();
+            delete peerConnections.current[peerAddress];
+          }
+        };
       }
 
-      const pc = peerConnectionRef.current;
+      const pc = peerConnections.current[peerAddress];
 
       try {
         if (signal.type === "offer") {
           await pc.setRemoteDescription(
             new RTCSessionDescription(signal.offer),
           );
+          if (iceQueues.current[peerAddress]) {
+            for (const cand of iceQueues.current[peerAddress]) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+            iceQueues.current[peerAddress] = [];
+          }
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit("webrtc_signal", {
-            to: data.from,
+            to: peerAddress,
             signal: { type: "answer", answer },
           });
         } else if (signal.type === "answer") {
@@ -152,9 +191,21 @@ export const useWebRTC = ({ socket, activeChat, decrypt }: UseWebRTCParams) => {
             await pc.setRemoteDescription(
               new RTCSessionDescription(signal.answer),
             );
+            if (iceQueues.current[peerAddress]) {
+              for (const cand of iceQueues.current[peerAddress]) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              }
+              iceQueues.current[peerAddress] = [];
+            }
           }
         } else if (signal.type === "ice-candidate" && signal.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } else {
+            if (!iceQueues.current[peerAddress])
+              iceQueues.current[peerAddress] = [];
+            iceQueues.current[peerAddress].push(signal.candidate);
+          }
         }
       } catch (err) {
         console.error("WebRTC Signaling Error:", err);
@@ -165,20 +216,23 @@ export const useWebRTC = ({ socket, activeChat, decrypt }: UseWebRTCParams) => {
     return () => {
       socket.off("webrtc_signal", handleWebRTCSignal);
     };
-  }, [socket, activeChat, decrypt]);
+  }, [socket, decrypt, myAddress]);
 
-  /**
-   * 3. Transmit encrypted data via established Data Channel
-   * @param {string} encryptedData - The AES-256 encrypted string
-   * @returns {void}
-   */
-  const sendDataViaWebRTC = (encryptedData: string) => {
-    if (dataChannelRef.current?.readyState === "open") {
-      dataChannelRef.current.send(encryptedData);
+  const sendDataViaWebRTC = (targetPeer: string, encryptedData: string) => {
+    const peerAddress = targetPeer.toLowerCase();
+    const dc = dataChannels.current[peerAddress];
+
+    if (dc?.readyState === "open") {
+      dc.send(encryptedData);
     } else {
-      console.warn("WebRTC Channel not open");
+      console.warn("WebRTC Channel not open for", peerAddress);
     }
   };
 
-  return { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection };
+  return {
+    isWebRTCConnected,
+    sendDataViaWebRTC,
+    initiateWebRTCConnection,
+    connectedPeers,
+  };
 };
