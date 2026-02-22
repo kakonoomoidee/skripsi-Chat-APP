@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useWallet } from "../../../hooks/useWallet";
-import { useAuth } from "../../../hooks/useAuth";
+import { ethers } from "ethers";
+import { useWallet } from "@/hooks/useWallet";
+import { useAuth } from "@/hooks/useAuth";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 
+/**
+ * 3. Login page component for unlocking wallet and authenticating
+ * @returns {JSX.Element}
+ */
 export default function LoginPage() {
   const navigate = useNavigate();
   const {
@@ -15,8 +20,8 @@ export default function LoginPage() {
   } = useWallet();
   const { login, loading: authLoading, isAuthenticated } = useAuth();
 
-  const [password, setPassword] = useState("");
-  const [localError, setLocalError] = useState("");
+  const [password, setPassword] = useState<string>("");
+  const [localError, setLocalError] = useState<string>("");
 
   const isLoading = walletLoading || authLoading;
 
@@ -26,7 +31,7 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
 
@@ -36,15 +41,18 @@ export default function LoginPage() {
     }
 
     try {
-      // 1. Decrypt wallet pake password dari input
       const unlockedWallet = await decryptWallet(password);
 
-      // 2. Login ke Relay pake wallet yang udah kebuka
-      await login(unlockedWallet);
+      // Type casting to bypass ethers HDNodeWallet vs Wallet strictness
+      await login(unlockedWallet as unknown as ethers.Wallet);
 
       navigate("/chat");
-    } catch (err) {
-      setLocalError(err.message || "Login failed.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setLocalError(err.message || "Login failed.");
+      } else {
+        setLocalError("An unknown error occurred.");
+      }
     }
   };
 
@@ -53,14 +61,14 @@ export default function LoginPage() {
       <WalletDisplay address={address} onReset={resetWallet} />
 
       {localError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg">
           {localError}
         </div>
       )}
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-zinc-300 mb-1">
             Encryption Password
           </label>
           <input
@@ -68,7 +76,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600"
             disabled={isLoading || !address}
           />
         </div>
@@ -76,7 +84,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading || !address}
-          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
         >
           {walletLoading
             ? "Decrypting Key..."
@@ -85,11 +93,11 @@ export default function LoginPage() {
               : "Decrypt & Login"}
         </button>
 
-        <div className="text-center text-sm text-gray-500 mt-4">
+        <div className="text-center text-sm text-zinc-500 mt-4">
           Want to create a new identity?{" "}
           <Link
             to="/register"
-            className="text-blue-600 hover:underline font-medium"
+            className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
           >
             Register Now
           </Link>

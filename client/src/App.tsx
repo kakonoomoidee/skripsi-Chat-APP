@@ -6,9 +6,9 @@ import {
 } from "react-router-dom";
 
 // Import komponen dari struktur folder yang baru
-import LoginPage from "./pages/auth/login/page";
-import RegisterPage from "./pages/auth/register/page";
-import ChatDashboard from "./pages/chat/page";
+import LoginPage from "@/pages/auth/login/LoginClient";
+import RegisterPage from "@/pages/auth/register/RegisterClient";
+import ChatDashboard from "@/pages/chat/ChatClient";
 
 function App() {
   return (
