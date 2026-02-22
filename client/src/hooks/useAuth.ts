@@ -2,8 +2,6 @@ import { useState } from "react";
 import axios from "axios";
 import { ethers } from "ethers";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 /**
  * Custom hook to manage Web3 authentication state and logic.
  * @returns Auth state and methods (register, login, logout).
@@ -19,9 +17,14 @@ export const useAuth = () => {
    * Registers a new user via gasless meta-transaction by signing a payload.
    * @param {ethers.Wallet} wallet - The user's wallet instance.
    * @param {string} username - The chosen username.
+   * @param {string} relayUrl - The active relay server URL.
    * @returns {Promise<any>} The server response data.
    */
-  const register = async (wallet: ethers.Wallet, username: string) => {
+  const register = async (
+    wallet: ethers.Wallet,
+    username: string,
+    relayUrl: string,
+  ) => {
     setLoading(true);
     setError(null);
     try {
@@ -32,7 +35,7 @@ export const useAuth = () => {
 
       const signature = await wallet.signMessage(ethers.getBytes(messageHash));
 
-      const response = await axios.post(`${API_URL}/auth/register`, {
+      const response = await axios.post(`${relayUrl}/auth/register`, {
         userAddress: wallet.address,
         username,
         publicKey: "PUBKEY_PLACEHOLDER",
@@ -57,13 +60,14 @@ export const useAuth = () => {
   /**
    * Authenticates a user using a cryptographic challenge-response mechanism.
    * @param {ethers.Wallet} wallet - The user's wallet instance.
+   * @param {string} relayUrl - The active relay server URL.
    * @returns {Promise<string>} The generated JWT token.
    */
-  const login = async (wallet: ethers.Wallet) => {
+  const login = async (wallet: ethers.Wallet, relayUrl: string) => {
     setLoading(true);
     setError(null);
     try {
-      const resNonce = await axios.post(`${API_URL}/auth/challenge`, {
+      const resNonce = await axios.post(`${relayUrl}/auth/challenge`, {
         address: wallet.address,
       });
       const { nonce } = resNonce.data;
@@ -71,7 +75,7 @@ export const useAuth = () => {
       const nonceHash = ethers.solidityPackedKeccak256(["string"], [nonce]);
       const signature = await wallet.signMessage(ethers.getBytes(nonceHash));
 
-      const resLogin = await axios.post(`${API_URL}/auth/login`, {
+      const resLogin = await axios.post(`${relayUrl}/auth/login`, {
         address: wallet.address,
         signature,
       });

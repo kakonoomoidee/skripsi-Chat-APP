@@ -4,8 +4,6 @@ import axios from "axios";
 import { Socket } from "socket.io-client";
 import { db } from "@/utils/db";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 /**
  * Interface for the properties required by useChatLogic hook
  */
@@ -16,23 +14,15 @@ interface UseChatLogicProps {
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
   hasSecret: (peerAddress: string) => boolean;
+  relayUrl: string; // TANGKAP URL DISINI
 }
 
-/**
- * Interface representing an incoming handshake request
- */
 export interface HandshakeRequest {
   from: string;
   ephemeralPublicKey: string;
   username?: string;
 }
 
-/**
- * 1. Main Chat Logic Hook
- * Manages peer-to-peer connections, handshake signaling, and message handling via Socket.io.
- * * @param {UseChatLogicProps} props - Dependencies including socket instance and crypto functions
- * @returns {object} { targetUsername, setTargetUsername, activeChat, activeUsername, myUsername, pendingRequests, isSearching, handleConnectPeer, handleAcceptRequest, handleRejectRequest }
- */
 export const useChatLogic = ({
   address,
   socket,
@@ -40,6 +30,7 @@ export const useChatLogic = ({
   computeSecret,
   decrypt,
   hasSecret,
+  relayUrl,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
   const [activeChat, setActiveChat] = useState<string | null>(null);
@@ -50,17 +41,15 @@ export const useChatLogic = ({
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
-  // Fetch current user's username on load
   useEffect(() => {
-    if (address) {
+    if (address && relayUrl) {
       axios
-        .get(`${API_URL}/auth/user/${address}`)
+        .get(`${relayUrl}/auth/user/${address}`)
         .then((res) => setMyUsername(res.data.username))
         .catch(() => setMyUsername("Unknown Profile"));
     }
-  }, [address]);
+  }, [address, relayUrl]);
 
-  // Handle Socket.io events
   useEffect(() => {
     if (!socket) return;
 
@@ -70,7 +59,7 @@ export const useChatLogic = ({
     }) => {
       let incomingUser = "Unknown";
       try {
-        const res = await axios.get(`${API_URL}/auth/user/${data.from}`);
+        const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -114,19 +103,14 @@ export const useChatLogic = ({
       socket.off("handshake_answer", onHandshakeAnswer);
       socket.off("receive_message", onReceiveMessage);
     };
-  }, [socket, computeSecret, decrypt]);
+  }, [socket, computeSecret, decrypt, relayUrl]);
 
-  /**
-   * 2. Initiate connection to a peer by username
-   * Performs reverse lookup and sends an initial handshake offer if no shared secret exists.
-   * * @returns {Promise<void>}
-   */
   const handleConnectPeer = async () => {
     if (!targetUsername.trim()) return;
     setIsSearching(true);
     try {
       const res = await axios.get(
-        `${API_URL}/auth/address/${targetUsername.trim()}`,
+        `${relayUrl}/auth/address/${targetUsername.trim()}`,
       );
       const peerAddress = res.data.address.toLowerCase();
 
@@ -159,12 +143,6 @@ export const useChatLogic = ({
     }
   };
 
-  /**
-   * 3. Accept incoming handshake request
-   * Computes the shared secret and emits a handshake response back to the peer.
-   * * @param {HandshakeRequest} request - The incoming request payload containing peer's ephemeral public key
-   * @returns {Promise<void>}
-   */
   const handleAcceptRequest = async (request: HandshakeRequest) => {
     computeSecret(request.from, request.ephemeralPublicKey);
     if (socket) {
@@ -183,7 +161,7 @@ export const useChatLogic = ({
       setActiveUsername(request.username);
     } else {
       try {
-        const res = await axios.get(`${API_URL}/auth/user/${request.from}`);
+        const res = await axios.get(`${relayUrl}/auth/user/${request.from}`);
         setActiveUsername(res.data.username);
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -194,12 +172,6 @@ export const useChatLogic = ({
     }
   };
 
-  /**
-   * 4. Reject incoming handshake request
-   * Removes the request from the pending list without computing a shared secret.
-   * * @param {string} requestAddress - The wallet address of the peer to reject
-   * @returns {void}
-   */
   const handleRejectRequest = (requestAddress: string) => {
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),

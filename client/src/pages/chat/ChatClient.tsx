@@ -7,6 +7,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { useCrypto } from "@/hooks/useCrypto";
 import { useSocket } from "@/hooks/useSocket";
 import { useChatLogic } from "@/hooks/useChatLogic";
+import { useRelay } from "@/hooks/useRelay";
 import { shortenAddress, formatTime } from "@/utils/format";
 import CryptoJS from "crypto-js";
 import { ethers, Wallet } from "ethers";
@@ -20,7 +21,8 @@ export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
   const { address } = useWallet();
-  const { socket, isConnected } = useSocket(token);
+  const { activeRelay, changeRelay, defaultRelays } = useRelay();
+  const { socket, isConnected } = useSocket(token, activeRelay);
   const { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret } =
     useCrypto();
 
@@ -42,13 +44,14 @@ export default function ChatDashboard() {
     computeSecret,
     decrypt,
     hasSecret,
+    relayUrl: activeRelay,
   });
 
   const [messageInput, setMessageInput] = useState<string>("");
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // FIX: Ref untuk trigger hidden file input pas klik tombol Import
+  // Ref untuk trigger hidden file input pas klik tombol Import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const messages = useLiveQuery(
@@ -175,7 +178,6 @@ export default function ChatDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input biar bisa upload file yang sama berkali-kali
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     const seedPhraseInput = prompt(
@@ -184,13 +186,11 @@ export default function ChatDashboard() {
     if (!seedPhraseInput) return;
 
     try {
-      // Validasi receh format kata
       const words = seedPhraseInput.trim().split(/\s+/);
       if (words.length !== 12) {
         return alert("Invalid! Seed Phrase must be exactly 12 words.");
       }
 
-      // Validasi address memastikan seed phrase ini emang beneran punya akun yang lagi login
       try {
         const validationWallet = Wallet.fromPhrase(seedPhraseInput);
         if (validationWallet.address.toLowerCase() !== address?.toLowerCase()) {
@@ -202,13 +202,11 @@ export default function ChatDashboard() {
         return alert("Invalid Seed Phrase format or misspelled words!");
       }
 
-      // Baca isi file-nya
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
           const encryptedText = event.target?.result as string;
 
-          // Dekripsi file pakai seed phrase
           const decryptedBytes = CryptoJS.AES.decrypt(
             encryptedText,
             seedPhraseInput,
@@ -225,19 +223,17 @@ export default function ChatDashboard() {
             throw new Error("Invalid backup format");
           }
 
-          // Kosongin DB lama, trus masukin semua pesan yang berhasil didekripsi
           await db.messages.clear();
           await db.messages.bulkAdd(parsedMessages);
 
           alert("Success! Chat history imported securely.");
-        } catch (err) {
+        } catch {
           alert(
             "Import failed! Wrong Seed Phrase, corrupted file, or it does not belong to you.",
           );
         }
       };
 
-      // Execute pembacaan file
       reader.readAsText(file);
     } catch {
       alert("An unexpected error occurred during import.");
@@ -256,6 +252,7 @@ export default function ChatDashboard() {
 
   return (
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30">
+      {/* SIDEBAR LELFT */}
       <div className="w-80 bg-zinc-950/80 flex flex-col border-r border-zinc-800">
         <div className="p-6">
           <h2 className="text-xl font-bold text-zinc-100 tracking-tight">
@@ -287,6 +284,23 @@ export default function ChatDashboard() {
               <span className="text-zinc-400 font-medium">
                 {isConnected ? "Relay Connected" : "Disconnected"}
               </span>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                Active Node Server
+              </label>
+              <select
+                value={activeRelay}
+                onChange={(e) => changeRelay(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1.5 outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              >
+                {defaultRelays.map((url) => (
+                  <option key={url} value={url}>
+                    {url.replace("http://", "")}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -411,6 +425,7 @@ export default function ChatDashboard() {
           )}
         </div>
 
+        {/* SIDEBAR FOOTER (IMPORT/EXPORT/LOGOUT) */}
         <div className="p-5 border-t border-zinc-800 flex flex-col gap-2.5">
           <input
             type="file"
@@ -487,6 +502,7 @@ export default function ChatDashboard() {
         </div>
       </div>
 
+      {/* CHAT AREA RIGHT */}
       <div className="flex-1 flex flex-col bg-zinc-950 relative">
         <div className="h-16 border-b border-zinc-800 flex items-center px-8 bg-zinc-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
           {activeChat ? (

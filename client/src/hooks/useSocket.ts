@@ -2,24 +2,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL;
-
 /**
  * 1. Initialize and manage Socket.io connection
  * @param {string | null} token - The JWT authentication token
+ * @param {string} relayUrl - The active relay server URL
  * @returns {object} { socket, isConnected }
  */
-export const useSocket = (token: string | null) => {
+export const useSocket = (token: string | null, relayUrl: string) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
   const socket = useMemo<Socket | null>(() => {
-    if (!token) return null;
+    if (!token || !relayUrl) return null;
 
-    return io(SOCKET_URL, {
+    return io(relayUrl, {
       auth: { token },
       autoConnect: false,
     });
-  }, [token]);
+  }, [token, relayUrl]);
 
   useEffect(() => {
     if (!socket) return;
@@ -27,7 +26,7 @@ export const useSocket = (token: string | null) => {
     socket.connect();
 
     const onConnect = () => {
-      console.log("Socket Connected to Relay Server");
+      console.log(`Socket Connected to Relay Server: ${relayUrl}`);
       setIsConnected(true);
     };
 
@@ -51,7 +50,7 @@ export const useSocket = (token: string | null) => {
       socket.off("connect_error", onError);
       socket.disconnect();
     };
-  }, [socket]);
+  }, [socket, relayUrl]);
 
   return { socket, isConnected };
 };

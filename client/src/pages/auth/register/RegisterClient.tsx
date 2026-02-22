@@ -3,13 +3,10 @@ import { useNavigate, Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
+import { useRelay } from "@/hooks/useRelay"; // FIX: Import Hook
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 
-/**
- * 4. Registration page for generating burner wallet and registering username
- * @returns {JSX.Element}
- */
 export default function RegisterPage() {
   const navigate = useNavigate();
   const {
@@ -20,18 +17,18 @@ export default function RegisterPage() {
   } = useWallet();
   const { register, login, loading: authLoading, isAuthenticated } = useAuth();
 
+  // FIX: Tarik data Relay
+  const { activeRelay, changeRelay, defaultRelays } = useRelay();
+
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [localError, setLocalError] = useState<string>("");
-
   const [seedPhrase, setSeedPhrase] = useState<string | null>(null);
 
   const isLoading = walletLoading || authLoading;
 
   useEffect(() => {
-    if (isAuthenticated && !seedPhrase) {
-      navigate("/chat");
-    }
+    if (isAuthenticated && !seedPhrase) navigate("/chat");
   }, [isAuthenticated, navigate, seedPhrase]);
 
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
@@ -51,11 +48,11 @@ export default function RegisterPage() {
     try {
       const { wallet: newWallet, seedPhrase: generatedSeed } =
         await createAndEncryptWallet(password);
-
       const walletInstance = newWallet as unknown as ethers.Wallet;
 
-      await register(walletInstance, username);
-      await login(walletInstance);
+      // FIX: Inject activeRelay ke fungsi register dan login
+      await register(walletInstance, username, activeRelay);
+      await login(walletInstance, activeRelay);
 
       setSeedPhrase(generatedSeed);
     } catch (err: unknown) {
@@ -99,7 +96,6 @@ export default function RegisterPage() {
             ))}
           </div>
         </div>
-
         <button
           onClick={handleCopyAndProceed}
           className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
@@ -151,10 +147,29 @@ export default function RegisterPage() {
           />
         </div>
 
+        {/* FIX: Tambahin Dropdown Relay */}
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-1">
+            Select Network Node
+          </label>
+          <select
+            value={activeRelay}
+            onChange={(e) => changeRelay(e.target.value)}
+            disabled={isLoading}
+            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
+          >
+            {defaultRelays.map((url) => (
+              <option key={url} value={url}>
+                {url}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
+          className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
         >
           {walletLoading
             ? "Encrypting Key..."
