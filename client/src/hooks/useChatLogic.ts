@@ -120,7 +120,6 @@ export const useChatLogic = ({
       setActiveChat(peerAddress);
       setActiveUsername(targetUsername.trim());
 
-      // FIX: Tandai diri sendiri sebagai Initiator untuk user ini
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {
@@ -141,7 +140,6 @@ export const useChatLogic = ({
     computeSecret(request.from, request.ephemeralPublicKey);
     const peerAddress = request.from.toLowerCase();
 
-    // FIX: Tandai diri sendiri sebagai Receiver (Bukan Initiator)
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
@@ -190,7 +188,7 @@ export const useChatLogic = ({
     activeSessions,
     switchChat,
     isSearching,
-    initiators, // FIX: Ekspor state initiator ke UI
+    initiators,
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,

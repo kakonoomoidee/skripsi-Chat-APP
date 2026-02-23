@@ -35,7 +35,7 @@ export default function ChatDashboard() {
     activeSessions,
     switchChat,
     isSearching,
-    initiators, // Ambil data siapa yang jadi bos
+    initiators,
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
@@ -93,7 +93,6 @@ export default function ChatDashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // FIX: Reset status initiated kalo koneksi beneran putus
   useEffect(() => {
     const current = activeChat?.toLowerCase();
     if (current && !connectedPeers.includes(current)) {
@@ -101,20 +100,19 @@ export default function ChatDashboard() {
     }
   }, [activeChat, connectedPeers]);
 
-  // FIX: HANYA Initiator yang boleh ngebangun WebRTC tunnel
   useEffect(() => {
     const current = activeChat?.toLowerCase();
     if (
       current &&
       hasSecret(current) &&
       !connectedPeers.includes(current) &&
-      initiators[current] === true // Pintu gembok anti-tabrakan
+      initiators[current] === true
     ) {
       if (!webrtcInitiated.current[current]) {
         webrtcInitiated.current[current] = true;
         setTimeout(() => {
           initiateWebRTCConnection(current);
-        }, 1000); // Kasih jeda biar receiver siap
+        }, 1000);
       }
     }
   }, [

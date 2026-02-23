@@ -5,27 +5,27 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// Import komponen dari struktur folder yang baru
+import LandingPage from "@/pages/landing/LandingClient";
 import LoginPage from "@/pages/auth/login/LoginClient";
 import RegisterPage from "@/pages/auth/register/RegisterClient";
-import ImportIdentityPage from "@/pages/auth/import/ImportIdentityClient"; // FIX: Import rute baru
+import ImportIdentityPage from "@/pages/auth/import/ImportIdentityClient";
 import ChatDashboard from "@/pages/chat/ChatClient";
 
+/**
+ * Main Application Router
+ * @returns {JSX.Element}
+ */
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500/30">
         <Routes>
-          {/* Default Route: Otomatis lempar ke Login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          {/* Auth Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/import" element={<ImportIdentityPage />} />{" "}
-          {/* Main Dashboard Route */}
+          <Route path="/import" element={<ImportIdentityPage />} />
           <Route path="/chat" element={<ChatDashboard />} />
-          {/* Fallback 404: Kalo user ketik URL ngasal, balikin ke Login */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
