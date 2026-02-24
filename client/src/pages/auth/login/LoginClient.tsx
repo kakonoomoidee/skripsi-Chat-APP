@@ -6,19 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
+import { RelaySelector, PasswordInput } from "@/components/shared"; // Import PasswordInput
 
-/**
- * Main Login component with support for custom infrastructure nodes
- * @returns {JSX.Element}
- */
 export default function LoginPage() {
   const navigate = useNavigate();
-  const {
-    address,
-    decryptWallet,
-    resetWallet,
-    loading: walletLoading,
-  } = useWallet();
+  const { address, decryptWallet, loading: walletLoading } = useWallet();
   const { login, loading: authLoading, isAuthenticated } = useAuth();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
@@ -32,19 +24,11 @@ export default function LoginPage() {
     if (isAuthenticated) navigate("/chat");
   }, [isAuthenticated, navigate]);
 
-  /**
-   * Decrypt local identity and authenticate via selected relay
-   * @param {React.FormEvent<HTMLFormElement>} e - Form submission event
-   * @returns {Promise<void>}
-   */
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
-
-    if (!password) {
-      setLocalError("Password is required to decrypt your identity.");
-      return;
-    }
+    if (!password)
+      return setLocalError("Password is required to decrypt your identity.");
 
     try {
       const unlockedWallet = await decryptWallet(password);
@@ -56,81 +40,54 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout title="Welcome Back" subtitle="Decrypt your identity to login.">
-      <WalletDisplay address={address} onReset={resetWallet} />
+    <AuthLayout
+      title="Welcome Back"
+      subtitle="Decrypt your local identity to establish a secure connection."
+    >
+      <WalletDisplay address={address} />
 
       {localError && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg">
+        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl mb-4">
           {localError}
         </div>
       )}
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Encryption Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600"
-            disabled={isLoading || !address}
-          />
-        </div>
+      <form onSubmit={handleLogin} className="space-y-5">
+        {/* REFACTORED: Using the shared PasswordInput */}
+        <PasswordInput
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading || !address}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Select Network Node
-          </label>
-          <div className="flex gap-2">
-            <select
-              value={activeRelay}
-              onChange={(e) => changeRelay(e.target.value)}
-              disabled={isLoading}
-              className="flex-1 w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
-            >
-              {defaultRelays.map((url: string) => (
-                <option key={url} value={url}>
-                  {url}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => {
-                const u = prompt(
-                  "Enter Custom Relay URL (e.g., http://192.168.1.10:3003):",
-                );
-                if (u) addCustomRelay(u);
-              }}
-              className="px-4 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 rounded-lg transition-colors disabled:opacity-50"
-            >
-              +
-            </button>
-          </div>
+        <div className="-mt-1">
+          <RelaySelector
+            activeRelay={activeRelay}
+            defaultRelays={defaultRelays}
+            changeRelay={changeRelay}
+            addCustomRelay={addCustomRelay}
+            size="md"
+          />
         </div>
 
         <button
           type="submit"
           disabled={isLoading || !address}
-          className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
+          className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
         >
           {walletLoading
             ? "Decrypting Key..."
             : authLoading
-              ? "Authenticating..."
-              : "Decrypt & Login"}
+              ? "Authenticating Handshake..."
+              : "Decrypt & Connect"}
         </button>
 
-        <div className="text-center text-sm text-zinc-500 mt-4 flex flex-col gap-2">
+        <div className="pt-4 mt-2 border-t border-zinc-800/50 flex flex-col gap-2 text-center text-sm text-zinc-500">
           <div>
             Want to create a new identity?{" "}
             <Link
               to="/register"
-              className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
+              className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
             >
               Register Now
             </Link>
@@ -139,9 +96,9 @@ export default function LoginPage() {
             Moving to a new device?{" "}
             <Link
               to="/import"
-              className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
+              className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
             >
-              Import Identity
+              Import Backup
             </Link>
           </div>
         </div>

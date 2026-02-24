@@ -6,17 +6,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
+import { RelaySelector, PasswordInput } from "@/components/shared"; // Import PasswordInput
 
-/**
- * Component for recovering identity via seed phrase with custom relay support
- * @returns {JSX.Element}
- */
 export default function ImportIdentityClient() {
   const navigate = useNavigate();
   const {
     address,
     importAndEncryptWallet,
-    resetWallet,
     loading: walletLoading,
   } = useWallet();
   const { login, loading: authLoading } = useAuth();
@@ -29,33 +25,20 @@ export default function ImportIdentityClient() {
 
   const isLoading = walletLoading || authLoading;
 
-  /**
-   * Handle the recovery and initial login process
-   * @param {React.FormEvent<HTMLFormElement>} e - Form submission event
-   * @returns {Promise<void>}
-   */
   const handleImport = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
 
-    if (!seedPhrase.trim() || !password) {
-      setLocalError("Seed Phrase and new Password are required.");
-      return;
-    }
-
-    if (seedPhrase.trim().split(/\s+/).length !== 12) {
-      setLocalError("Seed Phrase must be exactly 12 words.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setLocalError("Password must be at least 6 characters.");
-      return;
-    }
+    if (!seedPhrase.trim() || !password)
+      return setLocalError("Seed Phrase and new Password are required.");
+    if (seedPhrase.trim().split(/\s+/).length !== 12)
+      return setLocalError("Seed Phrase must be exactly 12 words.");
+    if (password.length < 6)
+      return setLocalError("Password must be at least 6 characters.");
 
     try {
       const recoveredWallet = await importAndEncryptWallet(
-        seedPhrase,
+        seedPhrase.trim(),
         password,
       );
       const walletInstance = recoveredWallet as unknown as ethers.Wallet;
@@ -73,17 +56,17 @@ export default function ImportIdentityClient() {
       title="Recover Identity"
       subtitle="Import your 12-word seed phrase to restore access."
     >
-      <WalletDisplay address={address} onReset={resetWallet} />
+      <WalletDisplay address={address} />
 
       {localError && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg">
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
           {localError}
         </div>
       )}
 
-      <form onSubmit={handleImport} className="space-y-4">
+      <form onSubmit={handleImport} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
+          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">
             12-Word Seed Phrase
           </label>
           <textarea
@@ -91,74 +74,47 @@ export default function ImportIdentityClient() {
             onChange={(e) => setSeedPhrase(e.target.value)}
             placeholder="e.g. engage strong senior reason faith renew wrap salmon edge actual right side"
             rows={3}
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600 resize-none font-mono text-sm"
-            disabled={isLoading}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            New Encryption Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="To secure your keystore on this device"
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+            className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600 resize-none font-mono text-sm shadow-sm"
             disabled={isLoading}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Select Network Node
-          </label>
-          <div className="flex gap-2">
-            <select
-              value={activeRelay}
-              onChange={(e) => changeRelay(e.target.value)}
-              disabled={isLoading}
-              className="flex-1 w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer"
-            >
-              {defaultRelays.map((url: string) => (
-                <option key={url} value={url}>
-                  {url}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => {
-                const u = prompt(
-                  "Enter Custom Relay URL (e.g., http://192.168.1.10:3003):",
-                );
-                if (u) addCustomRelay(u);
-              }}
-              className="px-4 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 rounded-lg transition-colors disabled:opacity-50"
-            >
-              +
-            </button>
-          </div>
+        {/* REFACTORED: Using the shared PasswordInput with override props */}
+        <PasswordInput
+          label="New Encryption Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="To secure your keystore on this device"
+          disabled={isLoading}
+        />
+
+        <div className="-mt-1">
+          <RelaySelector
+            activeRelay={activeRelay}
+            defaultRelays={defaultRelays}
+            changeRelay={changeRelay}
+            addCustomRelay={addCustomRelay}
+            size="md"
+          />
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
+          className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
         >
           {walletLoading
-            ? "Recovering..."
+            ? "Recovering Key..."
             : authLoading
-              ? "Authenticating..."
+              ? "Authenticating Handshake..."
               : "Import & Login"}
         </button>
 
-        <div className="text-center text-sm text-zinc-500 mt-4">
+        <div className="text-center text-sm text-zinc-500 pt-4 mt-2 border-t border-zinc-800/50">
           Remembered your password?{" "}
           <Link
             to="/login"
-            className="text-indigo-400 hover:text-indigo-300 hover:underline font-medium transition-colors"
+            className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
           >
             Back to Login
           </Link>
