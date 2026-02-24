@@ -6,11 +6,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
-import { RelaySelector } from "@/components/shared";
+import { RelaySelector, PasswordInput } from "@/components/shared"; // Import PasswordInput
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  // REFACTORED: resetWallet removed from here
   const { address, decryptWallet, loading: walletLoading } = useWallet();
   const { login, loading: authLoading, isAuthenticated } = useAuth();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
@@ -28,11 +27,8 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError("");
-
-    if (!password) {
-      setLocalError("Password is required to decrypt your identity.");
-      return;
-    }
+    if (!password)
+      return setLocalError("Password is required to decrypt your identity.");
 
     try {
       const unlockedWallet = await decryptWallet(password);
@@ -48,7 +44,6 @@ export default function LoginPage() {
       title="Welcome Back"
       subtitle="Decrypt your local identity to establish a secure connection."
     >
-      {/* REFACTORED: Only pass address */}
       <WalletDisplay address={address} />
 
       {localError && (
@@ -58,19 +53,12 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleLogin} className="space-y-5">
-        <div>
-          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">
-            Encryption Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600 shadow-sm"
-            disabled={isLoading || !address}
-          />
-        </div>
+        {/* REFACTORED: Using the shared PasswordInput */}
+        <PasswordInput
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading || !address}
+        />
 
         <div className="-mt-1">
           <RelaySelector
