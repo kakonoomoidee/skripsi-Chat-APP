@@ -6,7 +6,7 @@ import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
 
 /**
- * 3. Global Sidebar Component connected to Context
+ * Global Sidebar Component connected to Context
  * @returns {JSX.Element}
  */
 export default function Sidebar() {
@@ -34,6 +34,7 @@ export default function Sidebar() {
     handleExportChat,
     handleImportChat,
     logout,
+    resetWallet, // Extracted from context
   } = useChatContext();
 
   const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
@@ -241,16 +242,19 @@ export default function Sidebar() {
               changeRelay={changeRelay}
               addCustomRelay={addCustomRelay}
             />
+
             <SecuritySection
               autoDeleteMode={autoDeleteMode}
               handleModeChange={handleModeChange}
               handleExportChat={handleExportChat}
               handleImportChat={handleImportChat}
+              resetWallet={resetWallet} 
             />
+
             <div className="pt-4 border-t border-zinc-800/50">
               <button
                 onClick={logout}
-                className="w-full text-xs font-medium text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
+                className="w-full text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-2"
               >
                 <svg
                   className="w-3.5 h-3.5"
@@ -265,7 +269,7 @@ export default function Sidebar() {
                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                   />
                 </svg>
-                Sign Out / Lock
+                Lock Session
               </button>
             </div>
           </div>

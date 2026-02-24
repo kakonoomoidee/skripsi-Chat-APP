@@ -54,20 +54,21 @@ export interface ChatContextValue {
   handleImportChat: (e: ChangeEvent<HTMLInputElement>) => void;
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (isOpen: boolean) => void;
+  resetWallet: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 /**
  * Global Chat Provider
- * Wraps the chat application to provide decoupled state management and responsive mobile states.
+ * Wraps the chat application to provide decoupled state management and custom modals.
  * @param {ReactNode} children - The child components
  * @returns {JSX.Element}
  */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
-  const { address } = useWallet();
+  const { address, resetWallet } = useWallet();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
   const { socket, isConnected } = useSocket(token, activeRelay);
@@ -115,6 +116,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(true);
 
+  // Custom Modal State for Seed Phrase instead of native window.prompt
   const [seedModal, setSeedModal] = useState<{
     isOpen: boolean;
     type: "import" | "export";
@@ -305,6 +307,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         const encodedData = btoa(
           unescape(encodeURIComponent(dataStr + "|||SECURE_P2P|||" + seed)),
         );
+
         const backupPayload = {
           version: "3.0",
           encrypted: true,
@@ -329,11 +332,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         if (payload.encrypted) {
           const decodedStr = decodeURIComponent(escape(atob(payload.data)));
           const splitData = decodedStr.split("|||SECURE_P2P|||");
+
           if (splitData.length !== 2 || splitData[1] !== seed) {
             return setModalError(
               "Decryption failed! Seed phrase does not match this backup file.",
             );
           }
+
           const parsedMessages = JSON.parse(splitData[0]);
           await db.messages.bulkPut(parsedMessages);
           closeSeedModal();
@@ -352,7 +357,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setModalError("");
   };
 
-  // Wrapped handlers for responsive mobile transition
   const handleSwitchChatWrapped = (session: any) => {
     switchChat(session);
     setIsMobileSidebarOpen(false);
@@ -397,11 +401,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleImportChat,
     isMobileSidebarOpen,
     setIsMobileSidebarOpen,
+    resetWallet,
   };
 
   return (
     <ChatContext.Provider value={value}>
       {children}
+
+      {/* Custom Seed Phrase Modal */}
       {seedModal.isOpen && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -448,10 +455,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * Hook to consume Chat Context
- * @returns {ChatContextValue}
- */
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined)

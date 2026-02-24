@@ -9,31 +9,24 @@ export interface RelaySelectorProps {
   defaultRelays: string[];
   changeRelay: (url: string) => void;
   addCustomRelay: (url: string) => void;
+  size?: "sm" | "md"; // REFACTORED: Added size prop for layout flexibility
 }
 
-/**
- * Reusable Network Node Selector
- * Renders a fully custom dropdown with an informational tooltip regarding relay functionality.
- * Uses React Portal to ensure the modal breaks out of stacking contexts and centers globally.
- * @param {RelaySelectorProps} props - Relay states and modifier functions
- * @returns {JSX.Element}
- */
 export default function RelaySelector({
   activeRelay,
   defaultRelays,
   changeRelay,
   addCustomRelay,
+  size = "sm", // Default to 'sm' for Sidebar
 }: RelaySelectorProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [showInfo, setShowInfo] = useState<boolean>(false);
 
-  // Custom Modal States for adding relay
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [customRelayInput, setCustomRelayInput] = useState<string>("");
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown and tooltip if user clicks outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -56,6 +49,14 @@ export default function RelaySelector({
     setCustomRelayInput("");
   };
 
+  // Dynamic styling based on size prop
+  const triggerPadding =
+    size === "md" ? "py-3 pl-4 pr-10 text-sm" : "py-2.5 pl-3 pr-8 text-xs";
+  const buttonPadding =
+    size === "md" ? "px-4 py-3 text-sm" : "px-3.5 py-2.5 text-xs";
+  const listItemPadding =
+    size === "md" ? "px-4 py-3 text-sm" : "px-4 py-2.5 text-xs";
+
   return (
     <>
       <div ref={containerRef}>
@@ -64,7 +65,6 @@ export default function RelaySelector({
             Network Node
           </label>
 
-          {/* Info Toggle Button */}
           <button
             type="button"
             onClick={() => {
@@ -88,7 +88,6 @@ export default function RelaySelector({
             </svg>
           </button>
 
-          {/* Info Tooltip Popover */}
           {showInfo && (
             <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
               A <strong>Relay Node</strong> helps discover peers and exchange
@@ -99,16 +98,14 @@ export default function RelaySelector({
         </div>
 
         <div className="flex gap-2">
-          {/* Custom Dropdown Container */}
           <div className="relative flex-1">
-            {/* Dropdown Trigger Button */}
             <button
               type="button"
               onClick={() => {
                 setIsOpen(!isOpen);
                 setShowInfo(false);
               }}
-              className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
+              className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 rounded-xl outline-none text-left transition-all shadow-sm flex items-center justify-between ${triggerPadding}`}
             >
               <span className="truncate">
                 {activeRelay.replace("http://", "").replace("https://", "")}
@@ -128,7 +125,6 @@ export default function RelaySelector({
               </svg>
             </button>
 
-            {/* Custom Dropdown List */}
             {isOpen && (
               <div className="absolute z-40 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                 <ul className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
@@ -140,7 +136,7 @@ export default function RelaySelector({
                           changeRelay(url);
                           setIsOpen(false);
                         }}
-                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${
+                        className={`w-full text-left transition-colors ${listItemPadding} ${
                           activeRelay === url
                             ? "bg-indigo-600/10 text-indigo-400 font-medium"
                             : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
@@ -155,11 +151,10 @@ export default function RelaySelector({
             )}
           </div>
 
-          {/* Add Custom Node Button */}
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="px-3.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 hover:border-indigo-500/50 rounded-xl transition-all shadow-sm flex items-center justify-center font-bold"
+            className={`bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 hover:border-indigo-500/50 rounded-xl transition-all shadow-sm flex items-center justify-center font-bold ${buttonPadding}`}
             title="Add Custom Node"
           >
             +
@@ -167,7 +162,6 @@ export default function RelaySelector({
         </div>
       </div>
 
-      {/* REFACTORED: Custom Modal using React Portal to break out of Sidebar stacking context */}
       {isModalOpen &&
         typeof document !== "undefined" &&
         createPortal(
@@ -180,7 +174,6 @@ export default function RelaySelector({
                 Enter the URL of your custom WSS or HTTP relay server to connect
                 to an alternative network.
               </p>
-
               <input
                 type="text"
                 value={customRelayInput}
@@ -189,7 +182,6 @@ export default function RelaySelector({
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all mb-5"
                 autoFocus
               />
-
               <div className="flex gap-3">
                 <button
                   onClick={() => {
