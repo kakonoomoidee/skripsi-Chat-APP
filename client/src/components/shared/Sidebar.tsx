@@ -1,66 +1,41 @@
-import { useState, ChangeEvent } from "react";
+import { useState } from "react";
 import { shortenAddress } from "@/utils/format";
+import { useChatContext } from "@/context/ChatContext";
 import RelaySelector from "./RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
 
-export interface SidebarProps {
-  myUsername: string;
-  address: string | null;
-  isConnected: boolean;
-  activeRelay: string;
-  defaultRelays: string[];
-  changeRelay: (url: string) => void;
-  addCustomRelay: (url: string) => void;
-  activeSessions: any[];
-  activeChat: string | null;
-  switchChat: (session: any) => void;
-  connectedPeers: string[];
-  targetUsername: string;
-  setTargetUsername: (val: string) => void;
-  isSearching: boolean;
-  handleConnectPeer: () => void;
-  pendingRequests: any[];
-  handleAcceptRequest: (req: any) => void;
-  handleRejectRequest: (addr: string) => void;
-  autoDeleteMode: string;
-  handleModeChange: (e: ChangeEvent<HTMLSelectElement>) => void;
-  handleExportChat: () => void;
-  handleImportChat: (e: ChangeEvent<HTMLInputElement>) => void;
-  logout: () => void;
-}
-
 /**
- * 3. Global Sidebar Component
- * Modular sidebar layout combining chat management, requests, and decoupled settings.
- * @param {SidebarProps} props - Application states and interaction handlers
+ * 3. Global Sidebar Component connected to Context
  * @returns {JSX.Element}
  */
-export default function Sidebar({
-  myUsername,
-  address,
-  isConnected,
-  activeRelay,
-  defaultRelays,
-  changeRelay,
-  addCustomRelay,
-  activeSessions,
-  activeChat,
-  switchChat,
-  connectedPeers,
-  targetUsername,
-  setTargetUsername,
-  isSearching,
-  handleConnectPeer,
-  pendingRequests,
-  handleAcceptRequest,
-  handleRejectRequest,
-  autoDeleteMode,
-  handleModeChange,
-  handleExportChat,
-  handleImportChat,
-  logout,
-}: SidebarProps) {
+export default function Sidebar() {
+  const {
+    myUsername,
+    address,
+    isConnected,
+    activeRelay,
+    defaultRelays,
+    changeRelay,
+    addCustomRelay,
+    activeSessions,
+    activeChat,
+    switchChat,
+    connectedPeers,
+    targetUsername,
+    setTargetUsername,
+    isSearching,
+    handleConnectPeer,
+    pendingRequests,
+    handleAcceptRequest,
+    handleRejectRequest,
+    autoDeleteMode,
+    handleModeChange,
+    handleExportChat,
+    handleImportChat,
+    logout,
+  } = useChatContext();
+
   const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
     "chats",
   );
@@ -260,21 +235,18 @@ export default function Sidebar({
               address={address}
               isConnected={isConnected}
             />
-
             <RelaySelector
               activeRelay={activeRelay}
               defaultRelays={defaultRelays}
               changeRelay={changeRelay}
               addCustomRelay={addCustomRelay}
             />
-
             <SecuritySection
               autoDeleteMode={autoDeleteMode}
               handleModeChange={handleModeChange}
               handleExportChat={handleExportChat}
               handleImportChat={handleImportChat}
             />
-
             <div className="pt-4 border-t border-zinc-800/50">
               <button
                 onClick={logout}

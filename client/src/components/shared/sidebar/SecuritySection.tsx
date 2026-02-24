@@ -8,7 +8,7 @@ export interface SecuritySectionProps {
 }
 
 /**
- * 2. Security & Data Section Component
+ * 1. Security & Data Section Component
  * Manages chat history retention policies and encrypted backup import/export.
  * @param {SecuritySectionProps} props - Methods and state for data management
  * @returns {JSX.Element}
