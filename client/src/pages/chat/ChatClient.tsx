@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
+import { ethers } from "ethers";
 import { db } from "@/utils/db";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
@@ -11,6 +12,10 @@ import { useRelay } from "@/hooks/useRelay";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { shortenAddress, formatTime } from "@/utils/format";
 
+/**
+ * 1. Main Chat Dashboard Component orchestrating UI, multi-tab P2P communication, and data backup.
+ * @returns {JSX.Element}
+ */
 export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
@@ -62,7 +67,6 @@ export default function ChatDashboard() {
     "sessions",
   );
 
-  // FIX: State untuk Auto-Delete (Default: Never)
   const [autoDeleteMode, setAutoDeleteMode] = useState<string>(() => {
     return localStorage.getItem("autoDeleteMode") || "never";
   });
@@ -94,7 +98,6 @@ export default function ChatDashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // FIX: Efek Sweeper Auto-Delete pas komponen di-load
   useEffect(() => {
     const sweepOldMessages = async () => {
       if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
@@ -120,11 +123,10 @@ export default function ChatDashboard() {
     sweepOldMessages();
   }, [autoDeleteMode]);
 
-  // FIX: Efek khusus buat 'Burn on Close'
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (autoDeleteMode === "close") {
-        db.messages.clear(); // Hapus semua pesan secara sinkronus sblm tab mati
+        db.messages.clear();
       }
     };
 
@@ -132,7 +134,6 @@ export default function ChatDashboard() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [autoDeleteMode]);
 
-  // FIX: Handler pas user ganti dropdown mode
   const handleModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const mode = e.target.value;
     setAutoDeleteMode(mode);
@@ -185,7 +186,7 @@ export default function ChatDashboard() {
       const encryptedMsg = encrypt(currentChat, messageInput);
       sendDataViaWebRTC(currentChat, encryptedMsg);
       await db.messages.add({
-        ownerAddress: address.toLowerCase(),
+        ownerAddress: (address as string).toLowerCase(),
         chatId: currentChat.toLowerCase(),
         text: messageInput,
         isMine: true,
@@ -214,7 +215,7 @@ export default function ChatDashboard() {
         const encryptedImage = encrypt(currentChat, base64);
         sendDataViaWebRTC(currentChat, encryptedImage);
         await db.messages.add({
-          ownerAddress: address.toLowerCase(),
+          ownerAddress: (address as string).toLowerCase(),
           chatId: currentChat.toLowerCase(),
           text: base64,
           isMine: true,
@@ -234,6 +235,127 @@ export default function ChatDashboard() {
     navigator.clipboard.writeText(address);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleExportChat = async () => {
+    try {
+      const allMessages = await db.messages.toArray();
+      if (allMessages.length === 0) {
+        alert("No chat history to export.");
+        return;
+      }
+
+      const seed = prompt(
+        "Enter your exact 12-word seed phrase to encrypt your backup:",
+      );
+      if (!seed || seed.trim().split(/\s+/).length !== 12) {
+        alert("Invalid! Harus masukin tepat 12 kata ya bre.");
+        return;
+      }
+
+      try {
+        const derivedWallet = ethers.Wallet.fromPhrase(seed.trim());
+        if (derivedWallet.address.toLowerCase() !== address?.toLowerCase()) {
+          alert(
+            "Akses Ditolak! Seed phrase ini bukan punya akun lu yang lagi aktif bre.",
+          );
+          return;
+        }
+      } catch (err) {
+        alert(
+          "Format seed phrase tidak valid secara kriptografi Ethereum! Pastikan nggak typo.",
+        );
+        return;
+      }
+
+      const dataStr = JSON.stringify(allMessages);
+      const encodedData = btoa(
+        unescape(
+          encodeURIComponent(dataStr + "|||SECURE_P2P|||" + seed.trim()),
+        ),
+      );
+
+      const backupPayload = {
+        version: "3.0",
+        encrypted: true,
+        data: encodedData,
+      };
+
+      const blob = new Blob([JSON.stringify(backupPayload)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `securep2p_backup_${formatTime(Date.now()).replace(/:/g, "-")}.securep2p`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export chat history.");
+    }
+  };
+
+  const handleImportChat = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const payload = JSON.parse(content);
+
+        if (payload.encrypted) {
+          const seed = prompt(
+            "Enter your 12-word seed phrase to decrypt and restore data:",
+          );
+          if (!seed || seed.trim().split(/\s+/).length !== 12) {
+            alert("Invalid! Harus tepat 12 kata.");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+          }
+
+          try {
+            const derivedWallet = ethers.Wallet.fromPhrase(seed.trim());
+            if (
+              derivedWallet.address.toLowerCase() !== address?.toLowerCase()
+            ) {
+              alert(
+                "Akses Ditolak! Seed phrase ini bukan milik akun yang lagi aktif. Nggak bisa baca pesan orang lain bre!",
+              );
+              if (fileInputRef.current) fileInputRef.current.value = "";
+              return;
+            }
+          } catch (err) {
+            alert("Format seed phrase salah atau ada typo!");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+          }
+
+          const decodedStr = decodeURIComponent(escape(atob(payload.data)));
+          const splitData = decodedStr.split("|||SECURE_P2P|||");
+
+          if (splitData.length !== 2 || splitData[1] !== seed.trim()) {
+            alert(
+              "Decryption failed! Seed phrase tidak cocok dengan file backup ini.",
+            );
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+          }
+
+          const parsedMessages = JSON.parse(splitData[0]);
+          await db.messages.bulkPut(parsedMessages);
+          alert("Chat history restored successfully!");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to import. File might be corrupted.");
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -425,10 +547,10 @@ export default function ChatDashboard() {
             type="file"
             accept=".securep2p"
             ref={fileInputRef}
+            onChange={handleImportChat}
             className="hidden"
           />
 
-          {/* FIX: Tambahan Dropdown Auto-Delete */}
           <div>
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
               Auto-Delete History
@@ -448,10 +570,16 @@ export default function ChatDashboard() {
           </div>
 
           <div className="flex gap-2 mt-1">
-            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors"
+            >
               Import
             </button>
-            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors">
+            <button
+              onClick={handleExportChat}
+              className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors"
+            >
               Export
             </button>
           </div>
