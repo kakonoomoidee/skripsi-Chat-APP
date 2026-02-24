@@ -17,8 +17,8 @@ interface UseWebRTCParams {
 }
 
 /**
- * 1. Manage WebRTC Peer-to-Peer connections with ICE candidate queuing and multi-tenant DB support
- * @param {UseWebRTCParams} params - Socket instance, my address, active chat, and decryption function
+ * 1. Manage WebRTC peer connections, data channels, and ICE candidates for P2P communication
+ * @param {UseWebRTCParams} params - The initialization parameters
  * @returns {object} { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection, connectedPeers }
  */
 export const useWebRTC = ({
@@ -112,6 +112,14 @@ export const useWebRTC = ({
     const handleWebRTCSignal = async (data: { from: string; signal: any }) => {
       const peerAddress = data.from.toLowerCase();
       const { signal } = data;
+
+      if (signal.type === "offer" && peerConnections.current[peerAddress]) {
+        peerConnections.current[peerAddress].close();
+        delete peerConnections.current[peerAddress];
+        delete iceQueues.current[peerAddress];
+        delete dataChannels.current[peerAddress];
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
+      }
 
       if (!peerConnections.current[peerAddress]) {
         const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -224,8 +232,6 @@ export const useWebRTC = ({
 
     if (dc?.readyState === "open") {
       dc.send(encryptedData);
-    } else {
-      console.warn("WebRTC Channel not open for", peerAddress);
     }
   };
 

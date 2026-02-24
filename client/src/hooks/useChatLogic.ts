@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
@@ -23,9 +23,9 @@ export interface ActiveSession {
 }
 
 /**
- * 1. Manage peer-to-peer connection states, handshakes, and multiple active chat sessions
- * @param {UseChatLogicProps} props - Dependencies including socket instance, crypto functions, and relay URL
- * @returns {object} Chat state variables and interactive handler functions
+ * 1. Manage chat sessions, pending handshake requests, and active peers
+ * @param {UseChatLogicProps} params - The initialization parameters
+ * @returns {object} { targetUsername, setTargetUsername, activeChat, activeUsername, myUsername, pendingRequests, activeSessions, switchChat, isSearching, initiators, handleConnectPeer, handleAcceptRequest, handleRejectRequest }
  */
 export const useChatLogic = ({
   address,
@@ -44,9 +44,13 @@ export const useChatLogic = ({
   );
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
-
-  // FIX: State untuk nginget siapa yang Initiator di tiap sesi
   const [initiators, setInitiators] = useState<Record<string, boolean>>({});
+
+  const activeSessionsRef = useRef<ActiveSession[]>([]);
+
+  useEffect(() => {
+    activeSessionsRef.current = activeSessions;
+  }, [activeSessions]);
 
   useEffect(() => {
     if (address && relayUrl) {
@@ -64,6 +68,23 @@ export const useChatLogic = ({
       from: string;
       ephemeralPublicKey: string;
     }) => {
+      const peerAddress = data.from.toLowerCase();
+
+      const existingSession = activeSessionsRef.current.find(
+        (s) => s.address === peerAddress,
+      );
+
+      if (existingSession && ephemeralPublicKey) {
+        computeSecret(peerAddress, data.ephemeralPublicKey);
+        socket.emit("handshake_response", {
+          to: peerAddress,
+          ephemeralPublicKey: ephemeralPublicKey,
+        });
+
+        setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
+        return;
+      }
+
       let incomingUser = "Unknown";
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
@@ -92,7 +113,7 @@ export const useChatLogic = ({
       socket.off("handshake_offer", onHandshakeOffer);
       socket.off("handshake_answer", onHandshakeAnswer);
     };
-  }, [socket, computeSecret, relayUrl]);
+  }, [socket, computeSecret, relayUrl, ephemeralPublicKey]);
 
   const handleConnectPeer = async () => {
     if (!targetUsername.trim()) return;
@@ -119,7 +140,6 @@ export const useChatLogic = ({
 
       setActiveChat(peerAddress);
       setActiveUsername(targetUsername.trim());
-
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {

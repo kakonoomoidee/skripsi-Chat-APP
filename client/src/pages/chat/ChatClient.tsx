@@ -11,10 +11,6 @@ import { useRelay } from "@/hooks/useRelay";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { shortenAddress, formatTime } from "@/utils/format";
 
-/**
- * 1. Main Chat Dashboard Component orchestrating UI, multi-tab P2P communication, and node management.
- * @returns {JSX.Element}
- */
 export default function ChatDashboard() {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
@@ -66,6 +62,11 @@ export default function ChatDashboard() {
     "sessions",
   );
 
+  // FIX: State untuk Auto-Delete (Default: Never)
+  const [autoDeleteMode, setAutoDeleteMode] = useState<string>(() => {
+    return localStorage.getItem("autoDeleteMode") || "never";
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +93,51 @@ export default function ChatDashboard() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // FIX: Efek Sweeper Auto-Delete pas komponen di-load
+  useEffect(() => {
+    const sweepOldMessages = async () => {
+      if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
+
+      const now = Date.now();
+      let thresholdTime = now;
+
+      if (autoDeleteMode === "1") thresholdTime = now - 24 * 60 * 60 * 1000;
+      else if (autoDeleteMode === "3")
+        thresholdTime = now - 3 * 24 * 60 * 60 * 1000;
+      else if (autoDeleteMode === "7")
+        thresholdTime = now - 7 * 24 * 60 * 60 * 1000;
+      else if (autoDeleteMode === "30")
+        thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
+
+      try {
+        await db.messages.where("timestamp").below(thresholdTime).delete();
+      } catch (err) {
+        console.error("Failed to sweep old messages", err);
+      }
+    };
+
+    sweepOldMessages();
+  }, [autoDeleteMode]);
+
+  // FIX: Efek khusus buat 'Burn on Close'
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (autoDeleteMode === "close") {
+        db.messages.clear(); // Hapus semua pesan secara sinkronus sblm tab mati
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [autoDeleteMode]);
+
+  // FIX: Handler pas user ganti dropdown mode
+  const handleModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const mode = e.target.value;
+    setAutoDeleteMode(mode);
+    localStorage.setItem("autoDeleteMode", mode);
+  };
 
   useEffect(() => {
     const current = activeChat?.toLowerCase();
@@ -167,7 +213,6 @@ export default function ChatDashboard() {
       try {
         const encryptedImage = encrypt(currentChat, base64);
         sendDataViaWebRTC(currentChat, encryptedImage);
-
         await db.messages.add({
           ownerAddress: address.toLowerCase(),
           chatId: currentChat.toLowerCase(),
@@ -195,8 +240,15 @@ export default function ChatDashboard() {
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30">
       <div className="w-80 bg-zinc-950/80 flex flex-col border-r border-zinc-800">
         <div className="p-6 pb-4">
-          <h2 className="text-xl font-bold text-zinc-100 tracking-tight">
-            Secure<span className="text-indigo-500">P2P</span>
+          <h2 className="text-xl font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+            <img
+              src="/logo.png"
+              alt="SecureP2P Logo"
+              className="w-6 h-6 object-contain"
+            />
+            <span>
+              Secure<span className="text-indigo-500">P2P</span>
+            </span>
           </h2>
           <div className="mt-4 bg-zinc-900 p-4 rounded-xl border border-zinc-800/80 shadow-sm">
             <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-2 font-semibold">
@@ -266,7 +318,7 @@ export default function ChatDashboard() {
             onClick={() => setActiveTab("requests")}
             className={`pb-2 text-xs font-semibold uppercase tracking-widest transition-colors flex items-center gap-1 ${activeTab === "requests" ? "text-amber-400 border-b-2 border-amber-400" : "text-zinc-600 hover:text-zinc-400"}`}
           >
-            Requests
+            Requests{" "}
             {pendingRequests.length > 0 && (
               <span className="bg-amber-500 text-zinc-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
                 {pendingRequests.length}
@@ -368,18 +420,38 @@ export default function ChatDashboard() {
           )}
         </div>
 
-        <div className="p-5 border-t border-zinc-800 flex flex-col gap-2.5">
+        <div className="p-5 border-t border-zinc-800 flex flex-col gap-3">
           <input
             type="file"
             accept=".securep2p"
             ref={fileInputRef}
             className="hidden"
           />
-          <div className="flex gap-2">
-            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2 rounded-lg border border-zinc-800/80">
+
+          {/* FIX: Tambahan Dropdown Auto-Delete */}
+          <div>
+            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+              Auto-Delete History
+            </label>
+            <select
+              value={autoDeleteMode}
+              onChange={handleModeChange}
+              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs rounded-lg px-3 py-2 outline-none cursor-pointer focus:border-indigo-500 transition-colors"
+            >
+              <option value="never">Never (Keep Forever)</option>
+              <option value="30">Older than 30 Days</option>
+              <option value="7">Older than 7 Days</option>
+              <option value="3">Older than 3 Days</option>
+              <option value="1">Older than 24 Hours</option>
+              <option value="close">Burn on Close (Incognito)</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2 mt-1">
+            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors">
               Import
             </button>
-            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2 rounded-lg border border-zinc-800/80">
+            <button className="flex-1 text-xs font-medium bg-zinc-900 text-zinc-400 py-2.5 rounded-lg border border-zinc-800/80 hover:bg-zinc-800 transition-colors">
               Export
             </button>
           </div>
@@ -388,7 +460,7 @@ export default function ChatDashboard() {
               logout();
               navigate("/login");
             }}
-            className="w-full text-xs font-medium text-red-400 hover:bg-zinc-900 py-2 rounded-lg transition-colors"
+            className="w-full text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500 py-2.5 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
           >
             Sign Out
           </button>
