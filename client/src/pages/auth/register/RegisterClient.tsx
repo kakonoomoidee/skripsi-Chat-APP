@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
-import { RelaySelector, PasswordInput } from "@/components/shared"; // Import PasswordInput
+import { RelaySelector, PasswordInput } from "@/components/shared";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -91,6 +91,9 @@ export default function RegisterPage() {
     }
   };
 
+  // -------------------------------------------------------------
+  // RENDER: Seed Phrase Backup Screen
+  // -------------------------------------------------------------
   if (seedPhrase) {
     return (
       <AuthLayout
@@ -117,7 +120,11 @@ export default function RegisterPage() {
         </div>
         <button
           onClick={handleCopyAndProceed}
-          className={`w-full font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 ${isCopied ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20" : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"}`}
+          className={`w-full font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 ${
+            isCopied
+              ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+              : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+          }`}
         >
           {isCopied ? (
             <>
@@ -159,12 +166,15 @@ export default function RegisterPage() {
     );
   }
 
+  // -------------------------------------------------------------
+  // RENDER: Main Registration Screen
+  // -------------------------------------------------------------
   return (
     <AuthLayout
       title="Create Identity"
       subtitle="Register and secure your identity locally."
     >
-      <WalletDisplay address={address} />
+      {address && <WalletDisplay address={address} />}
 
       {localError && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
@@ -172,7 +182,8 @@ export default function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleRegister} className="space-y-5">
+      {/* Reduced spacing from space-y-5 to space-y-4 to let the form breathe and avoid cramped layout on smaller screens */}
+      <form onSubmit={handleRegister} className="space-y-4">
         <div>
           <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">
             Username
@@ -187,7 +198,15 @@ export default function RegisterPage() {
                 )
               }
               placeholder="e.g. Satoshi"
-              className={`w-full px-4 py-3 bg-zinc-900 border text-zinc-100 rounded-xl outline-none transition-all placeholder:text-zinc-600 pr-10 shadow-sm ${isChecking ? "border-amber-500/50" : isAvailable === true ? "border-emerald-500/50 focus:ring-1 focus:ring-emerald-500" : isAvailable === false ? "border-red-500/50 focus:ring-1 focus:ring-red-500" : "border-zinc-800 focus:ring-1 focus:ring-indigo-500"}`}
+              className={`w-full px-4 py-3 bg-zinc-900 border text-zinc-100 rounded-xl outline-none transition-all placeholder:text-zinc-600 pr-10 shadow-sm ${
+                isChecking
+                  ? "border-amber-500/50"
+                  : isAvailable === true
+                    ? "border-emerald-500/50 focus:ring-1 focus:ring-emerald-500"
+                    : isAvailable === false
+                      ? "border-red-500/50 focus:ring-1 focus:ring-red-500"
+                      : "border-zinc-800 focus:ring-1 focus:ring-indigo-500"
+              }`}
               disabled={isLoading}
             />
             <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
@@ -233,7 +252,6 @@ export default function RegisterPage() {
           )}
         </div>
 
-        {/* REFACTORED: Using the shared PasswordInput with custom placeholder */}
         <PasswordInput
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -254,7 +272,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={isLoading || isAvailable === false || isChecking}
-          className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
+          className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
         >
           {walletLoading
             ? "Encrypting Key..."
@@ -263,7 +281,7 @@ export default function RegisterPage() {
               : "Create & Encrypt"}
         </button>
 
-        <div className="pt-4 mt-2 border-t border-zinc-800/50 text-center text-sm text-zinc-500">
+        <div className="pt-3 mt-1 border-t border-zinc-800/50 text-center text-sm text-zinc-500">
           Already registered on this device?{" "}
           <Link
             to="/login"
