@@ -1,10 +1,11 @@
-import { useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { formatTime } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 
 /**
  * Chat Area Component connected to Context
- * Includes responsive hamburger menu for mobile drawer toggling.
+ * REFACTORED: Uses native Flexbox (shrink-0 & min-h-0) instead of absolute positioning
+ * for flawless scrolling, even with massive text blocks.
  * @returns {JSX.Element}
  */
 export default function ChatArea() {
@@ -23,14 +24,15 @@ export default function ChatArea() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-scroll to bottom logic
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   if (!activeChat) {
     return (
-      <div className="flex-1 flex flex-col bg-zinc-950 relative w-full">
-        <div className="h-16 border-b border-zinc-800 flex md:hidden items-center px-4 bg-zinc-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
+      <div className="flex flex-col bg-zinc-950 w-full h-full overflow-hidden">
+        <div className="h-16 shrink-0 border-b border-zinc-800 flex md:hidden items-center px-4 bg-zinc-950 w-full">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
             className="p-2 mr-2 text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -51,7 +53,7 @@ export default function ChatArea() {
           </button>
           <p className="text-zinc-600 text-sm font-medium">Select a Chat</p>
         </div>
-        <div className="flex-1 p-8 pt-24 pb-32 overflow-y-auto custom-scrollbar flex items-center justify-center flex-col text-zinc-600">
+        <div className="flex-1 min-h-0 p-8 overflow-y-auto custom-scrollbar flex items-center justify-center flex-col text-zinc-600">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-inner">
             <svg
               className="w-8 h-8 text-zinc-500"
@@ -79,8 +81,10 @@ export default function ChatArea() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-zinc-950 relative w-full">
-      <div className="h-16 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
+    // The main wrapper must have h-full and overflow-hidden to contain the flexbox
+    <div className="flex flex-col bg-zinc-950 w-full h-full overflow-hidden">
+      {/* HEADER: shrink-0 prevents it from squishing, removed absolute */}
+      <div className="h-16 shrink-0 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950 w-full z-10">
         <div className="flex items-center w-full">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
@@ -125,15 +129,16 @@ export default function ChatArea() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-8 pt-24 pb-32 overflow-y-auto custom-scrollbar">
+      {/* CHAT MESSAGES AREA: flex-1 takes remaining space, min-h-0 is the secret sauce to allow inner scrolling */}
+      <div className="flex-1 min-h-0 px-4 md:px-8 py-6 overflow-y-auto custom-scrollbar">
         <div className="space-y-6">
           {messages?.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.isMine ? "justify-end" : "justify-start"}`}
+              className={`flex w-full ${msg.isMine ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[85%] md:max-w-[65%] px-5 py-3 shadow-sm ${
+                className={`relative flex flex-col max-w-[85%] md:max-w-[65%] min-w-[80px] px-4 py-3 shadow-sm ${
                   msg.isMine
                     ? "bg-indigo-600 text-zinc-50 rounded-2xl rounded-tr-sm"
                     : "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-2xl rounded-tl-sm"
@@ -143,20 +148,23 @@ export default function ChatArea() {
                   <img
                     src={msg.text}
                     alt="p2p-attachment"
-                    className="rounded-lg max-w-full h-auto mb-2 border border-white/10"
+                    className="rounded-lg max-w-full h-auto mb-1 border border-white/10"
                   />
                 ) : (
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap wrap-break-words">
+                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
                     {msg.text}
                   </p>
                 )}
-                <p
-                  className={`text-[10px] mt-2 font-medium ${
-                    msg.isMine ? "text-indigo-200 text-right" : "text-zinc-500"
+
+                <span
+                  className={`text-[10px] mt-1.5 font-medium select-none ${
+                    msg.isMine
+                      ? "text-indigo-200 text-right"
+                      : "text-zinc-500 text-left"
                   }`}
                 >
                   {formatTime(msg.timestamp)}
-                </p>
+                </span>
               </div>
             </div>
           ))}
@@ -164,7 +172,8 @@ export default function ChatArea() {
         </div>
       </div>
 
-      <div className="p-4 md:p-6 bg-zinc-950/80 backdrop-blur-md border-t border-zinc-800 absolute bottom-0 w-full z-20">
+      {/* FOOTER / INPUT: shrink-0 prevents squishing, removed absolute */}
+      <div className="shrink-0 p-4 md:p-6 border-t border-zinc-800 bg-zinc-950 w-full z-20">
         <form
           onSubmit={handleSendMessage}
           className="flex gap-2 md:gap-3 max-w-5xl mx-auto items-center"
@@ -180,7 +189,7 @@ export default function ChatArea() {
             type="button"
             onClick={() => imageInputRef.current?.click()}
             disabled={!isWebRTCConnected}
-            className="p-3 text-zinc-400 hover:text-indigo-400 bg-zinc-900 rounded-xl border border-zinc-800 transition-colors disabled:opacity-50"
+            className="p-3 text-zinc-400 hover:text-indigo-400 bg-zinc-900 rounded-xl border border-zinc-800 transition-colors disabled:opacity-50 shrink-0"
           >
             <svg
               className="w-5 h-5"
@@ -202,12 +211,12 @@ export default function ChatArea() {
             onChange={(e) => setMessageInput(e.target.value)}
             disabled={!isWebRTCConnected}
             placeholder={isWebRTCConnected ? `Message...` : "Connecting..."}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 outline-none focus:ring-1 focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-50 transition-all placeholder-zinc-600"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 outline-none focus:ring-1 focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-50 transition-all placeholder-zinc-600 min-w-0"
           />
           <button
             type="submit"
             disabled={!messageInput.trim() || !isWebRTCConnected}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 py-3 text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 md:px-5 py-3 text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 shrink-0 flex items-center justify-center"
           >
             <svg
               className="w-5 h-5 md:hidden"
