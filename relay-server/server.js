@@ -2,68 +2,116 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-const { createClient } = require("redis");
-const { createAdapter } = require("@socket.io/redis-adapter");
-
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { ethers } = require("ethers");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 
-// Load ABI
 const IdentityRegistryABI = require("./identity_abi.json");
+const RelayRegistryABI = require("./relay_registry_abi.json");
 
-// Setup Express
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Setup HTTP Server
 const httpServer = http.createServer(app);
 
-// --- 1. SETUP BLOCKCHAIN CONNECTION ---
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const relayerWallet = new ethers.Wallet(
-  process.env.RELAYER_PRIVATE_KEY,
-  provider,
-);
-const contract = new ethers.Contract(
+const relayerKey =
+  process.env.RELAYER_PRIVATE_KEY || process.env.DEFAULT_RELAYER_KEY;
+const relayerWallet = new ethers.Wallet(relayerKey, provider);
+
+const identityContract = new ethers.Contract(
   process.env.CONTRACT_ADDRESS,
   IdentityRegistryABI,
+  relayerWallet,
+);
+
+const relayRegistryContract = new ethers.Contract(
+  process.env.RELAY_REGISTRY_ADDRESS,
+  RelayRegistryABI,
   relayerWallet,
 );
 
 console.log(`Blockchain connected via: ${process.env.RPC_URL}`);
 console.log(`Relayer Address: ${relayerWallet.address}`);
 
-// --- 2. SETUP REDIS (PUBSUB MESSAGING) ---
-const pubClient = createClient({ url: process.env.REDIS_URL });
-const subClient = pubClient.duplicate();
-
-// --- 3. SETUP SOCKET.IO ---
 const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
-// Initialize Redis & Socket Adapter
-Promise.all([pubClient.connect(), subClient.connect()])
-  .then(() => {
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log("Redis Adapter connected. Pub/Sub mode active.");
-  })
-  .catch((err) => {
-    console.error("Redis connection failed:", err);
-  });
-
-// --- IN-MEMORY STORAGE (For Auth Nonces) ---
-// Note: In a production cluster, use Redis for this storage too.
 const activeNonces = {};
+let knownRelays = [];
+const MY_PUBLIC_URL = `http://localhost:${process.env.PORT}`;
 
-// ==========================================
-// SOCKET MIDDLEWARE (Authentication)
-// ==========================================
+/**
+ * Synchronizes the list of active relay nodes directly from the blockchain smart contract.
+ * @returns {Promise<void>}
+ */
+async function syncRelaysFromBlockchain() {
+  try {
+    const relays = await relayRegistryContract.getAllRelays();
+    knownRelays = relays
+      .filter((r) => r.isActive && r.url !== MY_PUBLIC_URL)
+      .map((r) => r.url);
+
+    console.log(
+      `Synced ${knownRelays.length} external relay(s) from Blockchain.`,
+    );
+  } catch (error) {
+    console.error("Failed to sync relays from blockchain:", error.message);
+  }
+}
+
+/**
+ * Automatically checks and registers the relay to the blockchain upon startup.
+ * @returns {Promise<void>}
+ */
+async function checkAndAutoRegister() {
+  try {
+    const relays = await relayRegistryContract.getAllRelays();
+    const isRegistered = relays.find(
+      (r) => r.owner.toLowerCase() === relayerWallet.address.toLowerCase(),
+    );
+
+    if (!isRegistered) {
+      console.log(`Auto-registering ${MY_PUBLIC_URL} to Blockchain...`);
+      const tx = await relayRegistryContract.registerRelay(MY_PUBLIC_URL);
+      await tx.wait();
+      console.log("Auto-registration successful!");
+    } else {
+      console.log(`Relay already registered: ${isRegistered.url}`);
+    }
+
+    syncRelaysFromBlockchain();
+  } catch (error) {
+    console.error("Auto-registration failed:", error.reason || error.message);
+  }
+}
+
+relayRegistryContract.on("NewRelayRegistered", (url, owner) => {
+  console.log(`New relay registered on blockchain: ${url} by ${owner}`);
+  syncRelaysFromBlockchain();
+});
+
+checkAndAutoRegister();
+
+/**
+ * Broadcasts socket events to all known external relay servers (Gossip Protocol).
+ * @param {string} event - The socket event name
+ * @param {string} to - The target user's wallet address
+ * @param {object} data - The payload to transmit
+ * @returns {void}
+ */
+const gossipToOtherRelays = (event, to, data) => {
+  knownRelays.forEach((relayUrl) => {
+    axios
+      .post(`${relayUrl}/internal/gossip`, { event, to, data })
+      .catch(() => {});
+  });
+};
+
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
 
@@ -77,77 +125,51 @@ io.use((socket, next) => {
         new Error("Authentication failed: Invalid or expired token."),
       );
     }
-
-    // Attach user address to the socket session
     socket.userAddress = decoded.address;
     next();
   });
 });
 
-// ==========================================
-// SOCKET EVENTS (Messaging Logic)
-// ==========================================
 io.on("connection", (socket) => {
   const user = socket.userAddress.toLowerCase();
-  console.log(`Client connected: ${user}`);
+  console.log(`Client connected locally: ${user}`);
 
-  // Automatically join a room based on their Wallet Address
   socket.join(user);
 
-  // Handle sending messages
   socket.on("send_message", (data) => {
     const to = data.to.toLowerCase();
-    const { encryptedMessage } = data;
-
-    console.log(
-      `Message routed: ${user} -> ${to}, Encrypted: ${encryptedMessage}`,
-    );
-
-    // Relay the message to the target room
-    io.to(to).emit("receive_message", {
+    const payload = {
       from: user,
-      message: encryptedMessage,
+      message: data.encryptedMessage,
       timestamp: Date.now(),
-    });
+    };
+
+    io.to(to).emit("receive_message", payload);
+    gossipToOtherRelays("receive_message", to, payload);
   });
 
-  // ======================================================
-  // HANDSHAKE SIGNALING
-  // ======================================================
-  // STEP 1: User A initiates handshake with User B
   socket.on("handshake_init", (data) => {
     const to = data.to.toLowerCase();
-    const { ephemeralPublicKey } = data;
-    console.log(`Handshake Init: ${user} -> ${to}`);
+    const payload = { from: user, ephemeralPublicKey: data.ephemeralPublicKey };
 
-    io.in(to).emit("handshake_offer", {
-      from: user,
-      ephemeralPublicKey: ephemeralPublicKey,
-    });
+    io.to(to).emit("handshake_offer", payload);
+    gossipToOtherRelays("handshake_offer", to, payload);
   });
 
-  // STEP 2: User B responds to handshake offer
   socket.on("handshake_response", (data) => {
     const to = data.to.toLowerCase();
-    const { ephemeralPublicKey } = data;
-    console.log(`Handshake Response: ${user} -> ${to}`);
+    const payload = { from: user, ephemeralPublicKey: data.ephemeralPublicKey };
 
-    io.in(to).emit("handshake_answer", {
-      from: user,
-      ephemeralPublicKey: ephemeralPublicKey,
-    });
+    io.to(to).emit("handshake_answer", payload);
+    gossipToOtherRelays("handshake_answer", to, payload);
   });
 
-  // ======================================================
-  // WEBRTC SIGNALING (For P2P Data Channel)
-  // ======================================================
   socket.on("webrtc_signal", (data) => {
     const to = data.to.toLowerCase();
+    const payload = { from: user, signal: data.signal };
 
-    io.in(to).emit("webrtc_signal", {
-      from: user,
-      signal: data.signal,
-    });
+    io.to(to).emit("webrtc_signal", payload);
+    gossipToOtherRelays("webrtc_signal", to, payload);
   });
 
   socket.on("disconnect", () => {
@@ -155,61 +177,56 @@ io.on("connection", (socket) => {
   });
 });
 
-// ==========================================
-// AUTHENTICATION API
-// ==========================================
+app.post("/internal/gossip", (req, res) => {
+  const { event, to, data } = req.body;
+  io.to(to).emit(event, data);
+  res.sendStatus(200);
+});
 
-/**
- * 1. Request Challenge (Nonce)
- * Payload: { address: "0x..." }
- */
+app.post("/admin/register-relay", async (req, res) => {
+  const { url } = req.body;
+  try {
+    const tx = await relayRegistryContract.registerRelay(url || MY_PUBLIC_URL);
+    await tx.wait();
+    res.json({
+      success: true,
+      message: "Relay successfully registered to Blockchain!",
+      txHash: tx.hash,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: error.reason || "Blockchain transaction failed" });
+  }
+});
+
 app.post("/auth/challenge", (req, res) => {
   const { address } = req.body;
-  if (!address) {
+  if (!address)
     return res.status(400).json({ error: "Wallet address is required." });
-  }
 
-  // Generate a random nonce with a standard prefix
   const nonce = `AUTH-CHALLENGE-${Math.floor(Math.random() * 1000000)}`;
-
-  // Store nonce temporarily
   activeNonces[address] = nonce;
-
-  console.log(`Nonce generated for ${address}: ${nonce}`);
   res.json({ nonce });
 });
 
-/**
- * 2. Login (Verify Signature & Check Blockchain Identity)
- * Payload: { address: "0x...", signature: "0x..." }
- */
 app.post("/auth/login", async (req, res) => {
   const { address, signature } = req.body;
-
-  // Retrieve the nonce assigned to this address
   const nonce = activeNonces[address];
-  if (!nonce) {
-    return res.status(400).json({
-      error: "Nonce not found or expired. Please request a new challenge.",
-    });
-  }
+
+  if (!nonce)
+    return res.status(400).json({ error: "Nonce not found or expired." });
 
   try {
-    const userData = await contract.users(address);
-
-    // Verify the isRegistered property from the User struct
+    const userData = await identityContract.users(address);
     if (!userData || userData.isRegistered === false) {
-      console.warn(
-        `Login rejected: ${address} attempted to login without registration.`,
-      );
-      return res.status(403).json({
-        error: "Identity not found on the blockchain. Please register first.",
-      });
+      return res
+        .status(403)
+        .json({ error: "Identity not found. Please register first." });
     }
 
     const sig = ethers.Signature.from(signature);
-
-    const isValid = await contract.verifyLoginSignature(
+    const isValid = await identityContract.verifyLoginSignature(
       address,
       nonce,
       sig.v,
@@ -218,43 +235,24 @@ app.post("/auth/login", async (req, res) => {
     );
 
     if (isValid) {
-      // Generate JWT Token
       const token = jwt.sign({ address }, process.env.JWT_SECRET, {
         expiresIn: "1d",
       });
-
-      // Cleanup nonce to prevent replay attacks
       delete activeNonces[address];
-
-      console.log(`Authentication successful: ${address}`);
       res.json({ token, message: "Login successful." });
     } else {
-      console.warn(`Authentication failed: Invalid signature for ${address}`);
-      res
-        .status(401)
-        .json({ error: "Invalid signature. Authentication failed." });
+      res.status(401).json({ error: "Invalid signature." });
     }
   } catch (error) {
-    console.error("Login System Error:", error);
-    res
-      .status(500)
-      .json({ error: "Internal Server Error during verification." });
+    res.status(500).json({ error: "Internal Server Error." });
   }
 });
 
-/**
- * 3. Gasless Registration
- * Payload: { userAddress, username, publicKey, signature }
- */
 app.post("/auth/register", async (req, res) => {
   const { userAddress, username, publicKey, signature } = req.body;
-  console.log(`Incoming registration request for: ${username}`);
-
   try {
     const sig = ethers.Signature.from(signature);
-
-    // Execute transaction on Blockchain (Relayer pays gas)
-    const tx = await contract.registerUser(
+    const tx = await identityContract.registerUser(
       userAddress,
       username,
       publicKey,
@@ -262,81 +260,39 @@ app.post("/auth/register", async (req, res) => {
       sig.r,
       sig.s,
     );
-
-    console.log(`Transaction sent. Hash: ${tx.hash}`);
-
-    // Wait for confirmation
     await tx.wait();
-
-    console.log(`Registration confirmed for ${username}`);
-    res.json({
-      success: true,
-      txHash: tx.hash,
-      message: "User registered successfully.",
-    });
+    res.json({ success: true, txHash: tx.hash });
   } catch (error) {
-    console.error("Registration Failed:", error);
-
-    // Return a cleaner error message if possible
-    const errorMessage = error.reason || "Blockchain transaction failed.";
-    res.status(500).json({ error: errorMessage });
+    res.status(500).json({ error: error.reason || "Transaction failed." });
   }
 });
 
-/**
- * 4. Resolve Username to Wallet Address
- * Endpoint: GET /auth/address/:username
- */
 app.get("/auth/address/:username", async (req, res) => {
-  const { username } = req.params;
-
-  console.log(`Resolving address for username: ${username}`);
-
   try {
-    // Query the Blockchain via getAddressByUsername function
-    const resolvedAddress = await contract.getAddressByUsername(username);
-
-    // In Solidity, non-existent data defaults to address(0)
-    if (
-      resolvedAddress === "0x0000000000000000000000000000000000000000" ||
-      resolvedAddress === ethers.ZeroAddress
-    ) {
-      return res.status(404).json({
-        error: "Username not found on the Blockchain network.",
-      });
+    const resolvedAddress = await identityContract.getAddressByUsername(
+      req.params.username,
+    );
+    if (resolvedAddress === ethers.ZeroAddress) {
+      return res.status(404).json({ error: "Username not found." });
     }
-
-    // If found, return the resolved address
-    res.json({
-      username: username,
-      address: resolvedAddress,
-    });
+    res.json({ username: req.params.username, address: resolvedAddress });
   } catch (error) {
-    console.error("Failed to resolve username:", error);
-    res.status(500).json({
-      error: "Internal server error occurred while resolving identity.",
-    });
+    res.status(500).json({ error: "Server error resolving identity." });
   }
 });
 
-/**
- * 5. Resolve Wallet Address to Username (Reverse Lookup)
- * Endpoint: GET /auth/user/:address
- */
 app.get("/auth/user/:address", async (req, res) => {
   try {
-    const userData = await contract.users(req.params.address);
-    if (!userData || !userData.isRegistered) {
+    const userData = await identityContract.users(req.params.address);
+    if (!userData || !userData.isRegistered)
       return res.status(404).json({ error: "User not found" });
-    }
     res.json({ username: userData.username });
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// START SERVER
 httpServer.listen(process.env.PORT, () => {
   console.log(`Relay Server running on port ${process.env.PORT}`);
-  console.log(`STATUS: WebSocket Active | Redis Active | Blockchain Active`);
+  console.log(`STATUS: WebSocket Active | Decentralized Gossip Active`);
 });
