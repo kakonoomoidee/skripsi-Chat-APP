@@ -64,12 +64,38 @@ async function syncRelaysFromBlockchain() {
   }
 }
 
+/**
+ * Automatically checks and registers the relay to the blockchain upon startup.
+ * @returns {Promise<void>}
+ */
+async function checkAndAutoRegister() {
+  try {
+    const relays = await relayRegistryContract.getAllRelays();
+    const isRegistered = relays.find(
+      (r) => r.owner.toLowerCase() === relayerWallet.address.toLowerCase(),
+    );
+
+    if (!isRegistered) {
+      console.log(`Auto-registering ${MY_PUBLIC_URL} to Blockchain...`);
+      const tx = await relayRegistryContract.registerRelay(MY_PUBLIC_URL);
+      await tx.wait();
+      console.log("Auto-registration successful!");
+    } else {
+      console.log(`Relay already registered: ${isRegistered.url}`);
+    }
+
+    syncRelaysFromBlockchain();
+  } catch (error) {
+    console.error("Auto-registration failed:", error.reason || error.message);
+  }
+}
+
 relayRegistryContract.on("NewRelayRegistered", (url, owner) => {
   console.log(`New relay registered on blockchain: ${url} by ${owner}`);
   syncRelaysFromBlockchain();
 });
 
-syncRelaysFromBlockchain();
+checkAndAutoRegister();
 
 /**
  * Broadcasts socket events to all known external relay servers (Gossip Protocol).
