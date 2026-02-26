@@ -55,14 +55,18 @@ export interface ChatContextValue {
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (isOpen: boolean) => void;
   resetWallet: () => void;
+  requestPeerWallet: () => void;
+  peerWalletAddress: string | null;
+  handleSendCrypto: (amount: string) => Promise<void>;
+  showToast: (msg: string, type?: "error" | "success") => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 /**
  * Global Chat Provider
- * Wraps the chat application to provide decoupled state management and custom modals.
- * @param {ReactNode} children - The child components
+ * @param {object} props - The component properties
+ * @param {ReactNode} props.children - The child components
  * @returns {JSX.Element}
  */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
@@ -116,7 +120,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(true);
 
-  // Custom Modal State for Seed Phrase instead of native window.prompt
   const [seedModal, setSeedModal] = useState<{
     isOpen: boolean;
     type: "import" | "export";
@@ -124,6 +127,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }>({ isOpen: false, type: "export" });
   const [seedInput, setSeedInput] = useState<string>("");
   const [modalError, setModalError] = useState<string>("");
+
+  const [peerWalletAddress, setPeerWalletAddress] = useState<string | null>(
+    null,
+  );
+
+  const [toast, setToast] = useState<{
+    show: boolean;
+    msg: string;
+    type: "error" | "success";
+  }>({
+    show: false,
+    msg: "",
+    type: "error",
+  });
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
 
@@ -140,6 +157,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     [activeChat, address],
     [],
   );
+
+  /**
+   * Triggers a temporary toast notification
+   * @param {string} msg - The message to display
+   * @param {"error" | "success"} type - The style of the toast
+   * @returns {void}
+   */
+  const showToast = (msg: string, type: "error" | "success" = "error") => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3500);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) navigate("/login");
@@ -207,6 +237,148 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     initiators,
   ]);
 
+  useEffect(() => {
+    const checkIncomingForWalletRequests = async () => {
+      if (!messages || messages.length === 0 || !activeChat) return;
+      const lastMsg = messages[messages.length - 1];
+
+      if (lastMsg.isMine || lastMsg.id === undefined) return;
+
+      try {
+        const payload = JSON.parse(lastMsg.text);
+        if (payload.type === "WALLET_REQUEST") {
+          const myMetaMask = localStorage.getItem("linked_metamask");
+          if (myMetaMask) {
+            const responsePayload = JSON.stringify({
+              type: "WALLET_RESPONSE",
+              address: myMetaMask,
+            });
+            const encryptedPayload = encrypt(activeChat, responsePayload);
+            if (encryptedPayload && lastMsg.id) {
+              sendDataViaWebRTC(activeChat, encryptedPayload);
+              await db.messages.delete(lastMsg.id);
+            }
+          }
+        } else if (payload.type === "WALLET_RESPONSE" && lastMsg.id) {
+          setPeerWalletAddress(payload.address);
+          await db.messages.delete(lastMsg.id);
+        } else if (payload.type === "TX_SUCCESS" && lastMsg.id) {
+          await db.messages.update(lastMsg.id, {
+            text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
+          });
+        }
+      } catch (e) {}
+    };
+    checkIncomingForWalletRequests();
+  }, [messages, activeChat, encrypt, sendDataViaWebRTC]);
+
+  /**
+   * Initiates the P2P request for the peer's connected MetaMask wallet address.
+   * @returns {void}
+   */
+  const requestPeerWallet = () => {
+    const currentChat = activeChat as string;
+    if (!currentChat || !hasSecret(currentChat) || !isWebRTCConnected) return;
+
+    const requestPayload = JSON.stringify({ type: "WALLET_REQUEST" });
+    const encryptedPayload = encrypt(currentChat, requestPayload);
+
+    if (encryptedPayload) {
+      sendDataViaWebRTC(currentChat, encryptedPayload);
+    }
+  };
+
+  /**
+   * Ensures MetaMask is on the local network and triggers the transaction
+   * @param {string} amount - The amount of ETH to send
+   * @returns {Promise<void>}
+   */
+  const handleSendCrypto = async (amount: string) => {
+    if (!peerWalletAddress) {
+      throw new Error("Peer wallet address not resolved yet.");
+    }
+
+    if (typeof window.ethereum === "undefined") {
+      throw new Error(
+        "MetaMask is not installed. Please link it in the Security settings.",
+      );
+    }
+
+    const myMetaMask = localStorage.getItem("linked_metamask");
+    if (!myMetaMask) {
+      throw new Error(
+        "Your MetaMask is not linked. Please link it in the Security settings.",
+      );
+    }
+
+    if (myMetaMask.toLowerCase() === peerWalletAddress.toLowerCase()) {
+      throw new Error(
+        "Self-Transfer Blocked: Sender and Receiver addresses are identical.",
+      );
+    }
+
+    try {
+      const chainIdHex = "0x539";
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: chainIdHex }],
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: chainIdHex,
+                chainName: "Ganache Local",
+                rpcUrls: ["http://127.0.0.1:7545"],
+                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+
+      const amountHex = ethers.parseEther(amount).toString(16);
+
+      const transactionParameters = {
+        to: peerWalletAddress,
+        from: myMetaMask,
+        value: `0x${amountHex}`,
+      };
+
+      const txHash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [transactionParameters],
+      });
+
+      const currentChat = activeChat as string;
+      const successPayload = JSON.stringify({
+        type: "TX_SUCCESS",
+        hash: txHash,
+      });
+      const encryptedSuccess = encrypt(currentChat, successPayload);
+
+      if (encryptedSuccess) {
+        sendDataViaWebRTC(currentChat, encryptedSuccess);
+      }
+
+      await db.messages.add({
+        ownerAddress: address!.toLowerCase(),
+        chatId: currentChat.toLowerCase(),
+        text: `[SENT] ${amount} ETH\nTx Hash: ${txHash}`,
+        isMine: true,
+        timestamp: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("Direct MetaMask Transfer Error:", error);
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const currentChat = activeChat as string;
@@ -232,7 +404,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       });
       setMessageInput("");
     } catch {
-      alert("Failed to send message. Is WebRTC connected?");
+      showToast("Failed to send message. Is WebRTC connected?", "error");
     }
   };
 
@@ -240,8 +412,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const file = e.target.files?.[0];
     const currentChat = activeChat as string;
     if (!file || !currentChat || !isWebRTCConnected || !address) return;
-    if (file.size > 1024 * 500)
-      return alert("File too large! Max 500KB for P2P demo.");
+    if (file.size > 1024 * 500) {
+      showToast("File too large! Max 500KB for P2P demo.", "error");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -259,7 +433,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           isImage: true,
         });
       } catch {
-        alert("Encryption failed.");
+        showToast("Encryption failed.", "error");
       }
     };
     reader.readAsDataURL(file);
@@ -267,7 +441,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const handleExportChat = async () => {
     const allMessages = await db.messages.toArray();
-    if (allMessages.length === 0) return alert("No chat history to export.");
+    if (allMessages.length === 0) {
+      showToast("No chat history to export.", "error");
+      return;
+    }
     setSeedModal({ isOpen: true, type: "export" });
   };
 
@@ -342,8 +519,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           const parsedMessages = JSON.parse(splitData[0]);
           await db.messages.bulkPut(parsedMessages);
           closeSeedModal();
-          alert("Chat history restored successfully!");
-          window.location.reload();
+          showToast("Chat history restored successfully!", "success");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
         }
       } catch (err) {
         setModalError("Failed to import. File might be corrupted.");
@@ -359,6 +538,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const handleSwitchChatWrapped = (session: any) => {
     switchChat(session);
+    setPeerWalletAddress(null);
     setIsMobileSidebarOpen(false);
   };
 
@@ -402,15 +582,30 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isMobileSidebarOpen,
     setIsMobileSidebarOpen,
     resetWallet,
+    requestPeerWallet,
+    peerWalletAddress,
+    handleSendCrypto,
+    showToast,
   };
 
   return (
     <ChatContext.Provider value={value}>
       {children}
 
-      {/* Custom Seed Phrase Modal */}
+      {toast.show && (
+        <div
+          className={`fixed top-4 right-4 z-[200] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
+            toast.type === "error"
+              ? "bg-red-500/10 border border-red-500/20 text-red-400"
+              : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+          }`}
+        >
+          <span className="text-sm font-medium">{toast.msg}</span>
+        </div>
+      )}
+
       {seedModal.isOpen && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-zinc-100 mb-2">
               {seedModal.type === "export"
