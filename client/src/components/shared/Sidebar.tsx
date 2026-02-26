@@ -1,14 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 import RelaySelector from "./RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
 
-/**
- * Global Sidebar Component connected to Context
- * @returns {JSX.Element}
- */
 export default function Sidebar() {
   const {
     myUsername,
@@ -34,20 +30,66 @@ export default function Sidebar() {
     handleExportChat,
     handleImportChat,
     logout,
-    resetWallet, // Extracted from context
+    resetWallet,
+    searchError,
   } = useChatContext();
 
   const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
     "chats",
   );
 
+  const [recentContacts, setRecentContacts] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("securep2p_recent_contacts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (activeSessions.length > 0) {
+      setRecentContacts((prev) => {
+        const updated = [...prev];
+        let isChanged = false;
+
+        activeSessions.forEach((session) => {
+          if (!updated.find((c) => c.username === session.username)) {
+            updated.push({
+              username: session.username,
+              address: session.address,
+            });
+            isChanged = true;
+          }
+        });
+
+        if (isChanged) {
+          localStorage.setItem(
+            "securep2p_recent_contacts",
+            JSON.stringify(updated),
+          );
+          return updated;
+        }
+        return prev;
+      });
+    }
+  }, [activeSessions]);
+
+  const clearHistory = () => {
+    localStorage.removeItem("securep2p_recent_contacts");
+    setRecentContacts([]);
+  };
+
   const filteredSessions = activeSessions.filter((s) =>
     s.username.toLowerCase().includes(targetUsername.toLowerCase()),
   );
 
+  const isSelfChat =
+    targetUsername.trim().toLowerCase() === myUsername?.toLowerCase();
+
   return (
     <div className="w-80 bg-zinc-950/90 flex flex-col border-r border-zinc-800 backdrop-blur-xl h-full">
-      <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50">
+      <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50 shrink-0">
         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
           <svg
             className="w-5 h-5 text-white"
@@ -68,7 +110,7 @@ export default function Sidebar() {
         </h2>
       </div>
 
-      <div className="flex px-4 pt-4 gap-1 border-b border-zinc-800/50">
+      <div className="flex px-4 pt-4 gap-1 border-b border-zinc-800/50 shrink-0">
         <button
           onClick={() => setActiveTab("chats")}
           className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${activeTab === "chats" ? "text-indigo-400 border-b-2 border-indigo-500" : "text-zinc-500 hover:text-zinc-300"}`}
@@ -94,12 +136,13 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col">
+      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
         {activeTab === "chats" && (
           <div className="p-4 flex flex-col h-full">
-            <div className="relative mb-4 group">
+            <div className="relative mb-4 group shrink-0">
+              {/* REFACTORED: Changed top-2.5 to top-1/2 and added -translate-y-1/2 for perfect absolute vertical centering */}
               <svg
-                className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -121,20 +164,69 @@ export default function Sidebar() {
             </div>
 
             {targetUsername && filteredSessions.length === 0 && (
-              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center">
+              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center shrink-0">
                 <p className="text-xs text-zinc-400 mb-3">
                   No active session with{" "}
                   <span className="text-zinc-200 font-semibold">
                     {targetUsername}
                   </span>
                 </p>
-                <button
-                  onClick={handleConnectPeer}
-                  disabled={isSearching}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {isSearching ? "Searching Network..." : "Start Handshake"}
-                </button>
+
+                {isSelfChat ? (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    Cannot handshake yourself
+                  </div>
+                ) : searchError ? (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-lg flex flex-col items-center justify-center gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {searchError}
+                    </div>
+                    <span className="text-[10px] opacity-70">
+                      Check the username and try again
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectPeer}
+                    disabled={isSearching}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center"
+                  >
+                    {isSearching ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>
+                        Searching Network...
+                      </>
+                    ) : (
+                      "Start Handshake"
+                    )}
+                  </button>
+                )}
               </div>
             )}
 
@@ -163,24 +255,90 @@ export default function Sidebar() {
                   ></div>
                 </div>
               ))}
-              {activeSessions.length === 0 && !targetUsername && (
-                <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 mt-10">
-                  <svg
-                    className="w-8 h-8 opacity-20"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                  <p className="text-xs">No active sessions.</p>
-                </div>
-              )}
+
+              {recentContacts.filter(
+                (rc) =>
+                  !activeSessions.some((as) => as.username === rc.username),
+              ).length > 0 &&
+                !targetUsername && (
+                  <div className="pt-4">
+                    <div className="px-2 flex justify-between items-center mb-2">
+                      <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                        Recent History
+                      </label>
+                      <button
+                        onClick={clearHistory}
+                        className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {recentContacts
+                        .filter(
+                          (rc) =>
+                            !activeSessions.some(
+                              (as) => as.username === rc.username,
+                            ),
+                        )
+                        .map((contact) => (
+                          <div
+                            key={contact.username}
+                            onClick={() => setTargetUsername(contact.username)}
+                            className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
+                              <div className="w-8 h-8 rounded-full bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-zinc-400 font-bold text-xs">
+                                {contact.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
+                                  {contact.username}
+                                </p>
+                                <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
+                                  Disconnected
+                                </p>
+                              </div>
+                            </div>
+                            <svg
+                              className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+                              />
+                            </svg>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+              {activeSessions.length === 0 &&
+                recentContacts.length === 0 &&
+                !targetUsername && (
+                  <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 mt-10">
+                    <svg
+                      className="w-8 h-8 opacity-20"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                    <p className="text-xs">No active sessions or history.</p>
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -242,15 +400,13 @@ export default function Sidebar() {
               changeRelay={changeRelay}
               addCustomRelay={addCustomRelay}
             />
-
             <SecuritySection
               autoDeleteMode={autoDeleteMode}
               handleModeChange={handleModeChange}
               handleExportChat={handleExportChat}
               handleImportChat={handleImportChat}
-              resetWallet={resetWallet} 
+              resetWallet={resetWallet}
             />
-
             <div className="pt-4 border-t border-zinc-800/50">
               <button
                 onClick={logout}

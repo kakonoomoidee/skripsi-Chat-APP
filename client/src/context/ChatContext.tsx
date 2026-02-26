@@ -55,6 +55,7 @@ export interface ChatContextValue {
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (isOpen: boolean) => void;
   resetWallet: () => void;
+  searchError: string;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -89,6 +90,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    searchError,
   } = useChatLogic({
     address,
     socket,
@@ -116,7 +118,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(true);
 
-  // Custom Modal State for Seed Phrase instead of native window.prompt
   const [seedModal, setSeedModal] = useState<{
     isOpen: boolean;
     type: "import" | "export";
@@ -402,13 +403,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isMobileSidebarOpen,
     setIsMobileSidebarOpen,
     resetWallet,
+    searchError,
   };
 
   return (
     <ChatContext.Provider value={value}>
       {children}
 
-      {/* Custom Seed Phrase Modal */}
       {seedModal.isOpen && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
