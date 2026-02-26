@@ -257,7 +257,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        // Not a structured payload; skip processing
+      }
     };
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC]);

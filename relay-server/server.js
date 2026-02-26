@@ -1,4 +1,5 @@
 require("dotenv").config();
+const crypto = require("crypto");
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -7,19 +8,74 @@ const bodyParser = require("body-parser");
 const { ethers } = require("ethers");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const rateLimit = require("express-rate-limit");
 
 const IdentityRegistryABI = require("./identity_abi.json");
 const RelayRegistryABI = require("./relay_registry_abi.json");
 
+// Validate required environment variables at startup
+const REQUIRED_ENV_VARS = [
+  "PORT",
+  "RPC_URL",
+  "CONTRACT_ADDRESS",
+  "RELAY_REGISTRY_ADDRESS",
+  "JWT_SECRET",
+];
+const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error(
+    `FATAL: Missing required environment variables: ${missingVars.join(", ")}`,
+  );
+  process.exit(1);
+}
+
+const relayerKey =
+  process.env.RELAYER_PRIVATE_KEY || process.env.DEFAULT_RELAYER_KEY;
+if (!relayerKey) {
+  console.error(
+    "FATAL: Missing required environment variable: RELAYER_PRIVATE_KEY",
+  );
+  process.exit(1);
+}
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+
+if (allowedOrigins.length === 0) {
+  console.warn(
+    "WARNING: ALLOWED_ORIGINS is not set. Allowing all origins (not safe for production).",
+  );
+}
+
+const corsOptions = {
+  origin:
+    allowedOrigins.length > 0
+      ? (origin, callback) => {
+          if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error("Not allowed by CORS"));
+          }
+        }
+      : "*",
+};
+
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again later." },
+});
 
 const httpServer = http.createServer(app);
 
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const relayerKey =
-  process.env.RELAYER_PRIVATE_KEY || process.env.DEFAULT_RELAYER_KEY;
 const relayerWallet = new ethers.Wallet(relayerKey, provider);
 
 const identityContract = new ethers.Contract(
@@ -38,12 +94,18 @@ console.log(`Blockchain connected via: ${process.env.RPC_URL}`);
 console.log(`Relayer Address: ${relayerWallet.address}`);
 
 const io = new Server(httpServer, {
-  cors: { origin: "*" },
+  cors:
+    allowedOrigins.length > 0
+      ? { origin: allowedOrigins }
+      : { origin: "*" },
 });
 
+// Nonce TTL: auto-expire after 5 minutes
+const NONCE_TTL_MS = 5 * 60 * 1000;
 const activeNonces = {};
 let knownRelays = [];
-const MY_PUBLIC_URL = `http://localhost:${process.env.PORT}`;
+const MY_PUBLIC_URL =
+  process.env.RELAY_PUBLIC_URL || `http://localhost:${process.env.PORT}`;
 
 /**
  * Synchronizes the list of active relay nodes directly from the blockchain smart contract.
@@ -108,7 +170,9 @@ const gossipToOtherRelays = (event, to, data) => {
   knownRelays.forEach((relayUrl) => {
     axios
       .post(`${relayUrl}/internal/gossip`, { event, to, data })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(`Gossip to ${relayUrl} failed: ${err.message}`);
+      });
   });
 };
 
@@ -183,6 +247,15 @@ app.post("/internal/gossip", (req, res) => {
   res.sendStatus(200);
 });
 
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    relayUrl: MY_PUBLIC_URL,
+    knownRelays: knownRelays.length,
+    uptime: process.uptime(),
+  });
+});
+
 app.post("/admin/register-relay", async (req, res) => {
   const { url } = req.body;
   try {
@@ -200,17 +273,25 @@ app.post("/admin/register-relay", async (req, res) => {
   }
 });
 
-app.post("/auth/challenge", (req, res) => {
+app.post("/auth/challenge", authLimiter, (req, res) => {
   const { address } = req.body;
   if (!address)
     return res.status(400).json({ error: "Wallet address is required." });
 
-  const nonce = `AUTH-CHALLENGE-${Math.floor(Math.random() * 1000000)}`;
+  const nonce = `AUTH-CHALLENGE-${crypto.randomBytes(32).toString("hex")}`;
   activeNonces[address] = nonce;
+
+  // Auto-expire nonce after TTL to prevent replay attacks
+  setTimeout(() => {
+    if (activeNonces[address] === nonce) {
+      delete activeNonces[address];
+    }
+  }, NONCE_TTL_MS);
+
   res.json({ nonce });
 });
 
-app.post("/auth/login", async (req, res) => {
+app.post("/auth/login", authLimiter, async (req, res) => {
   const { address, signature } = req.body;
   const nonce = activeNonces[address];
 
