@@ -22,11 +22,6 @@ export interface ActiveSession {
   username: string;
 }
 
-/**
- * 1. Manage chat sessions, pending handshake requests, and active peers
- * @param {UseChatLogicProps} params - The initialization parameters
- * @returns {object} { targetUsername, setTargetUsername, activeChat, activeUsername, myUsername, pendingRequests, activeSessions, switchChat, isSearching, initiators, handleConnectPeer, handleAcceptRequest, handleRejectRequest }
- */
 export const useChatLogic = ({
   address,
   socket,
@@ -46,11 +41,17 @@ export const useChatLogic = ({
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [initiators, setInitiators] = useState<Record<string, boolean>>({});
 
+  const [searchError, setSearchError] = useState<string>("");
+
   const activeSessionsRef = useRef<ActiveSession[]>([]);
 
   useEffect(() => {
     activeSessionsRef.current = activeSessions;
   }, [activeSessions]);
+
+  useEffect(() => {
+    setSearchError("");
+  }, [targetUsername]);
 
   useEffect(() => {
     if (address && relayUrl) {
@@ -118,6 +119,8 @@ export const useChatLogic = ({
   const handleConnectPeer = async () => {
     if (!targetUsername.trim()) return;
     setIsSearching(true);
+    setSearchError("");
+
     try {
       const res = await axios.get(
         `${relayUrl}/auth/address/${targetUsername.trim()}`,
@@ -125,7 +128,7 @@ export const useChatLogic = ({
       const peerAddress = res.data.address.toLowerCase();
 
       if (address && peerAddress === address.toLowerCase()) {
-        alert("Cannot chat with yourself!");
+        setSearchError("Cannot chat with yourself.");
         setIsSearching(false);
         return;
       }
@@ -150,7 +153,7 @@ export const useChatLogic = ({
       }
       setTargetUsername("");
     } catch (err: unknown) {
-      alert("Username not found on the network!");
+      setSearchError("Username not found on the network.");
     } finally {
       setIsSearching(false);
     }
@@ -212,5 +215,6 @@ export const useChatLogic = ({
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    searchError,
   };
 };
