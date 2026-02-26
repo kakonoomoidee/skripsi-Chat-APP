@@ -12511,15 +12511,21 @@
     "version": "0.8.0+commit.c7dfd78e.Emscripten.clang"
   },
   "networks": {
+    "1337": {
+      "events": {},
+      "links": {},
+      "address": "0xbf1F433b8F9DB8524E5699Cd91d683a2Cb9fb0F2",
+      "transactionHash": "0xe617315f714d746237e5d7ac7fd7dddd5af06962eeece35434194084909aa0f8"
+    },
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x1F485CFC05fF2b89566ddE1c568A186a2a571aA0",
-      "transactionHash": "0x987352dcfb5dbbdc8ae7044151701511d632ef1672dd55de652fcdcd7edbb27d"
+      "address": "0xA04d831a6878aB256ca27882157B179D2321cFBA",
+      "transactionHash": "0x524762c0495b639989b94ff587c65ad6b4d7cc34dbb05ba067f7f24ee871f44f"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-02-26T02:09:00.995Z",
+  "updatedAt": "2026-02-26T09:04:42.102Z",
   "networkType": "ethereum",
   "devdoc": {
     "details": "Decentralized identity storage for P2P Chat. Supports gasless registration and challenge-response authentication.",

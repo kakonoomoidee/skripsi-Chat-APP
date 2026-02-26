@@ -22,11 +22,6 @@ export interface ActiveSession {
   username: string;
 }
 
-/**
- * Manage chat sessions, pending handshake requests, and active peers
- * @param {UseChatLogicProps} params - The initialization parameters
- * @returns {object} Context values for chat logic
- */
 export const useChatLogic = ({
   address,
   socket,

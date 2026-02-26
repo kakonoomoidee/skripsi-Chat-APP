@@ -1,9 +1,13 @@
 import { ChangeEvent, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { ethers } from "ethers";
 
-// ==========================================
-// ICON COMPONENTS
-// ==========================================
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -19,6 +23,7 @@ const ChevronDownIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
 const ImportIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -34,6 +39,7 @@ const ImportIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
 const ExportIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -49,6 +55,7 @@ const ExportIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
 const InfoIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -64,6 +71,7 @@ const InfoIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
 const TrashIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -79,6 +87,7 @@ const TrashIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
 const WarningIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -95,9 +104,22 @@ const WarningIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
+const WalletIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 9v3m-9 3h1.5"
+    />
+  </svg>
+);
+
 export interface SecuritySectionProps {
   autoDeleteMode: string;
   handleModeChange: (e: ChangeEvent<HTMLSelectElement>) => void;
@@ -106,6 +128,11 @@ export interface SecuritySectionProps {
   resetWallet: () => void;
 }
 
+/**
+ * Renders the settings sidebar section, handling Web3 wallet binding, data imports/exports, and identity management in a compact layout.
+ * @param {SecuritySectionProps} props - The component properties
+ * @returns {JSX.Element} The rendered component
+ */
 export default function SecuritySection({
   autoDeleteMode,
   handleModeChange,
@@ -117,10 +144,21 @@ export default function SecuritySection({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
+  const [showWalletInfoTooltip, setShowWalletInfoTooltip] =
+    useState<boolean>(false);
+  const [showBackupInfo, setShowBackupInfo] = useState<boolean>(false);
 
-  // State for Custom Wipe Modal
   const [isWipeModalOpen, setIsWipeModalOpen] = useState<boolean>(false);
+  const [wipeConfirmation, setWipeConfirmation] = useState<string>("");
+
+  const [metaMaskAddress, setMetaMaskAddress] = useState<string | null>(null);
+  const [walletDetails, setWalletDetails] = useState<{
+    balance: string;
+    network: string;
+    chainId: string;
+  } | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const deleteOptions = [
     { value: "never", label: "Auto-Delete: Never" },
@@ -132,19 +170,101 @@ export default function SecuritySection({
   ];
 
   useEffect(() => {
+    const savedAddress = localStorage.getItem("linked_metamask");
+    if (savedAddress && typeof window.ethereum !== "undefined") {
+      setMetaMaskAddress(savedAddress);
+      fetchWalletDetails(savedAddress);
+    }
+
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setShowInfo(false);
+        setShowSecurityInfo(false);
+        setShowWalletInfoTooltip(false);
+        setShowBackupInfo(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  /**
+   * Fetches the balance and network info for a given address
+   * @param {string} address - The wallet address
+   * @returns {Promise<void>}
+   */
+  const fetchWalletDetails = async (address: string) => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const network = await provider.getNetwork();
+      const balanceWei = await provider.getBalance(address);
+      const balanceEth = ethers.formatEther(balanceWei);
+
+      setWalletDetails({
+        balance: parseFloat(balanceEth).toFixed(4),
+        network: network.name === "unknown" ? "Localhost" : network.name,
+        chainId: network.chainId.toString(),
+      });
+    } catch (err) {
+      console.error("Failed to fetch wallet details:", err);
+    }
+  };
+
+  /**
+   * FORCES a new MetaMask connection prompt and fetches details.
+   * @returns {Promise<void>}
+   */
+  const handleConnectMetaMask = async () => {
+    if (typeof window.ethereum === "undefined") {
+      alert("MetaMask is not installed. Please install the extension.");
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      await window.ethereum.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+
+      if (accounts && accounts.length > 0) {
+        const linkedAddress = accounts[0];
+        setMetaMaskAddress(linkedAddress);
+        localStorage.setItem("linked_metamask", linkedAddress);
+
+        await fetchWalletDetails(linkedAddress);
+
+        console.log(`✅ Wallet Linked: ${linkedAddress}`);
+      }
+    } catch (error: any) {
+      console.error("MetaMask connection failed or rejected:", error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  /**
+   * Disconnects the linked wallet from local state
+   * @returns {void}
+   */
+  const handleDisconnectWallet = () => {
+    setMetaMaskAddress(null);
+    setWalletDetails(null);
+    localStorage.removeItem("linked_metamask");
+  };
+
+  /**
+   * Handles the selection of an auto-delete option
+   * @param {string} value - The selected mode value
+   * @returns {void}
+   */
   const handleOptionSelect = (value: string) => {
     const syntheticEvent = {
       target: { value },
@@ -153,9 +273,24 @@ export default function SecuritySection({
     setIsOpen(false);
   };
 
+  /**
+   * Executes the local identity wipe sequence
+   * @returns {void}
+   */
   const executeWipe = () => {
+    handleDisconnectWallet();
     setIsWipeModalOpen(false);
+    setWipeConfirmation("");
     resetWallet();
+  };
+
+  /**
+   * Opens the wipe modal
+   * @returns {void}
+   */
+  const openWipeModal = () => {
+    setWipeConfirmation("");
+    setIsWipeModalOpen(true);
   };
 
   const activeLabel =
@@ -164,100 +299,218 @@ export default function SecuritySection({
 
   return (
     <>
-      <div ref={containerRef}>
-        <div className="flex items-center gap-1.5 mb-2 relative">
-          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-            Security & Data
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              setShowInfo(!showInfo);
-              setIsOpen(false);
-            }}
-            className={`transition-colors focus:outline-none ${showInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
-          >
-            <InfoIcon className="w-3.5 h-3.5" />
-          </button>
-          {showInfo && (
-            <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
-              <strong>Auto-Delete</strong> only removes messages from your local
-              device. Due to the P2P architecture, it cannot delete messages
-              stored on your peer's device.
-            </div>
-          )}
-        </div>
+      <div ref={containerRef} className="flex flex-col gap-6">
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 relative">
+            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Web3 Wallet (Payment)
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowWalletInfoTooltip(!showWalletInfoTooltip);
+                setShowSecurityInfo(false);
+                setShowBackupInfo(false);
+                setIsOpen(false);
+              }}
+              className={`transition-colors focus:outline-none ${showWalletInfoTooltip ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </button>
+            {showWalletInfoTooltip && (
+              <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+                Link your MetaMask wallet to send and receive direct P2P crypto
+                transfers in chat.
+              </div>
+            )}
+          </div>
 
-        <div className="relative mb-3">
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(!isOpen);
-              setShowInfo(false);
-            }}
-            className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
-          >
-            <span className="truncate">{activeLabel}</span>
-            <ChevronDownIcon
-              className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-180 text-indigo-400" : ""}`}
-            />
-          </button>
-          {isOpen && (
-            <div className="absolute z-50 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <ul className="py-1">
-                {deleteOptions.map((opt) => (
-                  <li key={opt.value}>
-                    <button
-                      type="button"
-                      onClick={() => handleOptionSelect(opt.value)}
-                      className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${autoDeleteMode === opt.value ? "bg-indigo-600/10 text-indigo-400 font-medium" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}
+          {!metaMaskAddress ? (
+            <button
+              onClick={handleConnectMetaMask}
+              disabled={isConnecting}
+              className="w-full text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl border border-indigo-500 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+            >
+              {isConnecting ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <WalletIcon className="w-4 h-4" />
+              )}
+              {isConnecting ? "Connecting..." : "Link MetaMask Wallet"}
+            </button>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-inner">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                    Connected
+                  </span>
+                </div>
+                <button
+                  onClick={handleDisconnectWallet}
+                  className="text-[10px] text-red-400 hover:text-red-300 underline underline-offset-2"
+                >
+                  Disconnect
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[9px] text-zinc-500 block mb-0.5">
+                    ADDRESS
+                  </span>
+                  <span className="text-xs text-zinc-200 font-mono break-all bg-zinc-950 p-1.5 rounded-md border border-zinc-800/50 block">
+                    {metaMaskAddress}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50">
+                    <span className="text-[9px] text-zinc-500 block mb-0.5">
+                      NETWORK
+                    </span>
+                    <span
+                      className={`text-xs font-bold ${walletDetails?.chainId === "1" ? "text-red-400" : "text-indigo-400"}`}
                     >
-                      {opt.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      {walletDetails?.network || "Loading..."}{" "}
+                      {walletDetails?.chainId === "1" && "(Mainnet!)"}
+                    </span>
+                  </div>
+                  <div className="flex-1 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50">
+                    <span className="text-[9px] text-zinc-500 block mb-0.5">
+                      BALANCE
+                    </span>
+                    <span className="text-xs text-zinc-200 font-bold">
+                      {walletDetails?.balance || "0.00"} ETH
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {walletDetails?.chainId === "1" && (
+                <div className="mt-2 text-[10px] text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20 text-center">
+                  ⚠️ <strong>Warning:</strong> You are on Ethereum Mainnet.
+                  Switch to Ganache in MetaMask extension to test with dummy
+                  ETH.
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        <input
-          type="file"
-          accept=".securep2p"
-          ref={fileInputRef}
-          onChange={handleImportChat}
-          className="hidden"
-        />
-
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <ImportIcon className="w-3.5 h-3.5" />
-            Import
-          </button>
-          <button
-            onClick={handleExportChat}
-            className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <ExportIcon className="w-3.5 h-3.5" />
-            Export
-          </button>
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 relative">
+            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Data Backup
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBackupInfo(!showBackupInfo);
+                setShowWalletInfoTooltip(false);
+                setShowSecurityInfo(false);
+                setIsOpen(false);
+              }}
+              className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </button>
+            {showBackupInfo && (
+              <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+                Export your chats and local identity as an encrypted backup
+                file, or import to restore your data on this device.
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <ImportIcon className="w-3.5 h-3.5" /> Import
+            </button>
+            <button
+              onClick={handleExportChat}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <ExportIcon className="w-3.5 h-3.5" /> Export
+            </button>
+          </div>
+          <input
+            type="file"
+            accept=".securep2p"
+            ref={fileInputRef}
+            onChange={handleImportChat}
+            className="hidden"
+          />
         </div>
 
-        <div className="pt-4 border-t border-zinc-800/50">
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 relative">
+            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Auto-Delete Message
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSecurityInfo(!showSecurityInfo);
+                setShowWalletInfoTooltip(false);
+                setShowBackupInfo(false);
+                setIsOpen(false);
+              }}
+              className={`transition-colors focus:outline-none ${showSecurityInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </button>
+            {showSecurityInfo && (
+              <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+                <strong>Auto-Delete</strong> only removes messages from your
+                local device. Due to the P2P architecture, it cannot delete
+                messages stored on your peer's device.
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
+            >
+              <span className="truncate">{activeLabel}</span>
+              <ChevronDownIcon
+                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-180 text-indigo-400" : ""}`}
+              />
+            </button>
+            {isOpen && (
+              <div className="absolute z-50 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <ul className="py-1">
+                  {deleteOptions.map((opt) => (
+                    <li key={opt.value}>
+                      <button
+                        onClick={() => handleOptionSelect(opt.value)}
+                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${autoDeleteMode === opt.value ? "bg-indigo-600/10 text-indigo-400 font-medium" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}
+                      >
+                        {opt.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-zinc-800/50">
           <button
-            onClick={() => setIsWipeModalOpen(true)}
+            onClick={openWipeModal}
             className="w-full text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
           >
-            <TrashIcon className="w-3.5 h-3.5" />
-            Wipe Local Identity
+            <TrashIcon className="w-3.5 h-3.5" /> Wipe Local Identity
           </button>
         </div>
       </div>
 
-      {/* REFACTORED: Custom Wipe Modal (Replaces window.confirm) */}
       {isWipeModalOpen &&
         typeof document !== "undefined" &&
         createPortal(
@@ -269,17 +522,25 @@ export default function SecuritySection({
                 </div>
                 <h3 className="text-lg font-bold">Destructive Action</h3>
               </div>
-
               <p className="text-sm text-zinc-300 mb-2 leading-relaxed">
                 This will permanently delete your local identity from this
                 device.
               </p>
-              <p className="text-xs text-red-400/80 mb-6 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                If you haven't exported your backup (12-word seed phrase), you
-                will <strong>LOSE ACCESS</strong> to your account and messages
-                forever.
-              </p>
-
+              <div className="mb-6">
+                <label className="block text-xs font-medium text-zinc-400 mb-2">
+                  Type{" "}
+                  <span className="text-white font-bold select-all">WIPE</span>{" "}
+                  to confirm
+                </label>
+                <input
+                  type="text"
+                  value={wipeConfirmation}
+                  onChange={(e) => setWipeConfirmation(e.target.value)}
+                  placeholder="WIPE"
+                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 rounded-xl px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700 uppercase"
+                  autoComplete="off"
+                />
+              </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setIsWipeModalOpen(false)}
@@ -289,7 +550,8 @@ export default function SecuritySection({
                 </button>
                 <button
                   onClick={executeWipe}
-                  className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors shadow-lg shadow-red-500/20"
+                  disabled={wipeConfirmation !== "WIPE"}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${wipeConfirmation === "WIPE" ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20" : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}`}
                 >
                   Yes, Wipe Data
                 </button>
