@@ -70,6 +70,7 @@ export const useChatLogic = ({
       ephemeralPublicKey: string;
     }) => {
       const peerAddress = data.from.toLowerCase();
+
       const existingSession = activeSessionsRef.current.find(
         (s) => s.address === peerAddress,
       );
@@ -80,6 +81,7 @@ export const useChatLogic = ({
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
         });
+
         setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
         return;
       }

@@ -59,16 +59,11 @@ export interface ChatContextValue {
   peerWalletAddress: string | null;
   handleSendCrypto: (amount: string) => Promise<void>;
   showToast: (msg: string, type?: "error" | "success") => void;
+  searchError: string; // MERGED: Added to context interface
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
-/**
- * Global Chat Provider
- * @param {object} props - The component properties
- * @param {ReactNode} props.children - The child components
- * @returns {JSX.Element}
- */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
@@ -93,6 +88,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    searchError, // MERGED: Extracted from useChatLogic
   } = useChatLogic({
     address,
     socket,
@@ -158,12 +154,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  /**
-   * Triggers a temporary toast notification
-   * @param {string} msg - The message to display
-   * @param {"error" | "success"} type - The style of the toast
-   * @returns {void}
-   */
   const showToast = (msg: string, type: "error" | "success" = "error") => {
     setToast({ show: true, msg, type });
     setTimeout(() => {
@@ -272,10 +262,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC]);
 
-  /**
-   * Initiates the P2P request for the peer's connected MetaMask wallet address.
-   * @returns {void}
-   */
   const requestPeerWallet = () => {
     const currentChat = activeChat as string;
     if (!currentChat || !hasSecret(currentChat) || !isWebRTCConnected) return;
@@ -288,11 +274,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Ensures MetaMask is on the local network and triggers the transaction
-   * @param {string} amount - The amount of ETH to send
-   * @returns {Promise<void>}
-   */
   const handleSendCrypto = async (amount: string) => {
     if (!peerWalletAddress) {
       throw new Error("Peer wallet address not resolved yet.");
@@ -586,6 +567,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     peerWalletAddress,
     handleSendCrypto,
     showToast,
+    searchError, // MERGED: Exported for UI consumption
   };
 
   return (
@@ -594,7 +576,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       {toast.show && (
         <div
-          className={`fixed top-4 right-4 z-[200] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
+          className={`fixed top-4 right-4 z-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
             toast.type === "error"
               ? "bg-red-500/10 border border-red-500/20 text-red-400"
               : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
@@ -605,7 +587,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       )}
 
       {seedModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-zinc-100 mb-2">
               {seedModal.type === "export"

@@ -31,7 +31,7 @@ export default function Sidebar() {
     handleImportChat,
     logout,
     resetWallet,
-    searchError,
+    searchError, // MERGED: Extracted from context to show UI errors
   } = useChatContext();
 
   const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
@@ -140,7 +140,7 @@ export default function Sidebar() {
         {activeTab === "chats" && (
           <div className="p-4 flex flex-col h-full">
             <div className="relative mb-4 group shrink-0">
-              {/* REFACTORED: Changed top-2.5 to top-1/2 and added -translate-y-1/2 for perfect absolute vertical centering */}
+              {/* MERGED: Fixed icon alignment with top-1/2 -translate-y-1/2 */}
               <svg
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors"
                 fill="none"
@@ -172,6 +172,7 @@ export default function Sidebar() {
                   </span>
                 </p>
 
+                {/* MERGED: Custom UI Handlers for Self Search and Not Found Search */}
                 {isSelfChat ? (
                   <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
                     <svg
@@ -231,6 +232,7 @@ export default function Sidebar() {
             )}
 
             <div className="space-y-1.5 flex-1">
+              {/* ACTIVE SESSIONS */}
               {filteredSessions.map((session) => (
                 <div
                   key={session.address}
@@ -256,6 +258,7 @@ export default function Sidebar() {
                 </div>
               ))}
 
+              {/* MERGED: RECENT HISTORY SECTION */}
               {recentContacts.filter(
                 (rc) =>
                   !activeSessions.some((as) => as.username === rc.username),
@@ -319,6 +322,7 @@ export default function Sidebar() {
                   </div>
                 )}
 
+              {/* EMPTY STATE */}
               {activeSessions.length === 0 &&
                 recentContacts.length === 0 &&
                 !targetUsername && (
