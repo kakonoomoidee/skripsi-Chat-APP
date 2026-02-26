@@ -8,6 +8,7 @@ declare global {
   }
 }
 
+// ... [ICON COMPONENTS TETAP SAMA] ...
 const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -128,11 +129,6 @@ export interface SecuritySectionProps {
   resetWallet: () => void;
 }
 
-/**
- * Renders the settings sidebar section, handling Web3 wallet binding, data imports/exports, and identity management in a compact layout.
- * @param {SecuritySectionProps} props - The component properties
- * @returns {JSX.Element} The rendered component
- */
 export default function SecuritySection({
   autoDeleteMode,
   handleModeChange,
@@ -191,11 +187,6 @@ export default function SecuritySection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /**
-   * Fetches the balance and network info for a given address
-   * @param {string} address - The wallet address
-   * @returns {Promise<void>}
-   */
   const fetchWalletDetails = async (address: string) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -213,10 +204,6 @@ export default function SecuritySection({
     }
   };
 
-  /**
-   * FORCES a new MetaMask connection prompt and fetches details.
-   * @returns {Promise<void>}
-   */
   const handleConnectMetaMask = async () => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed. Please install the extension.");
@@ -240,8 +227,6 @@ export default function SecuritySection({
         localStorage.setItem("linked_metamask", linkedAddress);
 
         await fetchWalletDetails(linkedAddress);
-
-        console.log(`✅ Wallet Linked: ${linkedAddress}`);
       }
     } catch (error: any) {
       console.error("MetaMask connection failed or rejected:", error);
@@ -250,21 +235,12 @@ export default function SecuritySection({
     }
   };
 
-  /**
-   * Disconnects the linked wallet from local state
-   * @returns {void}
-   */
   const handleDisconnectWallet = () => {
     setMetaMaskAddress(null);
     setWalletDetails(null);
     localStorage.removeItem("linked_metamask");
   };
 
-  /**
-   * Handles the selection of an auto-delete option
-   * @param {string} value - The selected mode value
-   * @returns {void}
-   */
   const handleOptionSelect = (value: string) => {
     const syntheticEvent = {
       target: { value },
@@ -273,10 +249,6 @@ export default function SecuritySection({
     setIsOpen(false);
   };
 
-  /**
-   * Executes the local identity wipe sequence
-   * @returns {void}
-   */
   const executeWipe = () => {
     handleDisconnectWallet();
     setIsWipeModalOpen(false);
@@ -284,10 +256,6 @@ export default function SecuritySection({
     resetWallet();
   };
 
-  /**
-   * Opens the wipe modal
-   * @returns {void}
-   */
   const openWipeModal = () => {
     setWipeConfirmation("");
     setIsWipeModalOpen(true);
@@ -300,6 +268,7 @@ export default function SecuritySection({
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
+        {/* WALLET SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -399,6 +368,7 @@ export default function SecuritySection({
           )}
         </div>
 
+        {/* BACKUP SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -446,6 +416,7 @@ export default function SecuritySection({
           />
         </div>
 
+        {/* AUTO DELETE SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -464,7 +435,7 @@ export default function SecuritySection({
               <InfoIcon className="w-3.5 h-3.5" />
             </button>
             {showSecurityInfo && (
-              <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+              <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
                 <strong>Auto-Delete</strong> only removes messages from your
                 local device. Due to the P2P architecture, it cannot delete
                 messages stored on your peer's device.
@@ -478,12 +449,14 @@ export default function SecuritySection({
               className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
             >
               <span className="truncate">{activeLabel}</span>
+              {/* REFACTORED: Chevron rotation reversed because it opens upwards */}
               <ChevronDownIcon
-                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-180 text-indigo-400" : ""}`}
+                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-0 text-indigo-400" : "rotate-180"}`}
               />
             </button>
+            {/* REFACTORED: Dropdown menu positioned upwards using bottom-full mb-2 */}
             {isOpen && (
-              <div className="absolute z-50 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute z-100 bottom-full mb-2 w-full bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
                 <ul className="py-1">
                   {deleteOptions.map((opt) => (
                     <li key={opt.value}>
@@ -501,6 +474,7 @@ export default function SecuritySection({
           </div>
         </div>
 
+        {/* WIPE SECTION */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
             onClick={openWipeModal}
@@ -511,10 +485,11 @@ export default function SecuritySection({
         </div>
       </div>
 
+      {/* WIPE MODAL */}
       {isWipeModalOpen &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
             <div className="bg-zinc-900 border border-red-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center gap-3 mb-4 text-red-400">
                 <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
