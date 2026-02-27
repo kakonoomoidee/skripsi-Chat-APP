@@ -4,3 +4,4 @@
 export { default as Sidebar } from "./Sidebar";
 export { default as RelaySelector } from "./RelaySelector";
 export { default as PasswordInput } from "./PasswordInput";
+export { default as RelayStatusBadge } from "./RelayStatusBadge";

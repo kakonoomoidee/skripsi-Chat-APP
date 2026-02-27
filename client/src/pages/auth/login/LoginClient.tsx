@@ -1,43 +1,42 @@
-import React, { useState, useEffect } from "react";
+import { useEffect } from "react"; // REFACTORED: React, useState dicabut karena ga dipake
 import { useNavigate, Link } from "react-router-dom";
-import { ethers } from "ethers";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
+import { useAuthHandlers } from "@/hooks/useAuthHandlers";
+import { useRelayPing } from "@/hooks/useRelayPing"; // Import hook ping kita
+
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
-import { RelaySelector, PasswordInput } from "@/components/shared"; // Import PasswordInput
+import {
+  RelaySelector,
+  PasswordInput,
+  RelayStatusBadge,
+} from "@/components/shared";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { address, decryptWallet, loading: walletLoading } = useWallet();
-  const { login, loading: authLoading, isAuthenticated } = useAuth();
+
+  const { address, loading: walletLoading } = useWallet();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
 
-  const [password, setPassword] = useState<string>("");
-  const [localError, setLocalError] = useState<string>("");
+  const { isRelayAlive, isPinging } = useRelayPing(activeRelay);
 
-  const isLoading = walletLoading || authLoading;
+  const { password, setPassword, isLoading, handleLogin } = useAuthHandlers();
 
   useEffect(() => {
     if (isAuthenticated) navigate("/chat");
   }, [isAuthenticated, navigate]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLocalError("");
-    if (!password)
-      return setLocalError("Password is required to decrypt your identity.");
-
-    try {
-      const unlockedWallet = await decryptWallet(password);
-      await login(unlockedWallet as unknown as ethers.Wallet, activeRelay);
-      navigate("/chat");
-    } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : "Login failed.");
-    }
-  };
+  const isButtonDisabled =
+    isLoading ||
+    walletLoading ||
+    authLoading ||
+    !address ||
+    !password ||
+    !isRelayAlive;
 
   return (
     <AuthLayout
@@ -46,21 +45,16 @@ export default function LoginPage() {
     >
       <WalletDisplay address={address} />
 
-      {localError && (
-        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl mb-4">
-          {localError}
-        </div>
-      )}
-
-      <form onSubmit={handleLogin} className="space-y-5">
-        {/* REFACTORED: Using the shared PasswordInput */}
+      <form onSubmit={handleLogin} className="space-y-6">
         <PasswordInput
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={isLoading || !address}
         />
 
-        <div className="-mt-1">
+        <div className="relative pt-1">
+          <RelayStatusBadge isPinging={isPinging} isRelayAlive={isRelayAlive} />
+
           <RelaySelector
             activeRelay={activeRelay}
             defaultRelays={defaultRelays}
@@ -72,17 +66,19 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={isLoading || !address}
-          className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
+          disabled={isButtonDisabled}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98] mt-2"
         >
           {walletLoading
             ? "Decrypting Key..."
             : authLoading
               ? "Authenticating Handshake..."
-              : "Decrypt & Connect"}
+              : !isRelayAlive && !isPinging
+                ? "Server Offline"
+                : "Decrypt & Connect"}
         </button>
 
-        <div className="pt-4 mt-2 border-t border-zinc-800/50 flex flex-col gap-2 text-center text-sm text-zinc-500">
+        <div className="pt-4 border-t border-zinc-800/50 flex flex-col gap-2 text-center text-sm text-zinc-500">
           <div>
             Want to create a new identity?{" "}
             <Link
