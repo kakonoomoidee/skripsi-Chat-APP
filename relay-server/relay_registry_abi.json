@@ -20,6 +20,40 @@
     "signature": "0xb6a4d623c53056062a9dcefef25bd4d63438f70a2b7b077315de131c9cecdf1d"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "RelayDeactivated",
+    "type": "event",
+    "signature": "0xcc273b6278f7a1b4bd4f628f87d6063d8a56616c4cfa0028cde82a3039d1abde"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "newUrl",
+        "type": "string"
+      }
+    ],
+    "name": "RelayUrlUpdated",
+    "type": "event",
+    "signature": "0x2e5e11404942cbf1cdedadb806f3b17ff72cc264b7d370caf630673037d6e5e7"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -84,6 +118,28 @@
     "stateMutability": "nonpayable",
     "type": "function",
     "signature": "0x5af60026"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_newUrl",
+        "type": "string"
+      }
+    ],
+    "name": "updateRelayUrl",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "signature": "0x4ef08f94"
+  },
+  {
+    "inputs": [],
+    "name": "deactivateRelay",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "signature": "0x657a4107"
   },
   {
     "inputs": [],

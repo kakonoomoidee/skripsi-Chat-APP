@@ -48,6 +48,7 @@ export interface ChatContextValue {
   setMessageInput: (val: string) => void;
   handleSendMessage: (e: React.SyntheticEvent) => Promise<void>;
   handleSendImage: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleSendAudio: (audioBlob: Blob) => Promise<void>; // NEW: Audio sender
   autoDeleteMode: string;
   handleModeChange: (e: ChangeEvent<HTMLSelectElement>) => void;
   handleExportChat: () => void;
@@ -59,7 +60,7 @@ export interface ChatContextValue {
   peerWalletAddress: string | null;
   handleSendCrypto: (amount: string) => Promise<void>;
   showToast: (msg: string, type?: "error" | "success") => void;
-  searchError: string; // MERGED: Added to context interface
+  searchError: string;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -88,7 +89,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
-    searchError, // MERGED: Extracted from useChatLogic
+    searchError,
   } = useChatLogic({
     address,
     socket,
@@ -132,11 +133,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     show: boolean;
     msg: string;
     type: "error" | "success";
-  }>({
-    show: false,
-    msg: "",
-    type: "error",
-  });
+  }>({ show: false, msg: "", type: "error" });
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
 
@@ -156,9 +153,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const showToast = (msg: string, type: "error" | "success" = "error") => {
     setToast({ show: true, msg, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3500);
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3500);
   };
 
   useEffect(() => {
@@ -257,9 +252,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
           });
         }
-      } catch (e) {
-        // Not a structured payload; skip processing
-      }
+      } catch (e) {}
     };
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC]);
@@ -267,38 +260,27 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const requestPeerWallet = () => {
     const currentChat = activeChat as string;
     if (!currentChat || !hasSecret(currentChat) || !isWebRTCConnected) return;
-
     const requestPayload = JSON.stringify({ type: "WALLET_REQUEST" });
     const encryptedPayload = encrypt(currentChat, requestPayload);
-
-    if (encryptedPayload) {
-      sendDataViaWebRTC(currentChat, encryptedPayload);
-    }
+    if (encryptedPayload) sendDataViaWebRTC(currentChat, encryptedPayload);
   };
 
   const handleSendCrypto = async (amount: string) => {
-    if (!peerWalletAddress) {
+    if (!peerWalletAddress)
       throw new Error("Peer wallet address not resolved yet.");
-    }
-
-    if (typeof window.ethereum === "undefined") {
+    if (typeof window.ethereum === "undefined")
       throw new Error(
         "MetaMask is not installed. Please link it in the Security settings.",
       );
-    }
-
     const myMetaMask = localStorage.getItem("linked_metamask");
-    if (!myMetaMask) {
+    if (!myMetaMask)
       throw new Error(
         "Your MetaMask is not linked. Please link it in the Security settings.",
       );
-    }
-
-    if (myMetaMask.toLowerCase() === peerWalletAddress.toLowerCase()) {
+    if (myMetaMask.toLowerCase() === peerWalletAddress.toLowerCase())
       throw new Error(
         "Self-Transfer Blocked: Sender and Receiver addresses are identical.",
       );
-    }
 
     try {
       const chainIdHex = "0x539";
@@ -326,13 +308,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const amountHex = ethers.parseEther(amount).toString(16);
-
       const transactionParameters = {
         to: peerWalletAddress,
         from: myMetaMask,
         value: `0x${amountHex}`,
       };
-
       const txHash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [transactionParameters],
@@ -345,9 +325,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       });
       const encryptedSuccess = encrypt(currentChat, successPayload);
 
-      if (encryptedSuccess) {
-        sendDataViaWebRTC(currentChat, encryptedSuccess);
-      }
+      if (encryptedSuccess) sendDataViaWebRTC(currentChat, encryptedSuccess);
 
       await db.messages.add({
         ownerAddress: address!.toLowerCase(),
@@ -396,7 +374,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const currentChat = activeChat as string;
     if (!file || !currentChat || !isWebRTCConnected || !address) return;
     if (file.size > 1024 * 500) {
-      showToast("File too large! Max 500KB for P2P demo.", "error");
+      showToast("File too large! Max 500KB for P2P.", "error");
       return;
     }
 
@@ -420,6 +398,31 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleSendAudio = async (audioBlob: Blob) => {
+    const currentChat = activeChat as string;
+    if (!audioBlob || !currentChat || !isWebRTCConnected || !address) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Audio = `[AUDIO]${event.target?.result as string}`;
+      try {
+        const encryptedAudio = encrypt(currentChat, base64Audio);
+        if (!encryptedAudio) throw new Error("Encryption failed");
+        sendDataViaWebRTC(currentChat, encryptedAudio);
+        await db.messages.add({
+          ownerAddress: address.toLowerCase(),
+          chatId: currentChat.toLowerCase(),
+          text: base64Audio,
+          isMine: true,
+          timestamp: Date.now(),
+        });
+      } catch {
+        showToast("Audio encryption failed.", "error");
+      }
+    };
+    reader.readAsDataURL(audioBlob);
   };
 
   const handleExportChat = async () => {
@@ -558,6 +561,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setMessageInput,
     handleSendMessage,
     handleSendImage,
+    handleSendAudio,
     autoDeleteMode,
     handleModeChange,
     handleExportChat,
@@ -569,25 +573,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     peerWalletAddress,
     handleSendCrypto,
     showToast,
-    searchError, // MERGED: Exported for UI consumption
+    searchError,
   };
 
   return (
     <ChatContext.Provider value={value}>
       {children}
-
       {toast.show && (
         <div
-          className={`fixed top-4 right-4 z-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
-            toast.type === "error"
-              ? "bg-red-500/10 border border-red-500/20 text-red-400"
-              : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-          }`}
+          className={`fixed top-4 right-4 z-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${toast.type === "error" ? "bg-red-500/10 border border-red-500/20 text-red-400" : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"}`}
         >
           <span className="text-sm font-medium">{toast.msg}</span>
         </div>
       )}
-
       {seedModal.isOpen && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
