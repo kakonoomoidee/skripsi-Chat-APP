@@ -1,87 +1,52 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ethers } from "ethers";
-import axios from "axios";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
+import { useAuthHandlers } from "@/hooks/useAuthHandlers";
+import { useRelayPing } from "@/hooks/useRelayPing";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
-import { RelaySelector, PasswordInput } from "@/components/shared";
+import {
+  RelaySelector,
+  PasswordInput,
+  RelayStatusBadge,
+} from "@/components/shared";
+import { WarningIcon } from "@/components/icons";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const {
-    address,
-    createAndEncryptWallet,
-    loading: walletLoading,
-  } = useWallet();
-  const { register, login, loading: authLoading, isAuthenticated } = useAuth();
+  const { address } = useWallet();
+  const { isAuthenticated } = useAuth();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
 
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [localError, setLocalError] = useState<string>("");
-  const [seedPhrase, setSeedPhrase] = useState<string | null>(null);
+  const { isRelayAlive, isPinging } = useRelayPing(activeRelay);
+  const {
+    username,
+    setUsername,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    seedPhrase,
+    isChecking,
+    isAvailable,
+    isLoading,
+    walletLoading,
+    authLoading,
+    handleRegister,
+  } = useAuthHandlers();
 
-  const [isChecking, setIsChecking] = useState(false);
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  const isLoading = walletLoading || authLoading;
+  // REFACTORED: Deteksi error password secara real-time buat UI
+  const showPasswordError =
+    confirmPassword.length > 0 && password !== confirmPassword;
 
   useEffect(() => {
     if (isAuthenticated && !seedPhrase) navigate("/chat");
   }, [isAuthenticated, navigate, seedPhrase]);
-
-  useEffect(() => {
-    if (!username.trim()) {
-      setIsAvailable(null);
-      return;
-    }
-    const delayDebounceFn = setTimeout(async () => {
-      setIsChecking(true);
-      try {
-        await axios.get(`${activeRelay}/auth/address/${username.trim()}`);
-        setIsAvailable(false);
-      } catch (error: any) {
-        if (error.response && error.response.status === 404)
-          setIsAvailable(true);
-        else setIsAvailable(null);
-      } finally {
-        setIsChecking(false);
-      }
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [username, activeRelay]);
-
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLocalError("");
-
-    if (!username.trim() || !password)
-      return setLocalError("Username and Password are required.");
-    if (password.length < 6)
-      return setLocalError("Password must be at least 6 characters.");
-    if (isAvailable === false)
-      return setLocalError(
-        "Username is already taken. Please choose another one.",
-      );
-
-    try {
-      const { wallet: newWallet, seedPhrase: generatedSeed } =
-        await createAndEncryptWallet(password);
-      const walletInstance = newWallet as unknown as ethers.Wallet;
-      await register(walletInstance, username.trim(), activeRelay);
-      await login(walletInstance, activeRelay);
-      setSeedPhrase(generatedSeed);
-    } catch (err: unknown) {
-      setLocalError(
-        err instanceof Error ? err.message : "Registration failed.",
-      );
-    }
-  };
 
   const handleCopyAndProceed = () => {
     if (seedPhrase) {
@@ -92,35 +57,47 @@ export default function RegisterPage() {
   };
 
   // -------------------------------------------------------------
-  // RENDER: Seed Phrase Backup Screen
+  // RENDER: Seed Phrase Backup Screen (ULTIMATE REDESIGN VIP)
   // -------------------------------------------------------------
   if (seedPhrase) {
     return (
       <AuthLayout
-        title="Save Your Backup Phrase"
-        subtitle="This is the ONLY way to recover your account if you lose your device."
+        title="Secure Your Backup"
+        subtitle="Your 12-word recovery phrase is the master key to your identity."
       >
-        <div className="bg-amber-500/10 border border-amber-500/30 p-6 rounded-2xl mb-6 shadow-inner">
-          <p className="text-amber-400 text-sm font-medium mb-5 text-center px-4 leading-relaxed">
-            Write down these 12 words in order. Do not share them with anyone!
+        {/* Warning Alert Box */}
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm leading-relaxed shadow-sm animate-in fade-in slide-in-from-top-2">
+          <WarningIcon className="w-5 h-5 shrink-0 mt-0.5 opacity-80" />
+          <p>
+            Write down these 12 words in order and keep them safe offline.
+            <span className="font-semibold text-amber-300 block mt-1">
+              Never share this phrase with anyone!
+            </span>
           </p>
-          <div className="grid grid-cols-3 gap-3">
-            {seedPhrase.split(" ").map((word, index) => (
+        </div>
+
+        <div className="bg-zinc-900/40 border border-zinc-800/80 p-5 sm:p-6 rounded-2xl mb-8 relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 bg-indigo-500/10 blur-3xl pointer-events-none"></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 relative z-10">
+            {seedPhrase.split(" ").map((word: string, index: number) => (
               <div
                 key={index}
-                className="bg-zinc-950 px-3 py-2.5 rounded-xl border border-zinc-800 text-[13px] font-mono text-zinc-200 shadow-sm flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-500/50 transition-colors"
+                className="flex items-center gap-2.5 bg-zinc-950/80 border border-zinc-800/60 rounded-xl p-2.5 shadow-sm hover:border-indigo-500/50 hover:bg-zinc-900 transition-all duration-200 group"
               >
-                <span className="text-zinc-600 text-[9px] select-none absolute top-1 left-2 font-sans font-bold">
+                <div className="flex items-center justify-center w-6 h-6 rounded-md bg-zinc-800/50 text-[11px] font-bold text-zinc-500 group-hover:text-indigo-400 group-hover:bg-indigo-500/10 transition-colors shrink-0">
                   {index + 1}
+                </div>
+                <span className="font-mono text-[13px] sm:text-[14px] text-zinc-200 font-medium tracking-wide">
+                  {word}
                 </span>
-                <span className="mt-2">{word}</span>
               </div>
             ))}
           </div>
         </div>
+
         <button
           onClick={handleCopyAndProceed}
-          className={`w-full font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 ${
+          className={`w-full font-medium py-4 px-4 rounded-xl transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 ${
             isCopied
               ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
               : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
@@ -146,7 +123,7 @@ export default function RegisterPage() {
           ) : (
             <>
               <svg
-                className="w-4 h-4"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -158,7 +135,7 @@ export default function RegisterPage() {
                   d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
                 />
               </svg>
-              Copy & Continue
+              Copy Phrase & Continue
             </>
           )}
         </button>
@@ -166,9 +143,14 @@ export default function RegisterPage() {
     );
   }
 
-  // -------------------------------------------------------------
-  // RENDER: Main Registration Screen
-  // -------------------------------------------------------------
+  const isButtonDisabled =
+    isLoading ||
+    isAvailable === false ||
+    isChecking ||
+    !password ||
+    password !== confirmPassword ||
+    !isRelayAlive;
+
   return (
     <AuthLayout
       title="Create Identity"
@@ -176,13 +158,6 @@ export default function RegisterPage() {
     >
       {address && <WalletDisplay address={address} />}
 
-      {localError && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
-          {localError}
-        </div>
-      )}
-
-      {/* Reduced spacing from space-y-5 to space-y-4 to let the form breathe and avoid cramped layout on smaller screens */}
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
           <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">
@@ -246,20 +221,40 @@ export default function RegisterPage() {
             </div>
           </div>
           {!isChecking && isAvailable === false && (
-            <p className="text-xs text-red-400 mt-2 font-medium">
+            <p className="text-[10px] text-red-400 mt-1.5 ml-1 font-medium animate-in slide-in-from-top-1">
               Username is already taken!
             </p>
           )}
         </div>
 
-        <PasswordInput
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="To secure your private key"
-          disabled={isLoading}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col">
+            <PasswordInput
+              label="Set Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min. 6 chars"
+              disabled={isLoading}
+            />
+          </div>
+          <div className="flex flex-col">
+            <PasswordInput
+              label="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm password"
+              disabled={isLoading}
+            />
+            {showPasswordError && (
+              <p className="text-[10px] text-red-400 mt-1.5 ml-1 font-medium animate-in slide-in-from-top-1">
+                Passwords do not match!
+              </p>
+            )}
+          </div>
+        </div>
 
-        <div className="-mt-1">
+        <div className="relative pt-1">
+          <RelayStatusBadge isPinging={isPinging} isRelayAlive={isRelayAlive} />
           <RelaySelector
             activeRelay={activeRelay}
             defaultRelays={defaultRelays}
@@ -271,14 +266,16 @@ export default function RegisterPage() {
 
         <button
           type="submit"
-          disabled={isLoading || isAvailable === false || isChecking}
-          className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
+          disabled={isButtonDisabled}
+          className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
         >
           {walletLoading
             ? "Encrypting Key..."
             : authLoading
               ? "Registering Identity..."
-              : "Create & Encrypt"}
+              : !isRelayAlive && !isPinging
+                ? "Server Offline"
+                : "Create & Encrypt"}
         </button>
 
         <div className="pt-3 mt-1 border-t border-zinc-800/50 text-center text-sm text-zinc-500">

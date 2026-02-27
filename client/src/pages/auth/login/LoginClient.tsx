@@ -1,11 +1,10 @@
-import { useEffect } from "react"; // REFACTORED: React, useState dicabut karena ga dipake
+import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { useAuth } from "@/hooks/useAuth";
 import { useRelay } from "@/hooks/useRelay";
 import { useAuthHandlers } from "@/hooks/useAuthHandlers";
-import { useRelayPing } from "@/hooks/useRelayPing"; // Import hook ping kita
-
+import { useRelayPing } from "@/hooks/useRelayPing";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 import {
