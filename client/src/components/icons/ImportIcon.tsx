@@ -1,9 +1,9 @@
 /**
- * Renders the microphone recording icon.
+ * Renders the import/download document icon.
  * @param {{ className?: string }} props - Component props
  * @returns {JSX.Element}
  */
-export const MicIcon = ({ className }: { className?: string }) => (
+export const ImportIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
     fill="none"
@@ -14,7 +14,7 @@ export const MicIcon = ({ className }: { className?: string }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
     />
   </svg>
 );

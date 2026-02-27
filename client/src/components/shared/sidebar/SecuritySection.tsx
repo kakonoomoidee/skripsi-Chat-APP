@@ -1,7 +1,16 @@
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ethers } from "ethers";
 import { useSecurityHandlers } from "@/hooks/useSecurityHandlers";
+import {
+  ChevronDownIcon,
+  ImportIcon,
+  ExportIcon,
+  InfoIcon,
+  TrashIcon,
+  WarningIcon,
+  WalletIcon,
+} from "@/components/icons";
 
 declare global {
   interface Window {
@@ -9,129 +18,30 @@ declare global {
   }
 }
 
-// ... [PASTE SEMUA KOMPONEN SVG ICON LU DI SINI: ChevronDownIcon, ImportIcon, ExportIcon, dll] ...
-const ChevronDownIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-    />
-  </svg>
-);
-const ImportIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-    />
-  </svg>
-);
-const ExportIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-    />
-  </svg>
-);
-const InfoIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-const TrashIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-    />
-  </svg>
-);
-const WarningIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-    />
-  </svg>
-);
-const WalletIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 9v3m-9 3h1.5"
-    />
-  </svg>
-);
+/**
+ * Interface for Security Section props
+ */
+export interface SecuritySectionProps {
+  nodeSelector?: React.ReactNode;
+}
 
 /**
  * Renders the settings sidebar section, handling Web3 wallet binding, data imports/exports.
- * REFACTORED: Now completely self-contained using custom hooks.
- * @returns {JSX.Element} The rendered component
+ * @param {SecuritySectionProps} props - Allows injecting components like RelaySelector into the layout order.
+ * @returns {JSX.Element}
  */
-export default function SecuritySection() {
+export default function SecuritySection({
+  nodeSelector,
+}: SecuritySectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // REFACTORED: Panggil hook saktinya di sini
   const {
     autoDeleteMode,
     handleModeChange,
     handleExportChat,
     handleImportChat,
-    resetWallet,
+    handleWipeData,
     seedModal,
     closeSeedModal,
     seedInput,
@@ -145,9 +55,6 @@ export default function SecuritySection() {
   const [showWalletInfoTooltip, setShowWalletInfoTooltip] =
     useState<boolean>(false);
   const [showBackupInfo, setShowBackupInfo] = useState<boolean>(false);
-
-  const [isWipeModalOpen, setIsWipeModalOpen] = useState<boolean>(false);
-  const [wipeConfirmation, setWipeConfirmation] = useState<string>("");
 
   const [metaMaskAddress, setMetaMaskAddress] = useState<string | null>(null);
   const [walletDetails, setWalletDetails] = useState<{
@@ -188,6 +95,10 @@ export default function SecuritySection() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  /**
+   * Fetches the connected wallet's balance and network details.
+   * @param {string} address
+   */
   const fetchWalletDetails = async (address: string) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -202,6 +113,9 @@ export default function SecuritySection() {
     } catch (err) {}
   };
 
+  /**
+   * Initiates connection to the MetaMask extension.
+   */
   const handleConnectMetaMask = async () => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed. Please install the extension.");
@@ -228,17 +142,13 @@ export default function SecuritySection() {
     }
   };
 
+  /**
+   * Disconnects the linked MetaMask wallet from the local session.
+   */
   const handleDisconnectWallet = () => {
     setMetaMaskAddress(null);
     setWalletDetails(null);
     localStorage.removeItem("linked_metamask");
-  };
-
-  const executeWipe = () => {
-    handleDisconnectWallet();
-    setIsWipeModalOpen(false);
-    setWipeConfirmation("");
-    resetWallet();
   };
 
   const activeLabel =
@@ -248,7 +158,6 @@ export default function SecuritySection() {
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
-        {/* WALLET SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -333,65 +242,12 @@ export default function SecuritySection() {
                   </div>
                 </div>
               </div>
-              {walletDetails?.chainId === "1" && (
-                <div className="mt-2 text-[10px] text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20 text-center">
-                  <strong>Warning:</strong> You are on Ethereum Mainnet. Switch
-                  to Ganache in MetaMask extension to test with dummy ETH.
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* BACKUP SECTION */}
-        <div>
-          <div className="flex items-center gap-1.5 mb-2 relative">
-            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-              Data Backup
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                setShowBackupInfo(!showBackupInfo);
-                setShowWalletInfoTooltip(false);
-                setShowSecurityInfo(false);
-                setIsOpen(false);
-              }}
-              className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              <InfoIcon className="w-3.5 h-3.5" />
-            </button>
-            {showBackupInfo && (
-              <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
-                Export your chats and local identity as an encrypted backup
-                file, or import to restore your data on this device.
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <ImportIcon className="w-3.5 h-3.5" /> Import
-            </button>
-            <button
-              onClick={handleExportChat}
-              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <ExportIcon className="w-3.5 h-3.5" /> Export
-            </button>
-          </div>
-          <input
-            type="file"
-            accept=".securep2p"
-            ref={fileInputRef}
-            onChange={handleImportChat}
-            className="hidden"
-          />
-        </div>
+        {nodeSelector && <div>{nodeSelector}</div>}
 
-        {/* AUTO DELETE SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -412,8 +268,7 @@ export default function SecuritySection() {
             {showSecurityInfo && (
               <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
                 <strong>Auto-Delete</strong> only removes messages from your
-                local device. Due to the P2P architecture, it cannot delete
-                messages stored on your peer's device.
+                local device.
               </div>
             )}
           </div>
@@ -451,13 +306,56 @@ export default function SecuritySection() {
           </div>
         </div>
 
-        {/* WIPE SECTION */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 relative">
+            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Data Backup
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBackupInfo(!showBackupInfo);
+                setShowWalletInfoTooltip(false);
+                setShowSecurityInfo(false);
+                setIsOpen(false);
+              }}
+              className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </button>
+            {showBackupInfo && (
+              <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+                Export your chats and local identity as an encrypted backup
+                file, or import to restore your data.
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <ImportIcon className="w-3.5 h-3.5" /> Import
+            </button>
+            <button
+              onClick={handleExportChat}
+              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <ExportIcon className="w-3.5 h-3.5" /> Export
+            </button>
+          </div>
+          <input
+            type="file"
+            accept=".securep2p"
+            ref={fileInputRef}
+            onChange={handleImportChat}
+            className="hidden"
+          />
+        </div>
+
         <div className="pt-2 border-t border-zinc-800/50">
           <button
-            onClick={() => {
-              setWipeConfirmation("");
-              setIsWipeModalOpen(true);
-            }}
+            onClick={handleWipeData}
             className="w-full text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
           >
             <TrashIcon className="w-3.5 h-3.5" /> Wipe Local Identity
@@ -465,29 +363,48 @@ export default function SecuritySection() {
         </div>
       </div>
 
-      {/* REFACTORED: MOVED SEED MODAL HERE FROM CONTEXT */}
       {seedModal.isOpen &&
         typeof document !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <h3 className="text-lg font-bold text-zinc-100 mb-2">
-                {seedModal.type === "export"
-                  ? "Encrypt Backup"
-                  : "Decrypt Backup"}
-              </h3>
+            <div
+              className={`bg-zinc-900 border rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 ${seedModal.type === "wipe" ? "border-red-500/30" : "border-zinc-800"}`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                {seedModal.type === "wipe" && (
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 text-red-400">
+                    <WarningIcon className="w-5 h-5" />
+                  </div>
+                )}
+                <h3
+                  className={`text-lg font-bold ${seedModal.type === "wipe" ? "text-red-400" : "text-zinc-100"}`}
+                >
+                  {seedModal.type === "export"
+                    ? "Encrypt Backup"
+                    : seedModal.type === "import"
+                      ? "Decrypt Backup"
+                      : "Confirm Data Wipe"}
+                </h3>
+              </div>
+
               <p className="text-xs text-zinc-400 mb-4">
                 Enter your exact 12-word seed phrase to{" "}
                 {seedModal.type === "export"
                   ? "encrypt"
-                  : "decrypt and restore"}{" "}
+                  : seedModal.type === "import"
+                    ? "decrypt and restore"
+                    : "authorize the permanent deletion of"}{" "}
                 your data.
               </p>
               <textarea
                 value={seedInput}
                 onChange={(e) => setSeedInput(e.target.value)}
                 placeholder="e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon"
-                className="w-full h-24 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none mb-2"
+                className={`w-full h-24 bg-zinc-950 border rounded-xl p-3 text-sm text-zinc-200 outline-none transition-all resize-none mb-2 ${
+                  seedModal.type === "wipe"
+                    ? "border-red-500/30 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    : "border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                }`}
               />
               {modalError && (
                 <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
@@ -504,60 +421,13 @@ export default function SecuritySection() {
                 <button
                   onClick={submitSeedModal}
                   disabled={!seedInput.trim()}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+                  className={`flex-1 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-lg ${
+                    seedModal.type === "wipe"
+                      ? "bg-red-600 hover:bg-red-500 shadow-red-500/20"
+                      : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
+                  }`}
                 >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {/* WIPE MODAL */}
-      {isWipeModalOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
-            <div className="bg-zinc-900 border border-red-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center gap-3 mb-4 text-red-400">
-                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-                  <WarningIcon className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold">Destructive Action</h3>
-              </div>
-              <p className="text-sm text-zinc-300 mb-2 leading-relaxed">
-                This will permanently delete your local identity from this
-                device.
-              </p>
-              <div className="mb-6">
-                <label className="block text-xs font-medium text-zinc-400 mb-2">
-                  Type{" "}
-                  <span className="text-white font-bold select-all">WIPE</span>{" "}
-                  to confirm
-                </label>
-                <input
-                  type="text"
-                  value={wipeConfirmation}
-                  onChange={(e) => setWipeConfirmation(e.target.value)}
-                  placeholder="WIPE"
-                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 rounded-xl px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700 uppercase"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setIsWipeModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={executeWipe}
-                  disabled={wipeConfirmation !== "WIPE"}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${wipeConfirmation === "WIPE" ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20" : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}`}
-                >
-                  Yes, Wipe Data
+                  {seedModal.type === "wipe" ? "Wipe Data" : "Confirm"}
                 </button>
               </div>
             </div>

@@ -1,9 +1,9 @@
 /**
- * Renders the microphone recording icon.
+ * Renders the lock session / logout icon.
  * @param {{ className?: string }} props - Component props
  * @returns {JSX.Element}
  */
-export const MicIcon = ({ className }: { className?: string }) => (
+export const LockSessionIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
     fill="none"
@@ -14,7 +14,7 @@ export const MicIcon = ({ className }: { className?: string }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
     />
   </svg>
 );

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { ethers } from "ethers";
 import { useChatContext } from "@/context/ChatContext";
 import { useWalletStore } from "@/store";
 
@@ -13,9 +14,41 @@ export const TransferModal = ({ isOpen, onClose }: TransferModalProps) => {
   const { peerWalletAddress } = useWalletStore();
   const [transferAmount, setTransferAmount] = useState("");
 
+  // State for balance validation
+  const [currentBalance, setCurrentBalance] = useState<string | null>(null);
+
+  // Fetch balance when modal opens
+  useEffect(() => {
+    const getBalance = async () => {
+      const savedAddress = localStorage.getItem("linked_metamask");
+      if (isOpen && savedAddress && typeof window.ethereum !== "undefined") {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const balanceWei = await provider.getBalance(savedAddress);
+          const balanceEth = ethers.formatEther(balanceWei);
+          setCurrentBalance(parseFloat(balanceEth).toFixed(4));
+        } catch (err) {
+          console.error("Failed to fetch balance for modal", err);
+        }
+      }
+    };
+    getBalance();
+  }, [isOpen]);
+
   if (!isOpen || typeof document === "undefined") return null;
 
+  const numericAmount = Number(transferAmount);
+  const numericBalance = Number(currentBalance);
+
+  // Validation flags
+  const isInvalidAmount =
+    !transferAmount || isNaN(numericAmount) || numericAmount <= 0;
+  const isInsufficientFunds =
+    currentBalance !== null && numericAmount > numericBalance;
+  const isDisabled = isInvalidAmount || isInsufficientFunds;
+
   const executeTransfer = () => {
+    if (isDisabled) return;
     handleSendCrypto(transferAmount);
     setTransferAmount("");
     onClose();
@@ -50,20 +83,61 @@ export const TransferModal = ({ isOpen, onClose }: TransferModalProps) => {
               <br />
               {peerWalletAddress}
             </p>
+
             <div className="mb-6">
-              <label className="block text-xs font-medium text-zinc-400 mb-2">
-                Amount (ETH)
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={transferAmount}
-                onChange={(e) => setTransferAmount(e.target.value)}
-                placeholder="e.g. 0.05"
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700"
-                autoComplete="off"
-              />
+              {/* REFACTORED: Balance Indicator Upgrade */}
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs font-medium text-zinc-400">
+                  Amount (ETH)
+                </label>
+                {currentBalance && (
+                  <div
+                    className={`text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                      isInsufficientFunds
+                        ? "bg-red-500/10 text-red-400 border-red-500/30"
+                        : "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                    }`}
+                  >
+                    Balance: {currentBalance}
+                  </div>
+                )}
+              </div>
+
+              <div className="relative">
+                {/* CSS to hide number input spinners (arrows) */}
+                <style>{`
+                  input[type=number]::-webkit-inner-spin-button, 
+                  input[type=number]::-webkit-outer-spin-button { 
+                    -webkit-appearance: none; 
+                    margin: 0; 
+                  }
+                  input[type=number] {
+                    -moz-appearance: textfield;
+                  }
+                `}</style>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  placeholder="e.g. 0.05"
+                  className={`w-full bg-zinc-950 border focus:ring-1 rounded-xl px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700 ${
+                    isInsufficientFunds
+                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/30"
+                      : "border-zinc-800 focus:border-indigo-500 focus:ring-indigo-500/30"
+                  }`}
+                  autoComplete="off"
+                />
+              </div>
+              {/* Error Message */}
+              {isInsufficientFunds && (
+                <p className="text-[10px] text-red-400 mt-1.5 ml-1 animate-in slide-in-from-top-1">
+                  Insufficient funds for this transaction.
+                </p>
+              )}
             </div>
+
             <div className="flex gap-3">
               <button
                 onClick={onClose}
@@ -73,8 +147,12 @@ export const TransferModal = ({ isOpen, onClose }: TransferModalProps) => {
               </button>
               <button
                 onClick={executeTransfer}
-                disabled={!transferAmount || isNaN(Number(transferAmount))}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-lg shadow-emerald-500/20"
+                disabled={isDisabled}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 shadow-lg ${
+                  isDisabled
+                    ? "bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-none"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+                }`}
               >
                 Send via MetaMask
               </button>

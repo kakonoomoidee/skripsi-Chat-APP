@@ -1,3 +1,8 @@
+/**
+ * Renders the filled pause bars icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const PauseIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />

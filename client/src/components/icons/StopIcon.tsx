@@ -1,3 +1,8 @@
+/**
+ * Renders the square stop recording icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const StopIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}

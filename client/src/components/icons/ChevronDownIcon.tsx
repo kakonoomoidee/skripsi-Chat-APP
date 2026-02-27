@@ -1,9 +1,9 @@
 /**
- * Renders the microphone recording icon.
+ * Renders the chevron down arrow icon.
  * @param {{ className?: string }} props - Component props
  * @returns {JSX.Element}
  */
-export const MicIcon = ({ className }: { className?: string }) => (
+export const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
     fill="none"
@@ -14,7 +14,7 @@ export const MicIcon = ({ className }: { className?: string }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
     />
   </svg>
 );

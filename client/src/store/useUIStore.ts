@@ -8,10 +8,14 @@ interface UIState {
   showToast: (msg: string, type?: "error" | "success") => void;
   hideToast: () => void;
 
-  seedModal: { isOpen: boolean; type: "import" | "export"; payload?: string };
+  seedModal: {
+    isOpen: boolean;
+    type: "import" | "export" | "wipe";
+    payload?: string;
+  };
   setSeedModal: (config: {
     isOpen: boolean;
-    type: "import" | "export";
+    type: "import" | "export" | "wipe";
     payload?: string;
   }) => void;
   closeSeedModal: () => void;

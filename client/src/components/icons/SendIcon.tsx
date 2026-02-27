@@ -1,3 +1,8 @@
+/**
+ * Renders the paper plane send icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const SendIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}

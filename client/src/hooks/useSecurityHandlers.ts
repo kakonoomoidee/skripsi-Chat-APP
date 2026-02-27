@@ -3,20 +3,33 @@ import { ethers } from "ethers";
 import { db } from "@/utils/db";
 import { formatTime } from "@/utils/format";
 import { useWallet } from "@/hooks/useWallet";
-import { useUIStore, useSessionStore } from "@/store";
+import { useUIStore, useSessionStore, useWalletStore } from "@/store";
 
+/**
+ * Custom hook to handle all security-related actions.
+ * Encapsulates logic for exporting/importing chats and wiping identities.
+ * @returns {object} Handlers and states for the security section
+ */
 export const useSecurityHandlers = () => {
   const { address, resetWallet } = useWallet();
   const { showToast, seedModal, setSeedModal, closeSeedModal } = useUIStore();
   const { autoDeleteMode, setAutoDeleteMode } = useSessionStore();
+  const { setPeerWalletAddress } = useWalletStore();
 
   const [seedInput, setSeedInput] = useState("");
   const [modalError, setModalError] = useState("");
 
+  /**
+   * Updates the local auto-delete mode.
+   * @param {ChangeEvent<HTMLSelectElement>} e
+   */
   const handleModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     setAutoDeleteMode(e.target.value);
   };
 
+  /**
+   * Prepares chat history for export.
+   */
   const handleExportChat = async () => {
     const allMessages = await db.messages.toArray();
     if (allMessages.length === 0) {
@@ -26,11 +39,14 @@ export const useSecurityHandlers = () => {
     setSeedModal({ isOpen: true, type: "export" });
   };
 
+  /**
+   * Reads an imported file and prompts for decryption.
+   * @param {ChangeEvent<HTMLInputElement>} e
+   */
   const handleImportChat = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // REFACTORED: Cek kalau mode incognito lagi nyala pas mau import
     if (autoDeleteMode === "close") {
       showToast(
         "Cannot import while in Incognito Mode. Change mode first.",
@@ -49,6 +65,16 @@ export const useSecurityHandlers = () => {
     e.target.value = "";
   };
 
+  /**
+   * Opens the seed modal to confirm identity wipe.
+   */
+  const handleWipeData = () => {
+    setSeedModal({ isOpen: true, type: "wipe" });
+  };
+
+  /**
+   * Validates the provided seed phrase and executes the requested action.
+   */
   const submitSeedModal = async () => {
     setModalError("");
     const seed = seedInput.trim();
@@ -65,6 +91,24 @@ export const useSecurityHandlers = () => {
       }
     } catch (err) {
       return setModalError("Invalid seed phrase format or typo detected!");
+    }
+
+    if (seedModal.type === "wipe") {
+      try {
+        await db.messages.clear();
+        localStorage.removeItem("linked_metamask");
+        localStorage.removeItem("securep2p_recent_contacts");
+        setPeerWalletAddress(null);
+        resetWallet();
+
+        closeSeedModal();
+        setSeedInput("");
+        showToast("Identity Wiped Successfully. Restarting...", "success");
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        setModalError("Failed to wipe data.");
+      }
+      return;
     }
 
     if (seedModal.type === "export") {
@@ -116,8 +160,6 @@ export const useSecurityHandlers = () => {
           setSeedInput("");
           showToast("Chat history restored! Wait a moment...", "success");
 
-          // REFACTORED: Refresh app manually to load new DB state,
-          // we are safe to reload here because we blocked import in Incognito mode earlier
           setTimeout(() => {
             window.location.reload();
           }, 1500);
@@ -133,7 +175,7 @@ export const useSecurityHandlers = () => {
     handleModeChange,
     handleExportChat,
     handleImportChat,
-    resetWallet,
+    handleWipeData,
     seedModal,
     closeSeedModal,
     seedInput,

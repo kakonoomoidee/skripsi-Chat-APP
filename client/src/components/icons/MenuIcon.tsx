@@ -1,3 +1,8 @@
+/**
+ * Renders the hamburger menu icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const MenuIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}

@@ -1,3 +1,8 @@
+/**
+ * Renders the paperclip attachment icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const AttachmentIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}

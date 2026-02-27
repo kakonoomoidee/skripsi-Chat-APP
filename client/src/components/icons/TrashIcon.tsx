@@ -1,3 +1,8 @@
+/**
+ * Renders the trash bin icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const TrashIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}

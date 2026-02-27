@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
+import { useUIStore } from "@/store";
 import RelaySelector from "./RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
-import { createPortal } from "react-dom";
-import { useUIStore } from "@/store";
-import { LockIcon } from "@/components/icons";
+import { LockSessionIcon } from "@/components/icons";
 
+/**
+ * Main sidebar component for navigation and settings.
+ * @returns {JSX.Element}
+ */
 export default function Sidebar() {
   const {
     myUsername,
@@ -92,7 +96,7 @@ export default function Sidebar() {
       <div className="w-80 bg-zinc-950/90 flex flex-col border-r border-zinc-800 backdrop-blur-xl h-full">
         <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50 shrink-0">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <LockIcon className="w-5 h-5 text-white " />
+            <LockSessionIcon className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-lg font-bold text-zinc-100 tracking-tight">
             Secure<span className="text-indigo-400">P2P</span>
@@ -219,7 +223,6 @@ export default function Sidebar() {
               )}
 
               <div className="space-y-1.5 flex-1">
-                {/* ACTIVE SESSIONS */}
                 {filteredSessions.map((session) => (
                   <div
                     key={session.address}
@@ -385,31 +388,25 @@ export default function Sidebar() {
                 address={address}
                 isConnected={isConnected}
               />
-              <RelaySelector
-                activeRelay={activeRelay}
-                defaultRelays={defaultRelays}
-                changeRelay={changeRelay}
-                addCustomRelay={addCustomRelay}
+
+              {/* REFACTORED: Layout Order Adjusted via Props Injection */}
+              <SecuritySection
+                nodeSelector={
+                  <RelaySelector
+                    activeRelay={activeRelay}
+                    defaultRelays={defaultRelays}
+                    changeRelay={changeRelay}
+                    addCustomRelay={addCustomRelay}
+                  />
+                }
               />
-              <SecuritySection />
+
               <div className="pt-4 border-t border-zinc-800/50">
                 <button
                   onClick={logout}
                   className="w-full text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
+                  <LockSessionIcon className="w-3.5 h-3.5" />
                   Lock Session
                 </button>
               </div>

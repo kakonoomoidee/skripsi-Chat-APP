@@ -1,3 +1,8 @@
+/**
+ * Renders the cryptocurrency/dollar coin icon.
+ * @param {{ className?: string }} props - Component props
+ * @returns {JSX.Element}
+ */
 export const CryptoIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
