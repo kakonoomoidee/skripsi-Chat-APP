@@ -1,22 +1,23 @@
-import { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import {
   AttachmentIcon,
   CryptoIcon,
   SendIcon,
   MicIcon,
-  StopIcon,
+  TrashIcon,
 } from "../icons/index";
 
 export interface ChatInputProps {
   onOpenTransferModal: () => void;
 }
 
-/**
- * Renders the input form for sending text, images, audio, and triggering crypto transfers.
- * @param {ChatInputProps} props - Properties including modal trigger.
- * @returns {JSX.Element}
- */
+const formatDuration = (time: number) => {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+};
+
 export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const {
     isWebRTCConnected,
@@ -28,48 +29,140 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   } = useChatContext();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number>(0);
+  const barsRef = useRef<(HTMLDivElement | null)[]>([]);
 
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data);
-        };
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height =
+        scrollHeight > 100 ? "100px" : `${scrollHeight}px`;
+    }
+  }, [messageInput]);
 
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, {
-            type: "audio/webm",
-          });
-          handleSendAudio(audioBlob);
-          stream.getTracks().forEach((track) => track.stop()); // cleanup mic
-        };
-
-        mediaRecorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        alert("Microphone access denied or not available.");
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (messageInput.trim() && isWebRTCConnected) {
+        handleSendMessage(e as any);
       }
     }
   };
 
+  const stopAllMedia = () => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (animationFrameRef.current)
+      cancelAnimationFrame(animationFrameRef.current);
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      audioCtxRef.current.close();
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+  };
+
+  const drawVisualizer = () => {
+    if (!analyserRef.current) return;
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      animationFrameRef.current = requestAnimationFrame(draw);
+      analyserRef.current!.getByteFrequencyData(dataArray);
+
+      barsRef.current.forEach((bar, index) => {
+        if (bar) {
+          const value = dataArray[index * 2];
+          const height = Math.max(4, (value / 255) * 24);
+          bar.style.height = `${height}px`;
+        }
+      });
+    };
+    draw();
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const audioCtx = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
+      const analyser = audioCtx.createAnalyser();
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      analyser.fftSize = 128;
+      audioCtxRef.current = audioCtx;
+      analyserRef.current = analyser;
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      drawVisualizer();
+
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      alert("Microphone access denied or not available.");
+    }
+  };
+
+  const sendRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        handleSendAudio(audioBlob);
+        stopAllMedia();
+      };
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = null;
+      stopAllMedia();
+    }
+  };
+
   return (
-    <div className="shrink-0 p-4 md:p-6 border-t border-zinc-800 bg-zinc-950 w-full z-20">
+    <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe">
       <form
         onSubmit={handleSendMessage}
-        className="flex gap-2 md:gap-3 max-w-5xl mx-auto items-center"
+        className="flex gap-2.5 max-w-5xl mx-auto items-end"
       >
         <input
           type="file"
@@ -79,67 +172,105 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
           className="hidden"
         />
 
-        <button
-          type="button"
-          onClick={onOpenTransferModal}
-          disabled={!isWebRTCConnected}
-          className="p-3 text-emerald-500 hover:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-xl border border-emerald-500/20 transition-colors disabled:opacity-50 shrink-0"
-          title="Transfer Crypto"
+        <div
+          className={`flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-end pl-2 pr-2 py-1.5 transition-all shadow-sm ${
+            isRecording
+              ? "border-red-500/50 ring-1 ring-red-500/20"
+              : "focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30"
+          }`}
         >
-          <CryptoIcon className="w-5 h-5" />
-        </button>
+          {!isRecording && (
+            <>
+              <button
+                type="button"
+                onClick={onOpenTransferModal}
+                disabled={!isWebRTCConnected}
+                className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
+              >
+                <CryptoIcon className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={!isWebRTCConnected}
+                className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
+              >
+                <AttachmentIcon className="w-5 h-5" />
+              </button>
+            </>
+          )}
 
-        <button
-          type="button"
-          onClick={() => imageInputRef.current?.click()}
-          disabled={!isWebRTCConnected}
-          className="p-3 text-zinc-400 hover:text-indigo-400 bg-zinc-900 rounded-xl border border-zinc-800 transition-colors disabled:opacity-50 shrink-0"
-        >
-          <AttachmentIcon className="w-5 h-5" />
-        </button>
+          {isRecording ? (
+            <div className="flex-1 px-3 py-2.5 mb-0.5 flex items-center justify-between text-zinc-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+                <span className="font-mono text-sm">
+                  {formatDuration(recordingTime)}
+                </span>
+              </div>
 
-        {isRecording ? (
-          <div className="flex-1 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm flex items-center justify-between animate-pulse">
-            <span className="text-red-400 font-medium flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span>{" "}
-              Recording Audio...
-            </span>
-          </div>
-        ) : (
-          <input
-            type="text"
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            disabled={!isWebRTCConnected}
-            placeholder={isWebRTCConnected ? `Message...` : "Connecting..."}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 outline-none focus:ring-1 focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-50 transition-all placeholder-zinc-600 min-w-0"
-          />
-        )}
+              <div className="flex items-center gap-1 h-6">
+                {Array.from({ length: 20 }).map((_, i) => (
+                  <div
+                    key={i}
+                    // REFACTORED: TypeScript fix, explicitly return void instead of assigning in arrow function
+                    ref={(el) => {
+                      barsRef.current[i] = el;
+                    }}
+                    className="w-1 bg-indigo-400 rounded-full transition-all duration-75"
+                    style={{ height: "4px" }}
+                  />
+                ))}
+              </div>
 
-        {!messageInput.trim() && isWebRTCConnected ? (
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className="text-red-400 hover:text-red-300 p-1 transition-colors"
+              >
+                <TrashIcon className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={!isWebRTCConnected}
+              placeholder={
+                isWebRTCConnected ? "Type a message..." : "Connecting..."
+              }
+              className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
+            />
+          )}
+        </div>
+
+        {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
           <button
             type="button"
-            onClick={toggleRecording}
-            className={`p-3 rounded-xl transition-colors shrink-0 shadow-lg ${
-              isRecording
-                ? "bg-red-600 hover:bg-red-500 text-white shadow-red-500/20"
-                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
-            }`}
+            onClick={startRecording}
+            className="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 mb-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
           >
-            {isRecording ? (
-              <StopIcon className="w-5 h-5" />
-            ) : (
-              <MicIcon className="w-5 h-5" />
-            )}
+            <MicIcon className="w-5 h-5" />
           </button>
         ) : (
           <button
-            type="submit"
-            disabled={!messageInput.trim() || !isWebRTCConnected}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 md:px-5 py-3 text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 shrink-0 flex items-center justify-center"
+            type="button"
+            onClick={isRecording ? sendRecording : (handleSendMessage as any)}
+            disabled={
+              (!isRecording && !messageInput.trim()) || !isWebRTCConnected
+            }
+            className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
+              isRecording
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+            }`}
           >
-            <SendIcon className="w-5 h-5 md:hidden" />
-            <span className="hidden md:inline">Send</span>
+            <SendIcon
+              className={`w-5 h-5 ${isRecording ? "ml-0" : "ml-0.5"}`}
+            />
           </button>
         )}
       </form>

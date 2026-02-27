@@ -1,0 +1,7 @@
+/**
+ * Barrel export for message bubble components
+ */
+export { TextBubble } from "./TextBubble";
+export { MediaBubble } from "./MediaBubble";
+export { AudioBubble } from "./AudioBubble";
+export { CryptoBubble } from "./CryptoBubble";
