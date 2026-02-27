@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/shared";
 import { ChatArea } from "@/components/chat";
-import { ChatProvider, useChatContext } from "@/context/ChatContext";
+import { ChatProvider } from "@/context/ChatContext";
+import { useUIStore } from "@/store";
 
 /**
  * Responsive Layout Wrapper
@@ -8,7 +9,7 @@ import { ChatProvider, useChatContext } from "@/context/ChatContext";
  * @returns {JSX.Element}
  */
 const ChatLayout = () => {
-  const { isMobileSidebarOpen, setIsMobileSidebarOpen } = useChatContext();
+  const { isMobileSidebarOpen, setIsMobileSidebarOpen } = useUIStore();
 
   return (
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30 overflow-hidden relative w-full">
