@@ -19,17 +19,10 @@ export const useSecurityHandlers = () => {
   const [seedInput, setSeedInput] = useState("");
   const [modalError, setModalError] = useState("");
 
-  /**
-   * Updates the local auto-delete mode.
-   * @param {ChangeEvent<HTMLSelectElement>} e
-   */
   const handleModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     setAutoDeleteMode(e.target.value);
   };
 
-  /**
-   * Prepares chat history for export.
-   */
   const handleExportChat = async () => {
     const allMessages = await db.messages.toArray();
     if (allMessages.length === 0) {
@@ -39,10 +32,6 @@ export const useSecurityHandlers = () => {
     setSeedModal({ isOpen: true, type: "export" });
   };
 
-  /**
-   * Reads an imported file and prompts for decryption.
-   * @param {ChangeEvent<HTMLInputElement>} e
-   */
   const handleImportChat = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -65,16 +54,10 @@ export const useSecurityHandlers = () => {
     e.target.value = "";
   };
 
-  /**
-   * Opens the seed modal to confirm identity wipe.
-   */
   const handleWipeData = () => {
     setSeedModal({ isOpen: true, type: "wipe" });
   };
 
-  /**
-   * Validates the provided seed phrase and executes the requested action.
-   */
   const submitSeedModal = async () => {
     setModalError("");
     const seed = seedInput.trim();
@@ -93,24 +76,29 @@ export const useSecurityHandlers = () => {
       return setModalError("Invalid seed phrase format or typo detected!");
     }
 
+    // --- WIPE LOGIC (REFACTORED: Direct to Login) ---
     if (seedModal.type === "wipe") {
       try {
-        await db.messages.clear();
-        localStorage.removeItem("linked_metamask");
-        localStorage.removeItem("securep2p_recent_contacts");
+        await db.messages.clear(); // Hapus database IndexedDB
+        localStorage.clear(); // Nuke semua storage termasuk token auth
         setPeerWalletAddress(null);
         resetWallet();
 
         closeSeedModal();
         setSeedInput("");
-        showToast("Identity Wiped Successfully. Restarting...", "success");
-        setTimeout(() => window.location.reload(), 1500);
+        showToast("Identity Wiped. Redirecting to Login...", "success");
+
+        // Lempar user ke halaman login setelah 1.5 detik
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
       } catch (err) {
         setModalError("Failed to wipe data.");
       }
       return;
     }
 
+    // --- EXPORT LOGIC ---
     if (seedModal.type === "export") {
       try {
         const allMessages = await db.messages.toArray();
@@ -140,7 +128,9 @@ export const useSecurityHandlers = () => {
       } catch (err) {
         setModalError("Failed to export chat history.");
       }
-    } else if (seedModal.type === "import" && seedModal.payload) {
+    }
+    // --- IMPORT LOGIC ---
+    else if (seedModal.type === "import" && seedModal.payload) {
       try {
         const payload = JSON.parse(seedModal.payload);
         if (payload.encrypted) {
@@ -182,5 +172,6 @@ export const useSecurityHandlers = () => {
     setSeedInput,
     modalError,
     submitSeedModal,
+    showToast,
   };
 };

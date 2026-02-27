@@ -48,6 +48,7 @@ export default function SecuritySection({
     setSeedInput,
     modalError,
     submitSeedModal,
+    showToast, // Ambil fungsi showToast dari hook
   } = useSecurityHandlers();
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -73,6 +74,9 @@ export default function SecuritySection({
     { value: "close", label: "Burn on Close (Incognito)" },
   ];
 
+  // Identifikasi mode incognito
+  const isIncognito = autoDeleteMode === "close";
+
   useEffect(() => {
     const savedAddress = localStorage.getItem("linked_metamask");
     if (savedAddress && typeof window.ethereum !== "undefined") {
@@ -95,10 +99,6 @@ export default function SecuritySection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /**
-   * Fetches the connected wallet's balance and network details.
-   * @param {string} address
-   */
   const fetchWalletDetails = async (address: string) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -113,9 +113,6 @@ export default function SecuritySection({
     } catch (err) {}
   };
 
-  /**
-   * Initiates connection to the MetaMask extension.
-   */
   const handleConnectMetaMask = async () => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed. Please install the extension.");
@@ -142,9 +139,6 @@ export default function SecuritySection({
     }
   };
 
-  /**
-   * Disconnects the linked MetaMask wallet from the local session.
-   */
   const handleDisconnectWallet = () => {
     setMetaMaskAddress(null);
     setWalletDetails(null);
@@ -158,6 +152,7 @@ export default function SecuritySection({
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
+        {/* 1. WALLET SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -246,8 +241,10 @@ export default function SecuritySection({
           )}
         </div>
 
+        {/* 2. NETWORK NODE SECTION (Injected via Props to control order) */}
         {nodeSelector && <div>{nodeSelector}</div>}
 
+        {/* 3. AUTO DELETE SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -306,6 +303,7 @@ export default function SecuritySection({
           </div>
         </div>
 
+        {/* 4. DATA BACKUP SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -331,9 +329,21 @@ export default function SecuritySection({
             )}
           </div>
           <div className="flex gap-2">
+            {/* REFACTORED: Validasi Disabled UI untuk Tombol Import */}
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+              type="button"
+              onClick={() => {
+                if (isIncognito) {
+                  showToast("Disable Incognito Mode to import data.", "error");
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className={`flex-1 text-xs font-medium py-2.5 rounded-xl border transition-colors flex items-center justify-center gap-1.5 shadow-sm ${
+                isIncognito
+                  ? "bg-zinc-950 border-zinc-800/50 text-zinc-600 cursor-not-allowed opacity-60"
+                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800"
+              }`}
             >
               <ImportIcon className="w-3.5 h-3.5" /> Import
             </button>
@@ -353,6 +363,7 @@ export default function SecuritySection({
           />
         </div>
 
+        {/* 5. WIPE SECTION */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
             onClick={handleWipeData}
@@ -363,6 +374,7 @@ export default function SecuritySection({
         </div>
       </div>
 
+      {/* GLOBAL SEED MODAL FOR EXPORT, IMPORT, AND WIPE */}
       {seedModal.isOpen &&
         typeof document !== "undefined" &&
         createPortal(
