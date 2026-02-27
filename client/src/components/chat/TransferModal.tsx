@@ -1,20 +1,16 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useChatContext } from "@/context/ChatContext";
+import { useWalletStore } from "@/store";
 
 export interface TransferModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-/**
- * Renders the modal overlay for handling peer-to-peer crypto transfers.
- * @param {TransferModalProps} props - Controls visibility and closure.
- * @returns {JSX.Element | null}
- */
 export const TransferModal = ({ isOpen, onClose }: TransferModalProps) => {
-  const { activeUsername, peerWalletAddress, handleSendCrypto } =
-    useChatContext();
+  const { activeUsername, handleSendCrypto } = useChatContext();
+  const { peerWalletAddress } = useWalletStore();
   const [transferAmount, setTransferAmount] = useState("");
 
   if (!isOpen || typeof document === "undefined") return null;

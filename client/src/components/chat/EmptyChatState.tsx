@@ -1,12 +1,8 @@
-import { useChatContext } from "@/context/ChatContext";
 import { MenuIcon } from "../icons/index";
+import { useUIStore } from "@/store";
 
-/**
- * Renders the placeholder view when no active chat is selected.
- * @returns {JSX.Element}
- */
 export const EmptyChatState = () => {
-  const { setIsMobileSidebarOpen } = useChatContext();
+  const { setIsMobileSidebarOpen } = useUIStore();
 
   return (
     <div className="flex flex-col bg-zinc-950 w-full h-full overflow-hidden">

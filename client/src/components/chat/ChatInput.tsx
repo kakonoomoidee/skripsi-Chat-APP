@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
+import { useSessionStore, useUIStore } from "@/store";
 import {
   AttachmentIcon,
   CryptoIcon,
@@ -21,12 +22,13 @@ const formatDuration = (time: number) => {
 export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const {
     isWebRTCConnected,
-    messageInput,
-    setMessageInput,
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
   } = useChatContext();
+
+  const { messageInput, setMessageInput } = useSessionStore();
+  const { showToast } = useUIStore();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -134,7 +136,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      alert("Microphone access denied or not available.");
+      // REFACTORED: Replaced native alert with custom Toast
+      showToast("Microphone access denied or not available.", "error");
     }
   };
 
@@ -213,7 +216,6 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
                 {Array.from({ length: 20 }).map((_, i) => (
                   <div
                     key={i}
-                    // REFACTORED: TypeScript fix, explicitly return void instead of assigning in arrow function
                     ref={(el) => {
                       barsRef.current[i] = el;
                     }}

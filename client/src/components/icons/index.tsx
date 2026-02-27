@@ -10,3 +10,4 @@ export { StopIcon } from "./StopIcon";
 export { PlayIcon } from "./PlayIcon";
 export { PauseIcon } from "./PauseIcon";
 export { TrashIcon } from "./TrashIcon";
+export { LockIcon } from "./LockIcon";

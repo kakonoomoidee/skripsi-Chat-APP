@@ -1,5 +1,5 @@
 import { formatTime } from "@/utils/format";
-import { useChatContext } from "@/context/ChatContext";
+import { useUIStore } from "@/store";
 
 export const CryptoBubble = ({
   msg,
@@ -14,7 +14,7 @@ export const CryptoBubble = ({
   txHash: string;
   isVerification: boolean;
 }) => {
-  const { showToast } = useChatContext();
+  const { showToast } = useUIStore();
 
   return (
     <div

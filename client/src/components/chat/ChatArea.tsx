@@ -5,14 +5,11 @@ import { EmptyChatState } from "./EmptyChatState";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { TransferModal } from "./TransferModal";
+import { useUIStore } from "@/store";
 
-/**
- * Main layout wrapper for the active chat session.
- * REFACTORED: Now utilizes modular architecture for cleaner maintenance.
- * @returns {JSX.Element}
- */
 export default function ChatArea() {
-  const { activeChat, requestPeerWallet, showToast } = useChatContext();
+  const { activeChat, requestPeerWallet } = useChatContext();
+  const { showToast } = useUIStore(); // Pull from Zustand
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const handleOpenTransferModal = () => {

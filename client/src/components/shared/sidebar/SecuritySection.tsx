@@ -1,6 +1,7 @@
-import { ChangeEvent, useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ethers } from "ethers";
+import { useSecurityHandlers } from "@/hooks/useSecurityHandlers";
 
 declare global {
   interface Window {
@@ -8,7 +9,7 @@ declare global {
   }
 }
 
-// ... [ICON COMPONENTS TETAP SAMA] ...
+// ... [PASTE SEMUA KOMPONEN SVG ICON LU DI SINI: ChevronDownIcon, ImportIcon, ExportIcon, dll] ...
 const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -24,7 +25,6 @@ const ChevronDownIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const ImportIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -40,7 +40,6 @@ const ImportIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const ExportIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -56,7 +55,6 @@ const ExportIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const InfoIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -72,7 +70,6 @@ const InfoIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const TrashIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -88,7 +85,6 @@ const TrashIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const WarningIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -104,7 +100,6 @@ const WarningIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-
 const WalletIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -121,23 +116,29 @@ const WalletIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export interface SecuritySectionProps {
-  autoDeleteMode: string;
-  handleModeChange: (e: ChangeEvent<HTMLSelectElement>) => void;
-  handleExportChat: () => void;
-  handleImportChat: (e: ChangeEvent<HTMLInputElement>) => void;
-  resetWallet: () => void;
-}
-
-export default function SecuritySection({
-  autoDeleteMode,
-  handleModeChange,
-  handleExportChat,
-  handleImportChat,
-  resetWallet,
-}: SecuritySectionProps) {
+/**
+ * Renders the settings sidebar section, handling Web3 wallet binding, data imports/exports.
+ * REFACTORED: Now completely self-contained using custom hooks.
+ * @returns {JSX.Element} The rendered component
+ */
+export default function SecuritySection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // REFACTORED: Panggil hook saktinya di sini
+  const {
+    autoDeleteMode,
+    handleModeChange,
+    handleExportChat,
+    handleImportChat,
+    resetWallet,
+    seedModal,
+    closeSeedModal,
+    seedInput,
+    setSeedInput,
+    modalError,
+    submitSeedModal,
+  } = useSecurityHandlers();
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
@@ -193,15 +194,12 @@ export default function SecuritySection({
       const network = await provider.getNetwork();
       const balanceWei = await provider.getBalance(address);
       const balanceEth = ethers.formatEther(balanceWei);
-
       setWalletDetails({
         balance: parseFloat(balanceEth).toFixed(4),
         network: network.name === "unknown" ? "Localhost" : network.name,
         chainId: network.chainId.toString(),
       });
-    } catch (err) {
-      console.error("Failed to fetch wallet details:", err);
-    }
+    } catch (err) {}
   };
 
   const handleConnectMetaMask = async () => {
@@ -209,27 +207,22 @@ export default function SecuritySection({
       alert("MetaMask is not installed. Please install the extension.");
       return;
     }
-
     setIsConnecting(true);
     try {
       await window.ethereum.request({
         method: "wallet_requestPermissions",
         params: [{ eth_accounts: {} }],
       });
-
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
-
       if (accounts && accounts.length > 0) {
         const linkedAddress = accounts[0];
         setMetaMaskAddress(linkedAddress);
         localStorage.setItem("linked_metamask", linkedAddress);
-
         await fetchWalletDetails(linkedAddress);
       }
     } catch (error: any) {
-      console.error("MetaMask connection failed or rejected:", error);
     } finally {
       setIsConnecting(false);
     }
@@ -241,24 +234,11 @@ export default function SecuritySection({
     localStorage.removeItem("linked_metamask");
   };
 
-  const handleOptionSelect = (value: string) => {
-    const syntheticEvent = {
-      target: { value },
-    } as ChangeEvent<HTMLSelectElement>;
-    handleModeChange(syntheticEvent);
-    setIsOpen(false);
-  };
-
   const executeWipe = () => {
     handleDisconnectWallet();
     setIsWipeModalOpen(false);
     setWipeConfirmation("");
     resetWallet();
-  };
-
-  const openWipeModal = () => {
-    setWipeConfirmation("");
-    setIsWipeModalOpen(true);
   };
 
   const activeLabel =
@@ -293,7 +273,6 @@ export default function SecuritySection({
               </div>
             )}
           </div>
-
           {!metaMaskAddress ? (
             <button
               onClick={handleConnectMetaMask}
@@ -323,7 +302,6 @@ export default function SecuritySection({
                   Disconnect
                 </button>
               </div>
-
               <div className="space-y-2">
                 <div>
                   <span className="text-[9px] text-zinc-500 block mb-0.5">
@@ -333,7 +311,6 @@ export default function SecuritySection({
                     {metaMaskAddress}
                   </span>
                 </div>
-
                 <div className="flex gap-2">
                   <div className="flex-1 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50">
                     <span className="text-[9px] text-zinc-500 block mb-0.5">
@@ -356,12 +333,10 @@ export default function SecuritySection({
                   </div>
                 </div>
               </div>
-
               {walletDetails?.chainId === "1" && (
                 <div className="mt-2 text-[10px] text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20 text-center">
-                  ⚠️ <strong>Warning:</strong> You are on Ethereum Mainnet.
-                  Switch to Ganache in MetaMask extension to test with dummy
-                  ETH.
+                  <strong>Warning:</strong> You are on Ethereum Mainnet. Switch
+                  to Ganache in MetaMask extension to test with dummy ETH.
                 </div>
               )}
             </div>
@@ -442,26 +417,28 @@ export default function SecuritySection({
               </div>
             )}
           </div>
-
           <div className="relative">
             <button
               onClick={() => setIsOpen(!isOpen)}
               className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
             >
               <span className="truncate">{activeLabel}</span>
-              {/* REFACTORED: Chevron rotation reversed because it opens upwards */}
               <ChevronDownIcon
                 className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-0 text-indigo-400" : "rotate-180"}`}
               />
             </button>
-            {/* REFACTORED: Dropdown menu positioned upwards using bottom-full mb-2 */}
             {isOpen && (
               <div className="absolute z-100 bottom-full mb-2 w-full bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
                 <ul className="py-1">
                   {deleteOptions.map((opt) => (
                     <li key={opt.value}>
                       <button
-                        onClick={() => handleOptionSelect(opt.value)}
+                        onClick={() => {
+                          handleModeChange({
+                            target: { value: opt.value },
+                          } as any);
+                          setIsOpen(false);
+                        }}
                         className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${autoDeleteMode === opt.value ? "bg-indigo-600/10 text-indigo-400 font-medium" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}
                       >
                         {opt.label}
@@ -477,13 +454,65 @@ export default function SecuritySection({
         {/* WIPE SECTION */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
-            onClick={openWipeModal}
+            onClick={() => {
+              setWipeConfirmation("");
+              setIsWipeModalOpen(true);
+            }}
             className="w-full text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
           >
             <TrashIcon className="w-3.5 h-3.5" /> Wipe Local Identity
           </button>
         </div>
       </div>
+
+      {/* REFACTORED: MOVED SEED MODAL HERE FROM CONTEXT */}
+      {seedModal.isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <h3 className="text-lg font-bold text-zinc-100 mb-2">
+                {seedModal.type === "export"
+                  ? "Encrypt Backup"
+                  : "Decrypt Backup"}
+              </h3>
+              <p className="text-xs text-zinc-400 mb-4">
+                Enter your exact 12-word seed phrase to{" "}
+                {seedModal.type === "export"
+                  ? "encrypt"
+                  : "decrypt and restore"}{" "}
+                your data.
+              </p>
+              <textarea
+                value={seedInput}
+                onChange={(e) => setSeedInput(e.target.value)}
+                placeholder="e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon"
+                className="w-full h-24 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none mb-2"
+              />
+              {modalError && (
+                <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                  {modalError}
+                </p>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={closeSeedModal}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitSeedModal}
+                  disabled={!seedInput.trim()}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* WIPE MODAL */}
       {isWipeModalOpen &&
