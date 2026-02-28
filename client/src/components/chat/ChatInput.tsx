@@ -12,7 +12,6 @@ import {
   GalleryIcon,
 } from "../icons/index";
 import { CameraModal } from "./CameraModal";
-import { ReplyPreview } from "./bubbles/ReplyPreview";
 
 export interface ChatInputProps {
   onOpenTransferModal: () => void;
@@ -20,7 +19,6 @@ export interface ChatInputProps {
 
 /**
  * Checks file signature to prevent executable uploads hidden with safe extensions.
- * Fully refactored to support all variants of JPEG/JPG headers.
  * @param {File} file - The file to evaluate.
  * @returns {Promise<boolean>} Evaluation status.
  */
@@ -32,23 +30,19 @@ const isFileSignatureSafe = (file: File): Promise<boolean> => {
       const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 4);
       let header = "";
       for (let i = 0; i < arr.length; i++) {
-        header += arr[i].toString(16).padStart(2, "0");
+        header += arr[i].toString(16);
       }
-
-      // Check for common image and document signatures
       const safeHeaders = [
-        "25504446", // PDF
-        "504b0304", // DOCX/XLSX
-        "89504e47", // PNG
-        "47494638", // GIF
-        "52494646", // WEBP/AVI
+        "25504446",
+        "504b34",
+        "89504e47",
+        "ffd8ffe0",
+        "ffd8ffe1",
+        "ffd8ffe2",
       ];
-
-      // JPEG/JPG is tricky, it usually starts with FFD8FF, the 4th byte can vary
-      const isJpeg = header.toLowerCase().startsWith("ffd8ff");
-
-      const isSafe =
-        isJpeg || safeHeaders.some((h) => header.toLowerCase().startsWith(h));
+      const isSafe = safeHeaders.some((h) =>
+        header.toLowerCase().startsWith(h),
+      );
       resolve(isSafe || file.type.startsWith("text/"));
     };
     reader.readAsArrayBuffer(file.slice(0, 4));
@@ -69,15 +63,17 @@ const formatDuration = (time: number): string => {
 export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const {
     isWebRTCConnected,
-    handleSendMessage: originalHandleSendMessage,
+    handleSendMessage,
     handleSendImage,
     handleSendAudio,
     handleSendDocument,
     handleSendCameraPhoto,
     handleTyping,
+    activeUsername,
   } = useChatContext();
 
-  const { messageInput, setMessageInput, replyingTo } = useSessionStore();
+  const { messageInput, setMessageInput, replyingTo, setReplyingTo } =
+    useSessionStore();
   const { showToast } = useUIStore();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -143,28 +139,23 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   }, [replyingTo]);
 
   /**
-   * Custom message handler to inject replyingTo timestamp logic.
-   * @param {React.SyntheticEvent} e - Form event.
+   * Key down event manager.
+   * @param {React.KeyboardEvent<HTMLTextAreaElement>} e - Event object.
    * @returns {void}
    */
-  const handleSendMessageWrapper = (e: React.SyntheticEvent): void => {
-    e.preventDefault();
-    if (!messageInput.trim() || !isWebRTCConnected) return;
-
-    // Call the original handleSendMessage from context, it already reads replyingTo state.
-    // The timestamp logic will be handled inside ChatContext.tsx now.
-    originalHandleSendMessage(e as any);
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (messageInput.trim() && isWebRTCConnected) {
-        handleSendMessageWrapper(e as any);
+        handleSendMessage(e);
       }
     }
   };
 
+  /**
+   * Resets all media recorder processes.
+   * @returns {void}
+   */
   const stopAllMedia = (): void => {
     if (
       mediaRecorderRef.current &&
@@ -185,6 +176,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     setRecordingTime(0);
   };
 
+  /**
+   * Initializes real time audio visualization element.
+   * @returns {void}
+   */
   const drawVisualizer = (): void => {
     if (!analyserRef.current) return;
     const bufferLength = analyserRef.current.frequencyBinCount;
@@ -205,6 +200,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     draw();
   };
 
+  /**
+   * Initializes audio context and media stream API access.
+   * @returns {Promise<void>}
+   */
   const startRecording = async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -241,6 +240,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
+  /**
+   * Completes the capture sequence and dispatches file.
+   * @returns {void}
+   */
   const sendRecording = (): void => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = () => {
@@ -254,6 +257,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
+  /**
+   * Terminates active captures safely.
+   * @returns {void}
+   */
   const cancelRecording = (): void => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = null;
@@ -261,6 +268,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
+  /**
+   * Processes valid and safe document assignments.
+   * @param {React.ChangeEvent<HTMLInputElement>} e - Upload event payload.
+   * @returns {Promise<void>}
+   */
   const handleDocumentUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ): Promise<void> => {
@@ -270,16 +282,15 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     if (!file) return;
 
     if (file.size > 1048576) {
-      showToast("File size limit exceeded. Maximum allowed is 1MB.", "error");
+      showToast("File too large! Max 1MB allowed.", "error");
       if (documentInputRef.current) documentInputRef.current.value = "";
       return;
     }
 
     const isSafe = await isFileSignatureSafe(file);
     if (!isSafe) {
-      // FIX: Pesan Error Eksplisit Kalo File Ditolak Magic Numbers
       showToast(
-        "Upload Blocked: File signature invalid or corrupted.",
+        "Security Alert: Invalid or potentially malicious file format.",
         "error",
       );
       if (documentInputRef.current) documentInputRef.current.value = "";
@@ -294,34 +305,6 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     reader.readAsDataURL(file);
   };
 
-  const handleImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ): Promise<void> => {
-    const file = e.target.files?.[0];
-    setShowAttachMenu(false);
-
-    if (!file) return;
-
-    if (file.size > 1024 * 500) {
-      showToast(
-        "Image size limit exceeded. Maximum allowed is 500KB.",
-        "error",
-      );
-      if (imageInputRef.current) imageInputRef.current.value = "";
-      return;
-    }
-
-    const isSafe = await isFileSignatureSafe(file);
-    if (!isSafe) {
-      showToast("Upload Blocked: Image format invalid or corrupted.", "error");
-      if (imageInputRef.current) imageInputRef.current.value = "";
-      return;
-    }
-
-    // Call context function
-    handleSendImage(e);
-  };
-
   return (
     <>
       {isCameraOpen && (
@@ -332,17 +315,49 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
       )}
       <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe relative">
         <div className="max-w-5xl mx-auto flex flex-col gap-2 relative">
-          <ReplyPreview />
+          {replyingTo && (
+            <div className="bg-zinc-900 border-l-4 border-indigo-500 rounded-xl p-3 flex justify-between items-start animate-in slide-in-from-bottom-2 fade-in shadow-md">
+              <div className="flex-1 overflow-hidden pr-2">
+                <p className="text-xs font-bold text-indigo-400 mb-1">
+                  Replying to {replyingTo.isMine ? "You" : activeUsername}
+                </p>
+                <p className="text-xs text-zinc-300 line-clamp-2 leading-snug">
+                  {replyingTo.text}
+                </p>
+              </div>
+              <button
+                onClick={() => setReplyingTo(null)}
+                className="text-zinc-500 hover:text-red-400 p-1 bg-zinc-800/50 hover:bg-zinc-800 rounded-full transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
 
           <form
-            onSubmit={handleSendMessageWrapper}
+            onSubmit={handleSendMessage}
             className="flex gap-2.5 items-end w-full relative"
           >
             <input
               type="file"
               accept="image/*"
               ref={imageInputRef}
-              onChange={handleImageUpload}
+              onChange={(e) => {
+                setShowAttachMenu(false);
+                handleSendImage(e);
+              }}
               className="hidden"
             />
 
@@ -483,7 +498,9 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
             ) : (
               <button
                 type="button"
-                onClick={isRecording ? sendRecording : handleSendMessageWrapper}
+                onClick={
+                  isRecording ? sendRecording : (e) => handleSendMessage(e)
+                }
                 disabled={
                   (!isRecording && !messageInput.trim()) || !isWebRTCConnected
                 }
