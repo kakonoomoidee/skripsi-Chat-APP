@@ -47,8 +47,10 @@ export interface ChatContextValue {
   handleSendAudio: (audioBlob: Blob) => Promise<void>;
   resetWallet: () => void;
   requestPeerWallet: () => void;
-  handleSendCrypto: (amount: string) => Promise<void>; // DIBALIKIN!
+  handleSendCrypto: (amount: string) => Promise<void>;
   searchError: string;
+  isPeerTyping: boolean; // INI BARU
+  handleTyping: () => void; // INI BARU
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -82,6 +84,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleAcceptRequest,
     handleRejectRequest,
     searchError,
+    isPeerTyping,
+    setIsPeerTyping,
   } = useChatLogic({
     address,
     socket,
@@ -101,6 +105,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     myAddress: address,
     activeChat,
     decrypt,
+    setIsPeerTyping,
   });
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
@@ -219,7 +224,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (encryptedPayload) sendDataViaWebRTC(currentChat, encryptedPayload);
   };
 
-  // DIBALIKIN! Logic kirim crypto yang sempet kehapus
   const handleSendCrypto = async (amount: string) => {
     if (!peerWalletAddress)
       throw new Error("Peer wallet address not resolved yet.");
@@ -380,6 +384,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(audioBlob);
   };
 
+  // LOGIC BUAT NGIRIM PAYLOAD SILUMAN PAS LAGI NGETIK
+  const handleTyping = () => {
+    const currentChat = activeChat as string;
+    if (!currentChat || !isWebRTCConnected) return;
+
+    const payload = JSON.stringify({ type: "TYPING" });
+    const encryptedTyping = encrypt(currentChat, payload);
+    if (encryptedTyping) {
+      sendDataViaWebRTC(currentChat, encryptedTyping);
+    }
+  };
+
   const handleSwitchChatWrapped = (session: any) => {
     switchChat(session);
     setPeerWalletAddress(null);
@@ -422,6 +438,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     requestPeerWallet,
     handleSendCrypto,
     searchError,
+    isPeerTyping,
+    handleTyping,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

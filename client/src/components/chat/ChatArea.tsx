@@ -9,7 +9,7 @@ import { useUIStore } from "@/store";
 
 export default function ChatArea() {
   const { activeChat, requestPeerWallet } = useChatContext();
-  const { showToast } = useUIStore(); // Pull from Zustand
+  const { showToast } = useUIStore();
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const handleOpenTransferModal = () => {
