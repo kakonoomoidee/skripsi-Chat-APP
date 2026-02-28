@@ -10,27 +10,43 @@ interface ReplyBubbleContextProps {
   isMine: boolean;
 }
 
+/**
+ * Renders the contextual reply snippet inside a chat bubble.
+ * Uses high-precision P2P timestamp matching to find the exact message.
+ * @param {ReplyBubbleContextProps} props - Component properties.
+ * @returns {JSX.Element} The reply snippet component.
+ */
 export const ReplyBubbleContext = ({
   replyTo,
   isMine,
 }: ReplyBubbleContextProps) => {
   const { activeUsername, messages } = useChatContext();
 
+  /**
+   * Evaluates the closest message by timestamp delta and scrolls into view.
+   * @returns {void}
+   */
   const handleScrollToMessage = (): void => {
     let targetEl = document.getElementById(`msg-${replyTo.id}`);
 
     if (!targetEl && replyTo.timestamp) {
       const targetIsMine = !replyTo.isMine;
 
-      const targetMsg = messages.find((m) => {
-        const isSameOwnership = m.isMine === targetIsMine;
-        const isTimeClose =
-          Math.abs(m.timestamp - (replyTo.timestamp || 0)) < 15000;
-        return isSameOwnership && isTimeClose;
+      let closestMsg: any = null;
+      let minDiff = Infinity;
+
+      messages.forEach((m) => {
+        if (m.isMine === targetIsMine) {
+          const diff = Math.abs(m.timestamp - (replyTo.timestamp || 0));
+          if (diff < minDiff && diff < 15000) {
+            minDiff = diff;
+            closestMsg = m;
+          }
+        }
       });
 
-      if (targetMsg) {
-        targetEl = document.getElementById(`msg-${targetMsg.id}`);
+      if (closestMsg) {
+        targetEl = document.getElementById(`msg-${closestMsg.id}`);
       }
     }
 
