@@ -97,7 +97,10 @@ export const useWebRTC = ({
     const audioEl = document.getElementById(
       "p2p-audio-stream",
     ) as HTMLAudioElement;
-    if (audioEl) audioEl.srcObject = null;
+    if (audioEl) {
+      audioEl.srcObject = null;
+      audioEl.remove();
+    }
   };
 
   /**
@@ -198,7 +201,7 @@ export const useWebRTC = ({
               if (onCallEnded) onCallEnded();
               return;
             }
-          } catch (e) {}
+          } catch { /* ignore */ }
 
           const isReceivedImage = decryptedContent.startsWith("data:image");
           await db.messages.add({
@@ -209,7 +212,7 @@ export const useWebRTC = ({
             timestamp: Date.now(),
             isImage: isReceivedImage,
           });
-        } catch (error) {
+        } catch {
           console.error("Failed to decrypt WebRTC message");
         }
       };
@@ -345,7 +348,7 @@ export const useWebRTC = ({
                   if (onCallEnded) onCallEnded();
                   return;
                 }
-              } catch (e) {}
+              } catch { /* ignore */ }
 
               const isReceivedImage = decryptedContent.startsWith("data:image");
               await db.messages.add({
@@ -356,7 +359,7 @@ export const useWebRTC = ({
                 timestamp: Date.now(),
                 isImage: isReceivedImage,
               });
-            } catch (error) {
+            } catch {
               console.error("Failed to decrypt WebRTC message");
             }
           };

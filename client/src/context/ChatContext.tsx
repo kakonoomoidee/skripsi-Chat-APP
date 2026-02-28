@@ -27,7 +27,7 @@ export interface ChatContextValue {
   activeRelay: string;
   defaultRelays: string[];
   changeRelay: (url: string) => void;
-  addCustomRelay: (url: string) => void;
+  addCustomRelay: (url: string) => Promise<void>;
   isConnected: boolean;
   targetUsername: string;
   setTargetUsername: (val: string) => void;
@@ -77,7 +77,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     useCrypto();
 
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
-  const { messageInput, setMessageInput, autoDeleteMode } = useSessionStore();
+  const { messageInput, setMessageInput, autoDeleteMode, replyingTo, setReplyingTo } = useSessionStore();
   const { peerWalletAddress, setPeerWalletAddress } = useWalletStore();
 
   const [isIncomingCall, setIsIncomingCall] = useState(false);
@@ -172,7 +172,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch (err) {}
+      } catch { /* ignore */ }
     };
     sweepOldMessages();
   }, [autoDeleteMode]);
@@ -240,7 +240,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
           });
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     };
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC, setPeerWalletAddress]);
@@ -348,8 +348,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       return;
 
     try {
-      const payloadObj: any = { text: messageInput };
-      const { replyingTo, setReplyingTo } = useSessionStore.getState();
+      const payloadObj: Record<string, unknown> = { text: messageInput };
       if (replyingTo) {
         payloadObj.replyTo = {
           id: replyingTo.id,
@@ -680,6 +679,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined)

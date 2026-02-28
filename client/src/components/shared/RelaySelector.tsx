@@ -8,7 +8,7 @@ export interface RelaySelectorProps {
   activeRelay: string;
   defaultRelays: string[];
   changeRelay: (url: string) => void;
-  addCustomRelay: (url: string) => void;
+  addCustomRelay: (url: string) => Promise<void>;
   size?: "sm" | "md"; // REFACTORED: Added size prop for layout flexibility
 }
 
@@ -24,6 +24,7 @@ export default function RelaySelector({
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [customRelayInput, setCustomRelayInput] = useState<string>("");
+  const [relayError, setRelayError] = useState<string>("");
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,12 +42,17 @@ export default function RelaySelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddRelaySubmit = () => {
+  const handleAddRelaySubmit = async () => {
     if (customRelayInput.trim()) {
-      addCustomRelay(customRelayInput.trim());
+      try {
+        await addCustomRelay(customRelayInput.trim());
+        setIsModalOpen(false);
+        setCustomRelayInput("");
+        setRelayError("");
+      } catch (err) {
+        setRelayError(err instanceof Error ? err.message : "Failed to add relay.");
+      }
     }
-    setIsModalOpen(false);
-    setCustomRelayInput("");
   };
 
   // Dynamic styling based on size prop
@@ -177,16 +183,20 @@ export default function RelaySelector({
               <input
                 type="text"
                 value={customRelayInput}
-                onChange={(e) => setCustomRelayInput(e.target.value)}
+                onChange={(e) => { setCustomRelayInput(e.target.value); setRelayError(""); }}
                 placeholder="e.g. wss://my-relay.example.com"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all mb-5"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all mb-2"
                 autoFocus
               />
-              <div className="flex gap-3">
+              {relayError && (
+                <p className="text-xs text-red-400 mb-3">{relayError}</p>
+              )}
+              <div className="flex gap-3 mt-3">
                 <button
                   onClick={() => {
                     setIsModalOpen(false);
                     setCustomRelayInput("");
+                    setRelayError("");
                   }}
                   className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
                 >

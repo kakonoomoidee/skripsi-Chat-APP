@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { formatTime } from "@/utils/format";
 import { PlayIcon, PauseIcon } from "../../icons";
 
@@ -31,10 +31,7 @@ export const AudioBubble = ({
   const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
 
   // Memoize waveform so it doesn't change on re-renders
-  const waveform = useRef<number[]>([]);
-  if (waveform.current.length === 0) {
-    waveform.current = generateWaveform(32); // Increased bars for denser look
-  }
+  const waveform = useMemo(() => generateWaveform(32), []);
 
   const toggleAudio = () => {
     if (audioRef.current) {
@@ -91,13 +88,14 @@ export const AudioBubble = ({
 
   useEffect(() => {
     if (audioRef.current) {
+      const audioEl = audioRef.current;
       const onCanPlay = () => {
-        if (audioRef.current && audioRef.current.duration !== Infinity) {
-          setDuration(audioRef.current.duration);
+        if (audioEl && audioEl.duration !== Infinity) {
+          setDuration(audioEl.duration);
         }
       };
-      audioRef.current.addEventListener("canplay", onCanPlay);
-      return () => audioRef.current?.removeEventListener("canplay", onCanPlay);
+      audioEl.addEventListener("canplay", onCanPlay);
+      return () => audioEl.removeEventListener("canplay", onCanPlay);
     }
   }, []);
 
@@ -150,8 +148,8 @@ export const AudioBubble = ({
         <div className="flex-1 relative h-6 flex items-center group cursor-pointer">
           {/* Static Waveform Bars */}
           <div className="absolute inset-0 flex items-center justify-between gap-0.5 pointer-events-none w-full">
-            {waveform.current.map((height, i) => {
-              const barPercentage = (i / waveform.current.length) * 100;
+            {waveform.map((height, i) => {
+              const barPercentage = (i / waveform.length) * 100;
               const isActive = progress >= barPercentage;
 
               return (

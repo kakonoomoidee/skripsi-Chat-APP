@@ -53,6 +53,9 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (activeSessions.length > 0) {
+      // Merging active sessions into recent contacts history requires a direct
+      // setState here (synchronizing derived state from props is an accepted pattern).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecentContacts((prev) => {
         const updated = [...prev];
         let isChanged = false;

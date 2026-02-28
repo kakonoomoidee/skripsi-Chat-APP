@@ -11,10 +11,9 @@ export const useRelayPing = (activeRelay: string) => {
 
   useEffect(() => {
     let isMounted = true;
-    let intervalId: NodeJS.Timeout;
-
     const pingRelay = async () => {
       if (!activeRelay) return;
+      if (isMounted) setIsPinging(true);
       try {
         const httpUrl = activeRelay.replace(/^ws/, "http");
         const controller = new AbortController();
@@ -27,7 +26,7 @@ export const useRelayPing = (activeRelay: string) => {
           setIsRelayAlive(true);
           setIsPinging(false);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setIsRelayAlive(false);
           setIsPinging(false);
@@ -35,9 +34,8 @@ export const useRelayPing = (activeRelay: string) => {
       }
     };
 
-    setIsPinging(true);
     pingRelay();
-    intervalId = setInterval(pingRelay, 5000);
+    const intervalId = setInterval(pingRelay, 5000);
 
     return () => {
       isMounted = false;
