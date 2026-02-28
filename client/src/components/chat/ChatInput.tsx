@@ -7,11 +7,47 @@ import {
   SendIcon,
   MicIcon,
   TrashIcon,
+  DocumentIcon,
+  CameraIcon,
+  GalleryIcon,
 } from "../icons/index";
+import { CameraModal } from "./CameraModal";
 
 export interface ChatInputProps {
   onOpenTransferModal: () => void;
 }
+
+/**
+ * Checks file signature to prevent executable uploads hidden with safe extensions.
+ * @param {File} file - The file to evaluate.
+ * @returns {Promise<boolean>} Evaluation status.
+ */
+const isFileSignatureSafe = (file: File): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = (e) => {
+      if (!e.target || !e.target.result) return resolve(false);
+      const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 4);
+      let header = "";
+      for (let i = 0; i < arr.length; i++) {
+        header += arr[i].toString(16);
+      }
+      const safeHeaders = [
+        "25504446",
+        "504b34",
+        "89504e47",
+        "ffd8ffe0",
+        "ffd8ffe1",
+        "ffd8ffe2",
+      ];
+      const isSafe = safeHeaders.some((h) =>
+        header.toLowerCase().startsWith(h),
+      );
+      resolve(isSafe || file.type.startsWith("text/"));
+    };
+    reader.readAsArrayBuffer(file.slice(0, 4));
+  });
+};
 
 const formatDuration = (time: number) => {
   const minutes = Math.floor(time / 60);
@@ -25,6 +61,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
+    handleSendDocument,
+    handleSendCameraPhoto,
     handleTyping,
     activeUsername,
   } = useChatContext();
@@ -34,10 +72,14 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const { showToast } = useUIStore();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const attachMenuRef = useRef<HTMLDivElement>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -48,6 +90,34 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>(0);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  // NEW: Effect to handle "Click Outside" to close the attachment menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        attachMenuRef.current &&
+        !attachMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowAttachMenu(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowAttachMenu(false);
+      }
+    };
+
+    if (showAttachMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showAttachMenu]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -169,157 +239,254 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
+  /**
+   * Processes valid and safe document assignments.
+   * @param {React.ChangeEvent<HTMLInputElement>} e - Upload event payload.
+   * @returns {Promise<void>}
+   */
+  const handleDocumentUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    setShowAttachMenu(false);
+
+    if (!file) return;
+
+    if (file.size > 1048576) {
+      showToast("File too large! Max 1MB allowed.", "error");
+      if (documentInputRef.current) documentInputRef.current.value = "";
+      return;
+    }
+
+    const isSafe = await isFileSignatureSafe(file);
+    if (!isSafe) {
+      showToast(
+        "Security Alert: Invalid or potentially malicious file format.",
+        "error",
+      );
+      if (documentInputRef.current) documentInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      handleSendDocument(file.name, base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
-    <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe">
-      <div className="max-w-5xl mx-auto flex flex-col gap-2">
-        {replyingTo && (
-          <div className="bg-zinc-900 border-l-4 border-indigo-500 rounded-xl p-3 flex justify-between items-start animate-in slide-in-from-bottom-2 fade-in shadow-md">
-            <div className="flex-1 overflow-hidden pr-2">
-              <p className="text-xs font-bold text-indigo-400 mb-1">
-                Replying to {replyingTo.isMine ? "You" : activeUsername}
-              </p>
-              <p className="text-xs text-zinc-300 line-clamp-2 leading-snug">
-                {replyingTo.text}
-              </p>
-            </div>
-            <button
-              onClick={() => setReplyingTo(null)}
-              className="text-zinc-500 hover:text-red-400 p-1 bg-zinc-800/50 hover:bg-zinc-800 rounded-full transition-colors"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSendMessage}
-          className="flex gap-2.5 items-end w-full"
-        >
-          <input
-            type="file"
-            accept="image/*"
-            ref={imageInputRef}
-            onChange={handleSendImage}
-            className="hidden"
-          />
-
-          <div
-            className={`flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-end pl-2 pr-2 py-1.5 transition-all shadow-sm ${
-              isRecording
-                ? "border-red-500/50 ring-1 ring-red-500/20"
-                : "focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30"
-            }`}
-          >
-            {!isRecording && (
-              <>
-                <button
-                  type="button"
-                  onClick={onOpenTransferModal}
-                  disabled={!isWebRTCConnected}
-                  className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
-                >
-                  <CryptoIcon className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={!isWebRTCConnected}
-                  className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
-                >
-                  <AttachmentIcon className="w-5 h-5" />
-                </button>
-              </>
-            )}
-
-            {isRecording ? (
-              <div className="flex-1 px-3 py-2.5 mb-0.5 flex items-center justify-between text-zinc-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
-                  <span className="font-mono text-sm">
-                    {formatDuration(recordingTime)}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1 h-6">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div
-                      key={i}
-                      ref={(el) => {
-                        barsRef.current[i] = el;
-                      }}
-                      className="w-1 bg-indigo-400 rounded-full transition-all duration-75"
-                      style={{ height: "4px" }}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={cancelRecording}
-                  className="text-red-400 hover:text-red-300 p-1 transition-colors"
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
+    <>
+      {isCameraOpen && (
+        <CameraModal
+          onClose={() => setIsCameraOpen(false)}
+          onSend={(base64) => handleSendCameraPhoto(base64)}
+        />
+      )}
+      <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe relative">
+        <div className="max-w-5xl mx-auto flex flex-col gap-2 relative">
+          {replyingTo && (
+            <div className="bg-zinc-900 border-l-4 border-indigo-500 rounded-xl p-3 flex justify-between items-start animate-in slide-in-from-bottom-2 fade-in shadow-md">
+              <div className="flex-1 overflow-hidden pr-2">
+                <p className="text-xs font-bold text-indigo-400 mb-1">
+                  Replying to {replyingTo.isMine ? "You" : activeUsername}
+                </p>
+                <p className="text-xs text-zinc-300 line-clamp-2 leading-snug">
+                  {replyingTo.text}
+                </p>
               </div>
-            ) : (
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={messageInput}
-                onChange={(e) => {
-                  setMessageInput(e.target.value);
-                  handleTyping();
-                }}
-                onKeyDown={handleKeyDown}
-                disabled={!isWebRTCConnected}
-                placeholder={
-                  isWebRTCConnected ? "Type a message..." : "Connecting..."
-                }
-                className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
-              />
-            )}
-          </div>
+              <button
+                onClick={() => setReplyingTo(null)}
+                className="text-zinc-500 hover:text-red-400 p-1 bg-zinc-800/50 hover:bg-zinc-800 rounded-full transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
 
-          {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
-            <button
-              type="button"
-              onClick={startRecording}
-              className="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 mb-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-            >
-              <MicIcon className="w-5 h-5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={isRecording ? sendRecording : (handleSendMessage as any)}
-              disabled={
-                (!isRecording && !messageInput.trim()) || !isWebRTCConnected
-              }
-              className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
+          <form
+            onSubmit={handleSendMessage}
+            className="flex gap-2.5 items-end w-full relative"
+          >
+            <input
+              type="file"
+              accept="image/*"
+              ref={imageInputRef}
+              onChange={(e) => {
+                setShowAttachMenu(false);
+                handleSendImage(e);
+              }}
+              className="hidden"
+            />
+
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+              ref={documentInputRef}
+              onChange={handleDocumentUpload}
+              className="hidden"
+            />
+
+            <div
+              className={`flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-end pl-2 pr-2 py-1.5 transition-all shadow-sm ${
                 isRecording
-                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
-                  : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+                  ? "border-red-500/50 ring-1 ring-red-500/20"
+                  : "focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30"
               }`}
             >
-              <SendIcon
-                className={`w-5 h-5 ${isRecording ? "ml-0" : "ml-0.5"}`}
-              />
-            </button>
-          )}
-        </form>
+              {!isRecording && (
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={onOpenTransferModal}
+                    disabled={!isWebRTCConnected}
+                    className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    <CryptoIcon className="w-5 h-5" />
+                  </button>
+
+                  <div className="relative" ref={attachMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAttachMenu(!showAttachMenu)}
+                      disabled={!isWebRTCConnected}
+                      className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
+                    >
+                      <AttachmentIcon className="w-5 h-5" />
+                    </button>
+
+                    {showAttachMenu && (
+                      <div className="absolute bottom-full left-0 mb-3 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl p-2 w-56 flex flex-col gap-1 z-50 animate-in slide-in-from-bottom-2 fade-in">
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          className="flex items-center gap-3 w-full p-2.5 hover:bg-zinc-700 rounded-xl transition-colors text-zinc-200 text-sm font-medium"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                            <GalleryIcon className="w-4 h-4" />
+                          </div>
+                          Gallery
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAttachMenu(false);
+                            setIsCameraOpen(true);
+                          }}
+                          className="flex items-center gap-3 w-full p-2.5 hover:bg-zinc-700 rounded-xl transition-colors text-zinc-200 text-sm font-medium"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                            <CameraIcon className="w-4 h-4" />
+                          </div>
+                          Camera
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => documentInputRef.current?.click()}
+                          className="flex items-center gap-3 w-full p-2.5 hover:bg-zinc-700 rounded-xl transition-colors text-zinc-200 text-sm font-medium"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                            <DocumentIcon className="w-4 h-4" />
+                          </div>
+                          Document (Max 1MB)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isRecording ? (
+                <div className="flex-1 px-3 py-2.5 mb-0.5 flex items-center justify-between text-zinc-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+                    <span className="font-mono text-sm">
+                      {formatDuration(recordingTime)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 h-6">
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <div
+                        key={i}
+                        ref={(el) => {
+                          barsRef.current[i] = el;
+                        }}
+                        className="w-1 bg-indigo-400 rounded-full transition-all duration-75"
+                        style={{ height: "4px" }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={cancelRecording}
+                    className="text-red-400 hover:text-red-300 p-1 transition-colors"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={messageInput}
+                  onChange={(e) => {
+                    setMessageInput(e.target.value);
+                    handleTyping();
+                  }}
+                  onKeyDown={handleKeyDown}
+                  disabled={!isWebRTCConnected}
+                  placeholder={
+                    isWebRTCConnected ? "Type a message..." : "Connecting..."
+                  }
+                  className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
+                />
+              )}
+            </div>
+
+            {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 mb-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+              >
+                <MicIcon className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={
+                  isRecording ? sendRecording : (handleSendMessage as any)
+                }
+                disabled={
+                  (!isRecording && !messageInput.trim()) || !isWebRTCConnected
+                }
+                className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
+                  isRecording
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+                }`}
+              >
+                <SendIcon className={`w-5 h-5`} />
+              </button>
+            )}
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };

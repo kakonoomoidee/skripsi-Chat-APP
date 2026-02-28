@@ -45,12 +45,14 @@ export interface ChatContextValue {
   handleSendMessage: (e: React.SyntheticEvent) => Promise<void>;
   handleSendImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSendAudio: (audioBlob: Blob) => Promise<void>;
+  handleSendDocument: (fileName: string, base64: string) => Promise<void>;
+  handleSendCameraPhoto: (base64: string) => Promise<void>;
   resetWallet: () => void;
   requestPeerWallet: () => void;
   handleSendCrypto: (amount: string) => Promise<void>;
   searchError: string;
-  isPeerTyping: boolean; // INI BARU
-  handleTyping: () => void; // INI BARU
+  isPeerTyping: boolean;
+  handleTyping: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -375,6 +377,74 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(file);
   };
 
+  /**
+   * Processes and dispatches document files.
+   * @param {string} fileName - File name string.
+   * @param {string} base64 - Base64 encoded file data.
+   * @returns {Promise<void>}
+   */
+  const handleSendDocument = async (fileName: string, base64: string) => {
+    const currentChat = activeChat as string;
+    if (
+      !currentChat ||
+      !hasSecret(currentChat) ||
+      !isWebRTCConnected ||
+      !address
+    )
+      return;
+
+    try {
+      const payloadObj = { type: "DOCUMENT", fileName, fileData: base64 };
+      const stringifiedPayload = JSON.stringify(payloadObj);
+      const encryptedDoc = encrypt(currentChat, stringifiedPayload);
+      if (!encryptedDoc) throw new Error("Encryption failed");
+
+      sendDataViaWebRTC(currentChat, encryptedDoc);
+
+      await db.messages.add({
+        ownerAddress: address.toLowerCase(),
+        chatId: currentChat.toLowerCase(),
+        text: stringifiedPayload,
+        isMine: true,
+        timestamp: Date.now(),
+      });
+    } catch {
+      showToast("Document encryption failed.", "error");
+    }
+  };
+
+  /**
+   * Processes and dispatches base64 image data directly from camera.
+   * @param {string} base64 - Base64 encoded image string.
+   * @returns {Promise<void>}
+   */
+  const handleSendCameraPhoto = async (base64: string) => {
+    const currentChat = activeChat as string;
+    if (
+      !currentChat ||
+      !hasSecret(currentChat) ||
+      !isWebRTCConnected ||
+      !address
+    )
+      return;
+
+    try {
+      const encryptedImage = encrypt(currentChat, base64);
+      if (!encryptedImage) throw new Error("Encryption failed");
+      sendDataViaWebRTC(currentChat, encryptedImage);
+      await db.messages.add({
+        ownerAddress: address.toLowerCase(),
+        chatId: currentChat.toLowerCase(),
+        text: base64,
+        isMine: true,
+        timestamp: Date.now(),
+        isImage: true,
+      });
+    } catch {
+      showToast("Camera image encryption failed.", "error");
+    }
+  };
+
   const handleSendAudio = async (audioBlob: Blob) => {
     const currentChat = activeChat as string;
     if (!audioBlob || !currentChat || !isWebRTCConnected || !address) return;
@@ -400,7 +470,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(audioBlob);
   };
 
-  // LOGIC BUAT NGIRIM PAYLOAD SILUMAN PAS LAGI NGETIK
   const handleTyping = () => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
@@ -450,6 +519,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
+    handleSendDocument,
+    handleSendCameraPhoto,
     resetWallet,
     requestPeerWallet,
     handleSendCrypto,
