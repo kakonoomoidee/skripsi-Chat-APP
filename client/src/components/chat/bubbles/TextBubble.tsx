@@ -1,14 +1,50 @@
 import { formatTime } from "@/utils/format";
 import { useSessionStore } from "@/store";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
 
+/**
+ * Renders a chat bubble for text messages with reply functionality and click-outside handling.
+ * @param {Object} props - The component props.
+ * @param {any} props.msg - The message object.
+ * @returns {JSX.Element} The rendered text bubble component.
+ */
 export const TextBubble = ({ msg }: { msg: any }) => {
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
   const { activeUsername } = useChatContext();
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleScrollToMessage = (replyId: string) => {
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showMenu]);
+
+  /**
+   * Scrolls smoothly to the referenced replied message.
+   * @param {string} replyId - The ID of the message to scroll to.
+   * @returns {void}
+   */
+  const handleScrollToMessage = (replyId: string): void => {
     const targetEl = document.getElementById(`msg-${replyId}`);
     if (targetEl) {
       targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -30,11 +66,12 @@ export const TextBubble = ({ msg }: { msg: any }) => {
             : "bg-zinc-800 text-zinc-100 rounded-2xl rounded-tl-sm self-start"
         }`}
       >
-        {/* CHEVRON BUTTON DI POJOK KANAN ATAS DALEM BUBBLE */}
-        <div className="absolute top-1 right-1 z-20">
+        <div className="absolute top-1 right-1 z-20" ref={menuRef}>
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className={`p-0.5 rounded-full bg-black/20 text-white hover:bg-black/40 transition-all md:opacity-0 group-hover:opacity-100 ${showMenu ? "opacity-100" : "opacity-70"}`}
+            className={`p-0.5 rounded-full bg-black/20 text-white hover:bg-black/40 transition-all opacity-0 group-hover:opacity-100 ${
+              showMenu ? "opacity-100" : ""
+            }`}
           >
             <svg
               className="w-4 h-4"
@@ -53,7 +90,9 @@ export const TextBubble = ({ msg }: { msg: any }) => {
 
           {showMenu && (
             <div
-              className={`absolute z-50 top-full mt-1 ${msg.isMine ? "right-0" : "left-0"} bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-32 animate-in fade-in zoom-in-95`}
+              className={`absolute z-50 top-full mt-1 ${
+                msg.isMine ? "right-0" : "left-0"
+              } bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-32 animate-in fade-in zoom-in-95`}
             >
               <button
                 onClick={() => {
@@ -88,10 +127,16 @@ export const TextBubble = ({ msg }: { msg: any }) => {
         {msg.replyTo && (
           <div
             onClick={() => handleScrollToMessage(msg.replyTo.id)}
-            className={`mb-1.5 p-1.5 rounded-lg border-l-4 text-xs cursor-pointer hover:opacity-100 transition-all pr-6 ${msg.isMine ? "bg-black/20 border-indigo-300 opacity-90" : "bg-black/20 border-indigo-500 opacity-90"}`}
+            className={`mb-1.5 p-1.5 rounded-lg border-l-4 text-xs cursor-pointer hover:opacity-100 transition-all pr-6 ${
+              msg.isMine
+                ? "bg-black/20 border-indigo-300 opacity-90"
+                : "bg-black/20 border-indigo-500 opacity-90"
+            }`}
           >
             <p
-              className={`font-bold mb-0.5 text-[10px] ${msg.isMine ? "text-indigo-200" : "text-indigo-400"}`}
+              className={`font-bold mb-0.5 text-[10px] ${
+                msg.isMine ? "text-indigo-200" : "text-indigo-400"
+              }`}
             >
               {msg.replyTo.isMine ? "You" : activeUsername}
             </p>
