@@ -23,11 +23,11 @@ export const useRelay = () => {
 
   const addCustomRelay = async (url: string) => {
     const formattedUrl = url.trim().replace(/\/$/, "");
-    if (!formattedUrl.startsWith("http")) return alert("Invalid URL!");
+    if (!formattedUrl.startsWith("http")) throw new Error("Invalid URL!");
     try {
       await db.relays.add({ url: formattedUrl, name: "Custom Node" });
     } catch {
-      alert("Relay already exists!");
+      throw new Error("Relay already exists!");
     }
   };
 

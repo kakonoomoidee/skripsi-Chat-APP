@@ -46,7 +46,7 @@ export const CameraModal = ({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-      } catch (err) {
+      } catch {
         showToast("Camera access denied or not available.", "error");
         onClose();
       }

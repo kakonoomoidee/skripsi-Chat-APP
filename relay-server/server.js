@@ -169,7 +169,13 @@ checkAndAutoRegister();
 const gossipToOtherRelays = (event, to, data) => {
   knownRelays.forEach((relayUrl) => {
     axios
-      .post(`${relayUrl}/internal/gossip`, { event, to, data })
+      .post(
+        `${relayUrl}/internal/gossip`,
+        { event, to, data },
+        process.env.INTERNAL_SECRET
+          ? { headers: { "x-internal-secret": process.env.INTERNAL_SECRET } }
+          : {},
+      )
       .catch((err) => {
         console.warn(`Gossip to ${relayUrl} failed: ${err.message}`);
       });
@@ -242,6 +248,10 @@ io.on("connection", (socket) => {
 });
 
 app.post("/internal/gossip", (req, res) => {
+  const secret = req.headers["x-internal-secret"];
+  if (process.env.INTERNAL_SECRET && secret !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   const { event, to, data } = req.body;
   io.to(to).emit(event, data);
   res.sendStatus(200);

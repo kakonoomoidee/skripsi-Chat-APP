@@ -5,9 +5,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "start:relay1": "cross-env PORT=3001 RELAYER_PRIVATE_KEY=0xcdf7cc81a4ab6205a390103026dd25869b607c06a8fc7d84a52db8db9702d902 node server.js",
-    "start:relay2": "cross-env PORT=3002 RELAYER_PRIVATE_KEY=0xa1007c6a2c6d5c7815c6da6f530d6cf8a04a1454e09592ce36b0f57bd2f0823c node server.js",
-    "start:relay3": "cross-env PORT=3003 RELAYER_PRIVATE_KEY=0x576ab2cae6c01f0a567b3cc45d4ffa2f23d1c6f73a31754ded668d43e3cef3ce node server.js"
+    "start:relay1": "cross-env PORT=3001 node server.js",
+    "start:relay2": "cross-env PORT=3002 node server.js",
+    "start:relay3": "cross-env PORT=3003 node server.js"
   },
   "keywords": [],
   "author": "",

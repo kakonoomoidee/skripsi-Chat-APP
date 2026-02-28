@@ -110,7 +110,7 @@ export default function SecuritySection({
         network: network.name === "unknown" ? "Localhost" : network.name,
         chainId: network.chainId.toString(),
       });
-    } catch (err) {}
+    } catch { /* ignore */ }
   };
 
   const handleConnectMetaMask = async () => {
@@ -133,8 +133,7 @@ export default function SecuritySection({
         localStorage.setItem("linked_metamask", linkedAddress);
         await fetchWalletDetails(linkedAddress);
       }
-    } catch (error: any) {
-    } finally {
+    } catch { /* ignore */ } finally {
       setIsConnecting(false);
     }
   };
