@@ -43,6 +43,9 @@ export const useChatLogic = ({
 
   const [searchError, setSearchError] = useState<string>("");
 
+  // Nambah state khusus buat nyimpen status ngetik lawan chat
+  const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
+
   const activeSessionsRef = useRef<ActiveSession[]>([]);
 
   useEffect(() => {
@@ -216,5 +219,7 @@ export const useChatLogic = ({
     handleAcceptRequest,
     handleRejectRequest,
     searchError,
+    isPeerTyping,
+    setIsPeerTyping,
   };
 };

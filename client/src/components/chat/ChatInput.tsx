@@ -25,6 +25,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
+    handleTyping, // INI NAMBAH DIAMBIL DARI CONTEXT
   } = useChatContext();
 
   const { messageInput, setMessageInput } = useSessionStore();
@@ -136,7 +137,6 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      // REFACTORED: Replaced native alert with custom Toast
       showToast("Microphone access denied or not available.", "error");
     }
   };
@@ -238,7 +238,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
               ref={textareaRef}
               rows={1}
               value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
+              onChange={(e) => {
+                setMessageInput(e.target.value);
+                handleTyping(); // INI DIA TRIGGER SILUMANNYA
+              }}
               onKeyDown={handleKeyDown}
               disabled={!isWebRTCConnected}
               placeholder={

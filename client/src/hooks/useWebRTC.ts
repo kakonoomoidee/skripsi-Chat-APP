@@ -14,23 +14,22 @@ interface UseWebRTCParams {
   myAddress: string | null;
   activeChat: string | null;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
+  setIsPeerTyping?: (isTyping: boolean) => void; // Nambah prop opsional
 }
 
-/**
- * 1. Manage WebRTC peer connections, data channels, and ICE candidates for P2P communication
- * @param {UseWebRTCParams} params - The initialization parameters
- * @returns {object} { isWebRTCConnected, sendDataViaWebRTC, initiateWebRTCConnection, connectedPeers }
- */
 export const useWebRTC = ({
   socket,
   myAddress,
   activeChat,
   decrypt,
+  setIsPeerTyping, // Ambil dari param
 }: UseWebRTCParams) => {
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
   const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
   const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
+
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isWebRTCConnected = activeChat
     ? connectedPeers.includes(activeChat.toLowerCase())
@@ -60,6 +59,24 @@ export const useWebRTC = ({
       dc.onmessage = async (msgEvent) => {
         try {
           const decryptedContent = decrypt(peerAddress, msgEvent.data);
+
+          // CEK: Apakah ini payload TYPING siluman?
+          try {
+            const parsed = JSON.parse(decryptedContent);
+            if (parsed.type === "TYPING" && setIsPeerTyping) {
+              setIsPeerTyping(true);
+              if (typingTimeoutRef.current)
+                clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = setTimeout(
+                () => setIsPeerTyping(false),
+                2500,
+              );
+              return; // Berhenti di sini biar ga disimpen ke database
+            }
+          } catch (e) {
+            // Kalau bukan JSON, lanjut aja
+          }
+
           const isReceivedImage = decryptedContent.startsWith("data:image");
 
           await db.messages.add({
@@ -103,7 +120,7 @@ export const useWebRTC = ({
         signal: { type: "offer", offer },
       });
     },
-    [socket, decrypt, myAddress],
+    [socket, decrypt, myAddress, setIsPeerTyping],
   );
 
   useEffect(() => {
@@ -138,6 +155,24 @@ export const useWebRTC = ({
           dc.onmessage = async (msgEvent) => {
             try {
               const decryptedContent = decrypt(peerAddress, msgEvent.data);
+
+              // CEK: Apakah ini payload TYPING siluman (receiver side)
+              try {
+                const parsed = JSON.parse(decryptedContent);
+                if (parsed.type === "TYPING" && setIsPeerTyping) {
+                  setIsPeerTyping(true);
+                  if (typingTimeoutRef.current)
+                    clearTimeout(typingTimeoutRef.current);
+                  typingTimeoutRef.current = setTimeout(
+                    () => setIsPeerTyping(false),
+                    2500,
+                  );
+                  return; // Berhenti di sini
+                }
+              } catch (e) {
+                // Lanjut
+              }
+
               const isReceivedImage = decryptedContent.startsWith("data:image");
 
               await db.messages.add({
@@ -224,7 +259,7 @@ export const useWebRTC = ({
     return () => {
       socket.off("webrtc_signal", handleWebRTCSignal);
     };
-  }, [socket, decrypt, myAddress]);
+  }, [socket, decrypt, myAddress, setIsPeerTyping]);
 
   const sendDataViaWebRTC = (targetPeer: string, encryptedData: string) => {
     const peerAddress = targetPeer.toLowerCase();

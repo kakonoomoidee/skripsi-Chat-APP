@@ -3,7 +3,7 @@ import { MenuIcon } from "../icons/index";
 import { useUIStore } from "@/store";
 
 export const ChatHeader = () => {
-  const { activeUsername, isWebRTCConnected } = useChatContext();
+  const { activeUsername, isWebRTCConnected, isPeerTyping } = useChatContext();
   const { setIsMobileSidebarOpen } = useUIStore();
 
   return (
@@ -25,7 +25,11 @@ export const ChatHeader = () => {
               {activeUsername}
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {isWebRTCConnected ? (
+              {isPeerTyping ? (
+                <span className="text-[10px] text-indigo-400 font-medium italic">
+                  typing...
+                </span>
+              ) : isWebRTCConnected ? (
                 <span className="text-[10px] text-emerald-500 font-medium">
                   Secured Tunnel Active
                 </span>
