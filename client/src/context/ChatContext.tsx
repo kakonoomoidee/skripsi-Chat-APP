@@ -312,17 +312,33 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       return;
 
     try {
-      const encryptedMsg = encrypt(currentChat, messageInput);
+      const payloadObj: any = { text: messageInput };
+
+      const { replyingTo, setReplyingTo } = useSessionStore.getState();
+      if (replyingTo) {
+        payloadObj.replyTo = {
+          id: replyingTo.id,
+          text: replyingTo.text,
+          isMine: replyingTo.isMine,
+        };
+      }
+
+      const stringifiedPayload = JSON.stringify(payloadObj);
+      const encryptedMsg = encrypt(currentChat, stringifiedPayload);
       if (!encryptedMsg) throw new Error("Encryption failed");
+
       sendDataViaWebRTC(currentChat, encryptedMsg);
+
       await db.messages.add({
         ownerAddress: address.toLowerCase(),
         chatId: currentChat.toLowerCase(),
-        text: messageInput,
+        text: stringifiedPayload,
         isMine: true,
         timestamp: Date.now(),
       });
+
       setMessageInput("");
+      setReplyingTo(null);
     } catch {
       showToast("Failed to send message. Is WebRTC connected?", "error");
     }

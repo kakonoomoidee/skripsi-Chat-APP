@@ -16,7 +16,7 @@ export const MessageList = () => {
 
   return (
     <div className="flex-1 min-h-0 px-4 md:px-8 py-6 overflow-y-auto custom-scrollbar">
-      <div className="space-y-6">
+      <div className="space-y-2">
         {messages?.map((msg) => (
           <MessageBubble key={msg.id} msg={msg} />
         ))}
