@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useRef,
   ReactNode,
+  useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -53,6 +54,14 @@ export interface ChatContextValue {
   searchError: string;
   isPeerTyping: boolean;
   handleTyping: () => void;
+  isIncomingCall: boolean;
+  isInCall: boolean;
+  isMuted: boolean;
+  initiateCall: () => void;
+  acceptCall: () => void;
+  declineCall: () => void;
+  endCall: () => void;
+  toggleMute: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -70,6 +79,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { messageInput, setMessageInput, autoDeleteMode } = useSessionStore();
   const { peerWalletAddress, setPeerWalletAddress } = useWalletStore();
+
+  const [isIncomingCall, setIsIncomingCall] = useState(false);
+  const [isInCall, setIsInCall] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   const {
     targetUsername,
@@ -102,12 +115,27 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     sendDataViaWebRTC,
     initiateWebRTCConnection,
     connectedPeers,
+    startVoiceCall,
+    stopVoiceCall,
+    toggleMicMute,
   } = useWebRTC({
     socket,
     myAddress: address,
     activeChat,
     decrypt,
     setIsPeerTyping,
+    onCallOffer: () => setIsIncomingCall(true),
+    onCallAccepted: () => {
+      setIsInCall(true);
+      showToast("Call connected!", "success");
+    },
+    onCallRejected: () => showToast("Call declined by peer.", "error"),
+    onCallEnded: () => {
+      setIsInCall(false);
+      setIsIncomingCall(false);
+      setIsMuted(false);
+      showToast("Call ended.", "error");
+    },
   });
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
@@ -189,7 +217,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (!messages || messages.length === 0 || !activeChat) return;
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.isMine || lastMsg.id === undefined) return;
-
       try {
         const payload = JSON.parse(lastMsg.text);
         if (payload.type === "WALLET_REQUEST") {
@@ -218,7 +245,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC, setPeerWalletAddress]);
 
-  const requestPeerWallet = () => {
+  /**
+   * Dispatches a wallet address request to the active peer.
+   * @returns {void}
+   */
+  const requestPeerWallet = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !hasSecret(currentChat) || !isWebRTCConnected) return;
     const requestPayload = JSON.stringify({ type: "WALLET_REQUEST" });
@@ -226,22 +257,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (encryptedPayload) sendDataViaWebRTC(currentChat, encryptedPayload);
   };
 
-  const handleSendCrypto = async (amount: string) => {
+  /**
+   * Executes a cryptocurrency transaction using MetaMask.
+   * @param {string} amount - The amount of ETH to send.
+   * @returns {Promise<void>}
+   */
+  const handleSendCrypto = async (amount: string): Promise<void> => {
     if (!peerWalletAddress)
       throw new Error("Peer wallet address not resolved yet.");
     if (typeof window.ethereum === "undefined")
-      throw new Error(
-        "MetaMask is not installed. Please link it in the Security settings.",
-      );
+      throw new Error("MetaMask is not installed.");
     const myMetaMask = localStorage.getItem("linked_metamask");
-    if (!myMetaMask)
-      throw new Error(
-        "Your MetaMask is not linked. Please link it in the Security settings.",
-      );
+    if (!myMetaMask) throw new Error("Your MetaMask is not linked.");
     if (myMetaMask.toLowerCase() === peerWalletAddress.toLowerCase())
-      throw new Error(
-        "Self-Transfer Blocked: Sender and Receiver addresses are identical.",
-      );
+      throw new Error("Self-Transfer Blocked.");
 
     try {
       const chainIdHex = "0x539";
@@ -301,7 +330,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleSendMessage = async (e: React.SyntheticEvent) => {
+  /**
+   * Dispatches a text message over the active WebRTC data channel.
+   * @param {React.SyntheticEvent} e - The form submission event.
+   * @returns {Promise<void>}
+   */
+  const handleSendMessage = async (e: React.SyntheticEvent): Promise<void> => {
     e.preventDefault();
     const currentChat = activeChat as string;
     if (
@@ -315,7 +349,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const payloadObj: any = { text: messageInput };
-
       const { replyingTo, setReplyingTo } = useSessionStore.getState();
       if (replyingTo) {
         payloadObj.replyTo = {
@@ -346,7 +379,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleSendImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Processes and dispatches an image file over WebRTC.
+   * @param {React.ChangeEvent<HTMLInputElement>} e - The file input change event.
+   * @returns {Promise<void>}
+   */
+  const handleSendImage = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
     const file = e.target.files?.[0];
     const currentChat = activeChat as string;
     if (!file || !currentChat || !isWebRTCConnected || !address) return;
@@ -378,12 +418,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * Processes and dispatches document files.
-   * @param {string} fileName - File name string.
+   * Dispatches a document file payload over WebRTC.
+   * @param {string} fileName - Original file name.
    * @param {string} base64 - Base64 encoded file data.
    * @returns {Promise<void>}
    */
-  const handleSendDocument = async (fileName: string, base64: string) => {
+  const handleSendDocument = async (
+    fileName: string,
+    base64: string,
+  ): Promise<void> => {
     const currentChat = activeChat as string;
     if (
       !currentChat ||
@@ -414,11 +457,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * Processes and dispatches base64 image data directly from camera.
-   * @param {string} base64 - Base64 encoded image string.
+   * Dispatches base64 image data captured from the local camera.
+   * @param {string} base64 - Base64 encoded image data.
    * @returns {Promise<void>}
    */
-  const handleSendCameraPhoto = async (base64: string) => {
+  const handleSendCameraPhoto = async (base64: string): Promise<void> => {
     const currentChat = activeChat as string;
     if (
       !currentChat ||
@@ -445,7 +488,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleSendAudio = async (audioBlob: Blob) => {
+  /**
+   * Dispatches recorded audio blob data.
+   * @param {Blob} audioBlob - The recorded audio media blob.
+   * @returns {Promise<void>}
+   */
+  const handleSendAudio = async (audioBlob: Blob): Promise<void> => {
     const currentChat = activeChat as string;
     if (!audioBlob || !currentChat || !isWebRTCConnected || !address) return;
 
@@ -470,24 +518,116 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(audioBlob);
   };
 
-  const handleTyping = () => {
+  /**
+   * Dispatches a silent typing status payload.
+   * @returns {void}
+   */
+  const handleTyping = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
-
     const payload = JSON.stringify({ type: "TYPING" });
     const encryptedTyping = encrypt(currentChat, payload);
-    if (encryptedTyping) {
-      sendDataViaWebRTC(currentChat, encryptedTyping);
+    if (encryptedTyping) sendDataViaWebRTC(currentChat, encryptedTyping);
+  };
+
+  /**
+   * Triggers the voice call initiation process.
+   * @returns {void}
+   */
+  const initiateCall = (): void => {
+    const currentChat = activeChat as string;
+    if (!currentChat || !isWebRTCConnected) return;
+    const payload = JSON.stringify({ type: "CALL_OFFER" });
+    const encryptedCall = encrypt(currentChat, payload);
+    if (encryptedCall) {
+      sendDataViaWebRTC(currentChat, encryptedCall);
+      showToast("Calling...", "success");
     }
   };
 
-  const handleSwitchChatWrapped = (session: any) => {
+  /**
+   * Accepts an incoming voice call and establishes media streams.
+   * @returns {Promise<void>}
+   */
+  const acceptCall = async (): Promise<void> => {
+    const currentChat = activeChat as string;
+    if (!currentChat || !isWebRTCConnected) return;
+
+    const micStarted = await startVoiceCall(currentChat);
+    if (!micStarted) {
+      showToast("Microphone access needed.", "error");
+      return;
+    }
+
+    const payload = JSON.stringify({ type: "CALL_ACCEPTED" });
+    const encryptedAccept = encrypt(currentChat, payload);
+    if (encryptedAccept) {
+      sendDataViaWebRTC(currentChat, encryptedAccept);
+      setIsIncomingCall(false);
+      setIsInCall(true);
+    }
+  };
+
+  /**
+   * Declines an incoming voice call.
+   * @returns {void}
+   */
+  const declineCall = (): void => {
+    const currentChat = activeChat as string;
+    if (!currentChat || !isWebRTCConnected) return;
+    const payload = JSON.stringify({ type: "CALL_REJECTED" });
+    const encryptedReject = encrypt(currentChat, payload);
+    if (encryptedReject) {
+      sendDataViaWebRTC(currentChat, encryptedReject);
+      setIsIncomingCall(false);
+    }
+  };
+
+  /**
+   * Terminates an active voice call and releases media streams.
+   * @returns {void}
+   */
+  const endCall = (): void => {
+    const currentChat = activeChat as string;
+    if (!currentChat) return;
+
+    stopVoiceCall(currentChat);
+    const payload = JSON.stringify({ type: "CALL_ENDED" });
+    const encrypted = encrypt(currentChat, payload);
+    if (encrypted && isWebRTCConnected) {
+      sendDataViaWebRTC(currentChat, encrypted);
+    }
+    setIsInCall(false);
+    setIsIncomingCall(false);
+    setIsMuted(false);
+  };
+
+  /**
+   * Toggles local microphone mute status during an active call.
+   * @returns {void}
+   */
+  const toggleMute = (): void => {
+    const mutedStatus = toggleMicMute();
+    setIsMuted(mutedStatus);
+  };
+
+  /**
+   * Wraps switch chat handler with cleanup operations.
+   * @param {any} session - Target session data.
+   * @returns {void}
+   */
+  const handleSwitchChatWrapped = (session: any): void => {
     switchChat(session);
     setPeerWalletAddress(null);
     setIsMobileSidebarOpen(false);
   };
 
-  const handleAcceptRequestWrapped = (req: any) => {
+  /**
+   * Wraps accept request handler with cleanup operations.
+   * @param {any} req - Target request data.
+   * @returns {void}
+   */
+  const handleAcceptRequestWrapped = (req: any): void => {
     handleAcceptRequest(req);
     setIsMobileSidebarOpen(false);
   };
@@ -527,6 +667,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     searchError,
     isPeerTyping,
     handleTyping,
+    isIncomingCall,
+    isInCall,
+    isMuted,
+    initiateCall,
+    acceptCall,
+    declineCall,
+    endCall,
+    toggleMute,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

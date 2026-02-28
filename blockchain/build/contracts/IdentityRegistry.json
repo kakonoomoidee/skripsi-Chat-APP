@@ -12520,12 +12520,12 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x1ba2160641904c3EF08f1F01C5C9FA72A52543D4",
-      "transactionHash": "0x7ebf56f1315ebea63055633ceb846b102a444d1ba16408e837dfedffb34c6ee4"
+      "address": "0x636c6BfAED11bEAB22249a06Ae9405826ce47Aa5",
+      "transactionHash": "0x4acd093875d9ab0670ec76e2168ac2f99b5a00f7b3a7882e31e706c584588cfe"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-02-28T04:49:50.018Z",
+  "updatedAt": "2026-02-28T12:26:02.768Z",
   "networkType": "ethereum",
   "devdoc": {
     "details": "Decentralized identity storage for P2P Chat. Supports gasless registration and challenge-response authentication.",

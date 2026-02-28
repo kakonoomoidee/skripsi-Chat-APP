@@ -14,19 +14,33 @@ interface UseWebRTCParams {
   myAddress: string | null;
   activeChat: string | null;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
-  setIsPeerTyping?: (isTyping: boolean) => void; // Nambah prop opsional
+  setIsPeerTyping?: (isTyping: boolean) => void;
+  onCallOffer?: () => void;
+  onCallAccepted?: () => void;
+  onCallRejected?: () => void;
+  onCallEnded?: () => void;
 }
 
+/**
+ * Manages WebRTC peer connections, data channels, and media transceivers.
+ * @param {UseWebRTCParams} params - The initialization parameters.
+ * @returns {object} WebRTC state and control functions including voice call actions.
+ */
 export const useWebRTC = ({
   socket,
   myAddress,
   activeChat,
   decrypt,
-  setIsPeerTyping, // Ambil dari param
+  setIsPeerTyping,
+  onCallOffer,
+  onCallAccepted,
+  onCallRejected,
+  onCallEnded,
 }: UseWebRTCParams) => {
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
   const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
   const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
+  const localStreamRef = useRef<MediaStream | null>(null);
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,6 +48,72 @@ export const useWebRTC = ({
   const isWebRTCConnected = activeChat
     ? connectedPeers.includes(activeChat.toLowerCase())
     : false;
+
+  /**
+   * Requests microphone access and replaces the audio track in the peer connection.
+   * @param {string} targetPeer - The address of the peer.
+   * @returns {Promise<boolean>} True if microphone access is granted, false otherwise.
+   */
+  const startVoiceCall = async (targetPeer: string): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+      const pc = peerConnections.current[targetPeer.toLowerCase()];
+      if (pc) {
+        const audioSender = pc
+          .getSenders()
+          .find((s) => s.track === null || s.track?.kind === "audio");
+        if (audioSender) {
+          await audioSender.replaceTrack(stream.getAudioTracks()[0]);
+        } else {
+          // Failsafe: kalau sendernya ga ketemu, kita add track manual
+          pc.addTrack(stream.getAudioTracks()[0], stream);
+        }
+      }
+      return true;
+    } catch (e) {
+      console.error("Mic access denied", e);
+      return false;
+    }
+  };
+
+  /**
+   * Stops the local microphone stream and removes the audio track from the peer connection.
+   * @param {string} targetPeer - The address of the peer.
+   * @returns {void}
+   */
+  const stopVoiceCall = (targetPeer: string): void => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+    const pc = peerConnections.current[targetPeer.toLowerCase()];
+    if (pc) {
+      const audioSender = pc
+        .getSenders()
+        .find((s) => s.track?.kind === "audio");
+      if (audioSender) audioSender.replaceTrack(null);
+    }
+    const audioEl = document.getElementById(
+      "p2p-audio-stream",
+    ) as HTMLAudioElement;
+    if (audioEl) audioEl.srcObject = null;
+  };
+
+  /**
+   * Toggles the enabled state of the local microphone audio track.
+   * @returns {boolean} True if the microphone is currently muted, false otherwise.
+   */
+  const toggleMicMute = (): boolean => {
+    if (localStreamRef.current) {
+      const track = localStreamRef.current.getAudioTracks()[0];
+      if (track) {
+        track.enabled = !track.enabled;
+        return !track.enabled;
+      }
+    }
+    return false;
+  };
 
   const initiateWebRTCConnection = useCallback(
     async (targetPeer: string) => {
@@ -48,6 +128,33 @@ export const useWebRTC = ({
       peerConnections.current[peerAddress] = pc;
       iceQueues.current[peerAddress] = [];
 
+      pc.addTransceiver("audio", { direction: "sendrecv" });
+
+      pc.ontrack = (event) => {
+        let audioEl = document.getElementById(
+          "p2p-audio-stream",
+        ) as HTMLAudioElement;
+        if (!audioEl) {
+          audioEl = document.createElement("audio");
+          audioEl.id = "p2p-audio-stream";
+          audioEl.autoplay = true;
+          document.body.appendChild(audioEl);
+        }
+
+        // FIX BUG SUARA GA MUNCUL: Ekstrak track manual kalo stream bawaannya kosong
+        const stream =
+          event.streams && event.streams.length > 0
+            ? event.streams[0]
+            : new MediaStream([event.track]);
+
+        if (audioEl.srcObject !== stream) {
+          audioEl.srcObject = stream;
+          audioEl
+            .play()
+            .catch((e) => console.warn("Audio play blocked by browser:", e));
+        }
+      };
+
       const dc = pc.createDataChannel("secure_p2p_channel", { ordered: true });
       dataChannels.current[peerAddress] = dc;
 
@@ -59,8 +166,6 @@ export const useWebRTC = ({
       dc.onmessage = async (msgEvent) => {
         try {
           const decryptedContent = decrypt(peerAddress, msgEvent.data);
-
-          // CEK: Apakah ini payload TYPING siluman?
           try {
             const parsed = JSON.parse(decryptedContent);
             if (parsed.type === "TYPING" && setIsPeerTyping) {
@@ -71,14 +176,31 @@ export const useWebRTC = ({
                 () => setIsPeerTyping(false),
                 2500,
               );
-              return; // Berhenti di sini biar ga disimpen ke database
+              return;
             }
-          } catch (e) {
-            // Kalau bukan JSON, lanjut aja
-          }
+
+            if (parsed.type === "CALL_OFFER" && onCallOffer) {
+              onCallOffer();
+              return;
+            }
+            if (parsed.type === "CALL_ACCEPTED") {
+              startVoiceCall(peerAddress).then((success) => {
+                if (success && onCallAccepted) onCallAccepted();
+              });
+              return;
+            }
+            if (parsed.type === "CALL_REJECTED" && onCallRejected) {
+              onCallRejected();
+              return;
+            }
+            if (parsed.type === "CALL_ENDED") {
+              stopVoiceCall(peerAddress);
+              if (onCallEnded) onCallEnded();
+              return;
+            }
+          } catch (e) {}
 
           const isReceivedImage = decryptedContent.startsWith("data:image");
-
           await db.messages.add({
             ownerAddress: myAddress.toLowerCase(),
             chatId: peerAddress,
@@ -120,7 +242,16 @@ export const useWebRTC = ({
         signal: { type: "offer", offer },
       });
     },
-    [socket, decrypt, myAddress, setIsPeerTyping],
+    [
+      socket,
+      decrypt,
+      myAddress,
+      setIsPeerTyping,
+      onCallOffer,
+      onCallAccepted,
+      onCallRejected,
+      onCallEnded,
+    ],
   );
 
   useEffect(() => {
@@ -143,6 +274,33 @@ export const useWebRTC = ({
         peerConnections.current[peerAddress] = pc;
         iceQueues.current[peerAddress] = [];
 
+        pc.addTransceiver("audio", { direction: "sendrecv" });
+
+        pc.ontrack = (event) => {
+          let audioEl = document.getElementById(
+            "p2p-audio-stream",
+          ) as HTMLAudioElement;
+          if (!audioEl) {
+            audioEl = document.createElement("audio");
+            audioEl.id = "p2p-audio-stream";
+            audioEl.autoplay = true;
+            document.body.appendChild(audioEl);
+          }
+
+          // FIX BUG SUARA GA MUNCUL (Sisi Receiver):
+          const stream =
+            event.streams && event.streams.length > 0
+              ? event.streams[0]
+              : new MediaStream([event.track]);
+
+          if (audioEl.srcObject !== stream) {
+            audioEl.srcObject = stream;
+            audioEl
+              .play()
+              .catch((e) => console.warn("Audio play blocked by browser:", e));
+          }
+        };
+
         pc.ondatachannel = (event) => {
           const dc = event.channel;
           dataChannels.current[peerAddress] = dc;
@@ -155,8 +313,6 @@ export const useWebRTC = ({
           dc.onmessage = async (msgEvent) => {
             try {
               const decryptedContent = decrypt(peerAddress, msgEvent.data);
-
-              // CEK: Apakah ini payload TYPING siluman (receiver side)
               try {
                 const parsed = JSON.parse(decryptedContent);
                 if (parsed.type === "TYPING" && setIsPeerTyping) {
@@ -167,14 +323,31 @@ export const useWebRTC = ({
                     () => setIsPeerTyping(false),
                     2500,
                   );
-                  return; // Berhenti di sini
+                  return;
                 }
-              } catch (e) {
-                // Lanjut
-              }
+
+                if (parsed.type === "CALL_OFFER" && onCallOffer) {
+                  onCallOffer();
+                  return;
+                }
+                if (parsed.type === "CALL_ACCEPTED") {
+                  startVoiceCall(peerAddress).then((success) => {
+                    if (success && onCallAccepted) onCallAccepted();
+                  });
+                  return;
+                }
+                if (parsed.type === "CALL_REJECTED" && onCallRejected) {
+                  onCallRejected();
+                  return;
+                }
+                if (parsed.type === "CALL_ENDED") {
+                  stopVoiceCall(peerAddress);
+                  if (onCallEnded) onCallEnded();
+                  return;
+                }
+              } catch (e) {}
 
               const isReceivedImage = decryptedContent.startsWith("data:image");
-
               await db.messages.add({
                 ownerAddress: myAddress.toLowerCase(),
                 chatId: peerAddress,
@@ -217,6 +390,9 @@ export const useWebRTC = ({
           await pc.setRemoteDescription(
             new RTCSessionDescription(signal.offer),
           );
+
+          pc.getTransceivers().forEach((t) => (t.direction = "sendrecv"));
+
           if (iceQueues.current[peerAddress]) {
             for (const cand of iceQueues.current[peerAddress]) {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -259,15 +435,30 @@ export const useWebRTC = ({
     return () => {
       socket.off("webrtc_signal", handleWebRTCSignal);
     };
-  }, [socket, decrypt, myAddress, setIsPeerTyping]);
+  }, [
+    socket,
+    decrypt,
+    myAddress,
+    setIsPeerTyping,
+    onCallOffer,
+    onCallAccepted,
+    onCallRejected,
+    onCallEnded,
+  ]);
 
-  const sendDataViaWebRTC = (targetPeer: string, encryptedData: string) => {
+  /**
+   * Sends encrypted text or file data over the active WebRTC data channel.
+   * @param {string} targetPeer - The address of the peer to send data to.
+   * @param {string} encryptedData - The encrypted payload string.
+   * @returns {void}
+   */
+  const sendDataViaWebRTC = (
+    targetPeer: string,
+    encryptedData: string,
+  ): void => {
     const peerAddress = targetPeer.toLowerCase();
     const dc = dataChannels.current[peerAddress];
-
-    if (dc?.readyState === "open") {
-      dc.send(encryptedData);
-    }
+    if (dc?.readyState === "open") dc.send(encryptedData);
   };
 
   return {
@@ -275,5 +466,8 @@ export const useWebRTC = ({
     sendDataViaWebRTC,
     initiateWebRTCConnection,
     connectedPeers,
+    startVoiceCall,
+    stopVoiceCall,
+    toggleMicMute,
   };
 };

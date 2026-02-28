@@ -5,11 +5,10 @@ import { SendIcon } from "../icons/index";
 
 /**
  * Fullscreen camera modal component with capture and preview functionality.
- * Features front/back camera switching and custom toast error handling.
  * @param {Object} props - Component properties.
- * @param {Function} props.onClose - Function to trigger modal closure.
- * @param {Function} props.onSend - Function to process the captured base64 image.
- * @returns {JSX.Element} The React Portal containing the camera interface.
+ * @param {Function} props.onClose - Trigger modal closure.
+ * @param {Function} props.onSend - Process the captured base64 image.
+ * @returns {JSX.Element} The React Portal interface.
  */
 export const CameraModal = ({
   onClose,
@@ -30,7 +29,7 @@ export const CameraModal = ({
 
   /**
    * Initializes the camera stream with the specified facing mode.
-   * @param {"user" | "environment"} mode - The camera facing mode.
+   * @param {"user" | "environment"} mode - Camera facing mode.
    * @returns {Promise<void>}
    */
   const initCamera = useCallback(
@@ -75,18 +74,18 @@ export const CameraModal = ({
   }, [facingMode, initCamera]);
 
   /**
-   * Toggles between front and rear cameras.
+   * Toggles between front and rear device cameras.
    * @returns {void}
    */
-  const handleSwitchCamera = () => {
+  const handleSwitchCamera = (): void => {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   };
 
   /**
-   * Captures the current frame from the video stream onto a canvas.
+   * Captures the current frame from the video stream onto a 2D canvas.
    * @returns {void}
    */
-  const capture = () => {
+  const capture = (): void => {
     if (videoRef.current && canvasRef.current) {
       const ctx = canvasRef.current.getContext("2d");
       const video = videoRef.current;
