@@ -25,10 +25,12 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
-    handleTyping, // INI NAMBAH DIAMBIL DARI CONTEXT
+    handleTyping,
+    activeUsername,
   } = useChatContext();
 
-  const { messageInput, setMessageInput } = useSessionStore();
+  const { messageInput, setMessageInput, replyingTo, setReplyingTo } =
+    useSessionStore();
   const { showToast } = useUIStore();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +57,12 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
         scrollHeight > 100 ? "100px" : `${scrollHeight}px`;
     }
   }, [messageInput]);
+
+  useEffect(() => {
+    if (replyingTo && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [replyingTo]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -163,122 +171,155 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
 
   return (
     <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe">
-      <form
-        onSubmit={handleSendMessage}
-        className="flex gap-2.5 max-w-5xl mx-auto items-end"
-      >
-        <input
-          type="file"
-          accept="image/*"
-          ref={imageInputRef}
-          onChange={handleSendImage}
-          className="hidden"
-        />
-
-        <div
-          className={`flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-end pl-2 pr-2 py-1.5 transition-all shadow-sm ${
-            isRecording
-              ? "border-red-500/50 ring-1 ring-red-500/20"
-              : "focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30"
-          }`}
-        >
-          {!isRecording && (
-            <>
-              <button
-                type="button"
-                onClick={onOpenTransferModal}
-                disabled={!isWebRTCConnected}
-                className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
-              >
-                <CryptoIcon className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={!isWebRTCConnected}
-                className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
-              >
-                <AttachmentIcon className="w-5 h-5" />
-              </button>
-            </>
-          )}
-
-          {isRecording ? (
-            <div className="flex-1 px-3 py-2.5 mb-0.5 flex items-center justify-between text-zinc-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
-                <span className="font-mono text-sm">
-                  {formatDuration(recordingTime)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1 h-6">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div
-                    key={i}
-                    ref={(el) => {
-                      barsRef.current[i] = el;
-                    }}
-                    className="w-1 bg-indigo-400 rounded-full transition-all duration-75"
-                    style={{ height: "4px" }}
-                  />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={cancelRecording}
-                className="text-red-400 hover:text-red-300 p-1 transition-colors"
-              >
-                <TrashIcon className="w-5 h-5" />
-              </button>
+      <div className="max-w-5xl mx-auto flex flex-col gap-2">
+        {replyingTo && (
+          <div className="bg-zinc-900 border-l-4 border-indigo-500 rounded-xl p-3 flex justify-between items-start animate-in slide-in-from-bottom-2 fade-in shadow-md">
+            <div className="flex-1 overflow-hidden pr-2">
+              <p className="text-xs font-bold text-indigo-400 mb-1">
+                Replying to {replyingTo.isMine ? "You" : activeUsername}
+              </p>
+              <p className="text-xs text-zinc-300 line-clamp-2 leading-snug">
+                {replyingTo.text}
+              </p>
             </div>
-          ) : (
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={messageInput}
-              onChange={(e) => {
-                setMessageInput(e.target.value);
-                handleTyping(); // INI DIA TRIGGER SILUMANNYA
-              }}
-              onKeyDown={handleKeyDown}
-              disabled={!isWebRTCConnected}
-              placeholder={
-                isWebRTCConnected ? "Type a message..." : "Connecting..."
-              }
-              className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
-            />
-          )}
-        </div>
+            <button
+              onClick={() => setReplyingTo(null)}
+              className="text-zinc-500 hover:text-red-400 p-1 bg-zinc-800/50 hover:bg-zinc-800 rounded-full transition-colors"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
 
-        {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
-          <button
-            type="button"
-            onClick={startRecording}
-            className="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 mb-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-          >
-            <MicIcon className="w-5 h-5" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={isRecording ? sendRecording : (handleSendMessage as any)}
-            disabled={
-              (!isRecording && !messageInput.trim()) || !isWebRTCConnected
-            }
-            className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
+        <form
+          onSubmit={handleSendMessage}
+          className="flex gap-2.5 items-end w-full"
+        >
+          <input
+            type="file"
+            accept="image/*"
+            ref={imageInputRef}
+            onChange={handleSendImage}
+            className="hidden"
+          />
+
+          <div
+            className={`flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-end pl-2 pr-2 py-1.5 transition-all shadow-sm ${
               isRecording
-                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
-                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+                ? "border-red-500/50 ring-1 ring-red-500/20"
+                : "focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30"
             }`}
           >
-            <SendIcon
-              className={`w-5 h-5 ${isRecording ? "ml-0" : "ml-0.5"}`}
-            />
-          </button>
-        )}
-      </form>
+            {!isRecording && (
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenTransferModal}
+                  disabled={!isWebRTCConnected}
+                  className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                >
+                  <CryptoIcon className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={!isWebRTCConnected}
+                  className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
+                >
+                  <AttachmentIcon className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            {isRecording ? (
+              <div className="flex-1 px-3 py-2.5 mb-0.5 flex items-center justify-between text-zinc-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+                  <span className="font-mono text-sm">
+                    {formatDuration(recordingTime)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 h-6">
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <div
+                      key={i}
+                      ref={(el) => {
+                        barsRef.current[i] = el;
+                      }}
+                      className="w-1 bg-indigo-400 rounded-full transition-all duration-75"
+                      style={{ height: "4px" }}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={cancelRecording}
+                  className="text-red-400 hover:text-red-300 p-1 transition-colors"
+                >
+                  <TrashIcon className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={messageInput}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                  handleTyping();
+                }}
+                onKeyDown={handleKeyDown}
+                disabled={!isWebRTCConnected}
+                placeholder={
+                  isWebRTCConnected ? "Type a message..." : "Connecting..."
+                }
+                className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
+              />
+            )}
+          </div>
+
+          {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 mb-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+            >
+              <MicIcon className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={isRecording ? sendRecording : (handleSendMessage as any)}
+              disabled={
+                (!isRecording && !messageInput.trim()) || !isWebRTCConnected
+              }
+              className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
+                isRecording
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+                  : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+              }`}
+            >
+              <SendIcon
+                className={`w-5 h-5 ${isRecording ? "ml-0" : "ml-0.5"}`}
+              />
+            </button>
+          )}
+        </form>
+      </div>
     </div>
   );
 };

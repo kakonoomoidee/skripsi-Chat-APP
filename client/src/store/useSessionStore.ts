@@ -6,6 +6,9 @@ interface SessionState {
 
   autoDeleteMode: string;
   setAutoDeleteMode: (mode: string) => void;
+
+  replyingTo: any | null;
+  setReplyingTo: (msg: any | null) => void;
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -17,4 +20,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     localStorage.setItem("autoDeleteMode", mode);
     set({ autoDeleteMode: mode });
   },
+
+  replyingTo: null,
+  setReplyingTo: (msg) => set({ replyingTo: msg }),
 }));
