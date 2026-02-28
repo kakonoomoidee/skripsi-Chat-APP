@@ -147,7 +147,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (messageInput.trim() && isWebRTCConnected) {
-        handleSendMessage(e as any);
+        handleSendMessage(e);
       }
     }
   };
@@ -235,7 +235,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
-    } catch (err) {
+    } catch {
       showToast("Microphone access denied or not available.", "error");
     }
   };
@@ -499,7 +499,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
               <button
                 type="button"
                 onClick={
-                  isRecording ? sendRecording : (handleSendMessage as any)
+                  isRecording ? sendRecording : (e) => handleSendMessage(e)
                 }
                 disabled={
                   (!isRecording && !messageInput.trim()) || !isWebRTCConnected

@@ -21,8 +21,8 @@ function App() {
   const { toast } = useUIStore();
 
   const isReturningUser =
-    !!localStorage.getItem("token") ||
-    !!localStorage.getItem("encryptedIdentity");
+    !!localStorage.getItem("auth_token") ||
+    !!localStorage.getItem("chat_app_keystore");
 
   return (
     <>

@@ -72,7 +72,7 @@ export const useSecurityHandlers = () => {
           "Access Denied! Seed phrase does not match the active account.",
         );
       }
-    } catch (err) {
+    } catch {
       return setModalError("Invalid seed phrase format or typo detected!");
     }
 
@@ -92,7 +92,7 @@ export const useSecurityHandlers = () => {
         setTimeout(() => {
           window.location.href = "/login";
         }, 1500);
-      } catch (err) {
+      } catch {
         setModalError("Failed to wipe data.");
       }
       return;
@@ -125,7 +125,7 @@ export const useSecurityHandlers = () => {
         closeSeedModal();
         setSeedInput("");
         showToast("Backup exported successfully!", "success");
-      } catch (err) {
+      } catch {
         setModalError("Failed to export chat history.");
       }
     }
@@ -154,7 +154,7 @@ export const useSecurityHandlers = () => {
             window.location.reload();
           }, 1500);
         }
-      } catch (err) {
+      } catch {
         setModalError("Failed to import. File might be corrupted.");
       }
     }

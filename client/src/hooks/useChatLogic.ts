@@ -93,7 +93,7 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
-      } catch (err) {
+      } catch {
         console.error("Failed to fetch peer username");
       }
 
@@ -155,7 +155,7 @@ export const useChatLogic = ({
         });
       }
       setTargetUsername("");
-    } catch (err: unknown) {
+    } catch {
       setSearchError("Username not found on the network.");
     } finally {
       setIsSearching(false);

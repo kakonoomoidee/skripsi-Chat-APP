@@ -23,7 +23,7 @@ export const MessageBubble = ({ msg }: MessageBubbleProps) => {
       parsedText = parsed.text;
       replyData = parsed.replyTo || null;
     }
-  } catch (e) {
+  } catch {
     // Legacy mapping protection
   }
 
