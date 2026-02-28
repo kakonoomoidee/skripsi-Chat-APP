@@ -65,6 +65,9 @@ export const useWebRTC = ({
           .find((s) => s.track === null || s.track?.kind === "audio");
         if (audioSender) {
           await audioSender.replaceTrack(stream.getAudioTracks()[0]);
+        } else {
+          // Failsafe: kalau sendernya ga ketemu, kita add track manual
+          pc.addTrack(stream.getAudioTracks()[0], stream);
         }
       }
       return true;
@@ -137,8 +140,18 @@ export const useWebRTC = ({
           audioEl.autoplay = true;
           document.body.appendChild(audioEl);
         }
-        if (audioEl.srcObject !== event.streams[0]) {
-          audioEl.srcObject = event.streams[0];
+
+        // FIX BUG SUARA GA MUNCUL: Ekstrak track manual kalo stream bawaannya kosong
+        const stream =
+          event.streams && event.streams.length > 0
+            ? event.streams[0]
+            : new MediaStream([event.track]);
+
+        if (audioEl.srcObject !== stream) {
+          audioEl.srcObject = stream;
+          audioEl
+            .play()
+            .catch((e) => console.warn("Audio play blocked by browser:", e));
         }
       };
 
@@ -273,8 +286,18 @@ export const useWebRTC = ({
             audioEl.autoplay = true;
             document.body.appendChild(audioEl);
           }
-          if (audioEl.srcObject !== event.streams[0]) {
-            audioEl.srcObject = event.streams[0];
+
+          // FIX BUG SUARA GA MUNCUL (Sisi Receiver):
+          const stream =
+            event.streams && event.streams.length > 0
+              ? event.streams[0]
+              : new MediaStream([event.track]);
+
+          if (audioEl.srcObject !== stream) {
+            audioEl.srcObject = stream;
+            audioEl
+              .play()
+              .catch((e) => console.warn("Audio play blocked by browser:", e));
           }
         };
 
