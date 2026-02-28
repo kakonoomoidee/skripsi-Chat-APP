@@ -1,14 +1,20 @@
 import { useChatContext } from "@/context/ChatContext";
-import { MenuIcon } from "../icons/index";
+import { MenuIcon, PhoneIcon } from "../icons/index";
 import { useUIStore } from "@/store";
+import { CallNotification } from "./CallNotification";
+import { InCallModal } from "./InCallModal";
 
 export const ChatHeader = () => {
-  const { activeUsername, isWebRTCConnected, isPeerTyping } = useChatContext();
+  const { activeUsername, isWebRTCConnected, isPeerTyping, initiateCall } =
+    useChatContext();
   const { setIsMobileSidebarOpen } = useUIStore();
 
   return (
-    <div className="h-16 shrink-0 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950 w-full z-10">
-      <div className="flex items-center w-full">
+    <div className="relative h-16 shrink-0 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950 w-full z-10 justify-between">
+      <CallNotification />
+      <InCallModal />
+
+      <div className="flex items-center">
         <button
           onClick={() => setIsMobileSidebarOpen(true)}
           className="md:hidden p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -42,6 +48,15 @@ export const ChatHeader = () => {
           </div>
         </div>
       </div>
+
+      {isWebRTCConnected && (
+        <button
+          onClick={initiateCall}
+          className="p-2.5 bg-zinc-800/50 hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 rounded-full transition-colors ml-auto"
+        >
+          <PhoneIcon className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 };

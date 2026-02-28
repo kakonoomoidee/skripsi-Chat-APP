@@ -21,3 +21,4 @@ export { LockIcon } from "./LockIcon";
 export { DocumentIcon } from "./DocumentIcon";
 export { CameraIcon } from "./CameraIcon";
 export { GalleryIcon } from "./GalleryIcon";
+export { PhoneIcon } from "./PhoneIcon";

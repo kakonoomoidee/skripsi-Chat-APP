@@ -49,7 +49,12 @@ const isFileSignatureSafe = (file: File): Promise<boolean> => {
   });
 };
 
-const formatDuration = (time: number) => {
+/**
+ * Formats duration time string.
+ * @param {number} time - Duration in seconds.
+ * @returns {string} Formatted MM:SS string.
+ */
+const formatDuration = (time: number): string => {
   const minutes = Math.floor(time / 60);
   const seconds = Math.floor(time % 60);
   return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
@@ -91,7 +96,6 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const animationFrameRef = useRef<number>(0);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
 
-  // NEW: Effect to handle "Click Outside" to close the attachment menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -134,7 +138,12 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   }, [replyingTo]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  /**
+   * Key down event manager.
+   * @param {React.KeyboardEvent<HTMLTextAreaElement>} e - Event object.
+   * @returns {void}
+   */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (messageInput.trim() && isWebRTCConnected) {
@@ -143,7 +152,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
-  const stopAllMedia = () => {
+  /**
+   * Resets all media recorder processes.
+   * @returns {void}
+   */
+  const stopAllMedia = (): void => {
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -163,7 +176,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     setRecordingTime(0);
   };
 
-  const drawVisualizer = () => {
+  /**
+   * Initializes real time audio visualization element.
+   * @returns {void}
+   */
+  const drawVisualizer = (): void => {
     if (!analyserRef.current) return;
     const bufferLength = analyserRef.current.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -183,7 +200,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     draw();
   };
 
-  const startRecording = async () => {
+  /**
+   * Initializes audio context and media stream API access.
+   * @returns {Promise<void>}
+   */
+  const startRecording = async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -219,7 +240,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
-  const sendRecording = () => {
+  /**
+   * Completes the capture sequence and dispatches file.
+   * @returns {void}
+   */
+  const sendRecording = (): void => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, {
@@ -232,7 +257,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
     }
   };
 
-  const cancelRecording = () => {
+  /**
+   * Terminates active captures safely.
+   * @returns {void}
+   */
+  const cancelRecording = (): void => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = null;
       stopAllMedia();
@@ -246,7 +275,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
    */
   const handleDocumentUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  ): Promise<void> => {
     const file = e.target.files?.[0];
     setShowAttachMenu(false);
 
