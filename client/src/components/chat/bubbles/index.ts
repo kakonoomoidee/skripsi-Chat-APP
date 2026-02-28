@@ -5,3 +5,4 @@ export { TextBubble } from "./TextBubble";
 export { MediaBubble } from "./MediaBubble";
 export { AudioBubble } from "./AudioBubble";
 export { CryptoBubble } from "./CryptoBubble";
+export { DocumentBubble } from "./DocumentBubble";

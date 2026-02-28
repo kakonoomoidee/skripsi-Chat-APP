@@ -18,3 +18,6 @@ export { WarningIcon } from "./WarningIcon";
 export { WalletIcon } from "./WalletIcon";
 export { LockSessionIcon } from "./LockSessionIcon";
 export { LockIcon } from "./LockIcon";
+export { DocumentIcon } from "./DocumentIcon";
+export { CameraIcon } from "./CameraIcon";
+export { GalleryIcon } from "./GalleryIcon";

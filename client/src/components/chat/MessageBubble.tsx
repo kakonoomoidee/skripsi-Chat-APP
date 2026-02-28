@@ -3,6 +3,7 @@ import {
   CryptoBubble,
   MediaBubble,
   TextBubble,
+  DocumentBubble,
 } from "./bubbles/index";
 
 export interface MessageBubbleProps {
@@ -12,14 +13,19 @@ export interface MessageBubbleProps {
 export const MessageBubble = ({ msg }: MessageBubbleProps) => {
   let parsedText = msg.text;
   let replyData = null;
+  let docData = null;
 
   try {
     const parsed = JSON.parse(msg.text);
-    if (parsed.text !== undefined) {
+    if (parsed.type === "DOCUMENT") {
+      docData = { fileName: parsed.fileName, fileData: parsed.fileData };
+    } else if (parsed.text !== undefined) {
       parsedText = parsed.text;
       replyData = parsed.replyTo || null;
     }
-  } catch (e) {}
+  } catch (e) {
+    // Legacy mapping protection
+  }
 
   const isCryptoTx =
     parsedText?.startsWith("[SENT]") || parsedText?.startsWith("[RECEIVED]");
@@ -30,7 +36,9 @@ export const MessageBubble = ({ msg }: MessageBubbleProps) => {
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`flex w-full transition-all duration-300 rounded-2xl ${msg.isMine ? "justify-end" : "justify-start"}`}
+      className={`flex w-full transition-all duration-300 rounded-2xl ${
+        msg.isMine ? "justify-end" : "justify-start"
+      }`}
     >
       {isAudio ? (
         <AudioBubble
@@ -61,6 +69,12 @@ export const MessageBubble = ({ msg }: MessageBubbleProps) => {
             />
           );
         })()
+      ) : docData ? (
+        <DocumentBubble
+          msg={cleanMsg}
+          fileName={docData.fileName}
+          fileData={docData.fileData}
+        />
       ) : cleanMsg.isImage ? (
         <MediaBubble msg={cleanMsg} />
       ) : (
