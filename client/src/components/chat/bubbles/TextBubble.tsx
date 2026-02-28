@@ -1,17 +1,10 @@
 import { formatTime } from "@/utils/format";
 import { useSessionStore } from "@/store";
 import { useState, useRef, useEffect } from "react";
-import { useChatContext } from "@/context/ChatContext";
+import { ReplyBubbleContext } from "./ReplyBubbleContext";
 
-/**
- * Renders a chat bubble for text messages with reply functionality and click-outside handling.
- * @param {Object} props - The component props.
- * @param {any} props.msg - The message object.
- * @returns {JSX.Element} The rendered text bubble component.
- */
 export const TextBubble = ({ msg }: { msg: any }) => {
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
-  const { activeUsername } = useChatContext();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -21,41 +14,19 @@ export const TextBubble = ({ msg }: { msg: any }) => {
         setShowMenu(false);
       }
     };
-
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowMenu(false);
-      }
+      if (event.key === "Escape") setShowMenu(false);
     };
 
     if (showMenu) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("keydown", handleEscape);
     }
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [showMenu]);
-
-  /**
-   * Scrolls smoothly to the referenced replied message.
-   * @param {string} replyId - The ID of the message to scroll to.
-   * @returns {void}
-   */
-  const handleScrollToMessage = (replyId: string): void => {
-    const targetEl = document.getElementById(`msg-${replyId}`);
-    if (targetEl) {
-      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-
-      targetEl.classList.add("bg-indigo-500/40", "scale-[1.02]", "z-10");
-
-      setTimeout(() => {
-        targetEl.classList.remove("bg-indigo-500/40", "scale-[1.02]", "z-10");
-      }, 1000);
-    }
-  };
 
   return (
     <div className="relative group w-full flex flex-col">
@@ -100,6 +71,7 @@ export const TextBubble = ({ msg }: { msg: any }) => {
                     id: msg.id,
                     text: msg.text,
                     isMine: msg.isMine,
+                    timestamp: msg.timestamp,
                   });
                   setShowMenu(false);
                 }}
@@ -125,25 +97,7 @@ export const TextBubble = ({ msg }: { msg: any }) => {
         </div>
 
         {msg.replyTo && (
-          <div
-            onClick={() => handleScrollToMessage(msg.replyTo.id)}
-            className={`mb-1.5 p-1.5 rounded-lg border-l-4 text-xs cursor-pointer hover:opacity-100 transition-all pr-6 ${
-              msg.isMine
-                ? "bg-black/20 border-indigo-300 opacity-90"
-                : "bg-black/20 border-indigo-500 opacity-90"
-            }`}
-          >
-            <p
-              className={`font-bold mb-0.5 text-[10px] ${
-                msg.isMine ? "text-indigo-200" : "text-indigo-400"
-              }`}
-            >
-              {msg.replyTo.isMine ? "You" : activeUsername}
-            </p>
-            <p className="line-clamp-1 text-white/90 leading-snug">
-              {msg.replyTo.text}
-            </p>
-          </div>
+          <ReplyBubbleContext replyTo={msg.replyTo} isMine={msg.isMine} />
         )}
 
         <p className="text-[13px] leading-relaxed wrap-break-words whitespace-pre-wrap pr-5">

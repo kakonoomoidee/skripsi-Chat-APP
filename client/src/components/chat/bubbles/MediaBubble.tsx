@@ -1,23 +1,117 @@
 import { formatTime } from "@/utils/format";
+import { useSessionStore } from "@/store";
+import { useState, useRef, useEffect } from "react";
+import { ReplyBubbleContext } from "./ReplyBubbleContext";
 
 export const MediaBubble = ({ msg }: { msg: any }) => {
+  const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node))
+        setShowMenu(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowMenu(false);
+    };
+
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showMenu]);
+
   return (
-    <div
-      className={`relative flex flex-col max-w-[85%] md:max-w-[65%] min-w-20 shadow-lg backdrop-blur-md p-1.5 ${
-        msg.isMine
-          ? "bg-linear-to-br from-indigo-500/90 to-indigo-600/90 rounded-2xl rounded-tr-sm border border-indigo-400/30"
-          : "bg-linear-to-br from-zinc-800/95 to-zinc-900/95 rounded-2xl rounded-tl-sm border border-zinc-700/50"
-      }`}
-    >
-      <div className="relative">
-        <img
-          src={msg.text}
-          alt="p2p-attachment"
-          className="rounded-[10px] max-w-full h-auto object-cover"
-        />
-        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/50 text-white/90 backdrop-blur-sm">
-          {formatTime(msg.timestamp)}
-        </span>
+    <div className="relative group w-full flex flex-col">
+      <div
+        className={`relative flex flex-col max-w-[85vw] md:max-w-[65%] min-w-30 shadow-sm p-1 rounded-2xl ${
+          msg.isMine
+            ? "bg-indigo-600 rounded-tr-sm self-end"
+            : "bg-zinc-800 rounded-tl-sm self-start"
+        }`}
+      >
+        <div className="absolute top-2 right-2 z-20" ref={menuRef}>
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className={`p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100 ${
+              showMenu ? "opacity-100" : ""
+            }`}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {showMenu && (
+            <div
+              className={`absolute z-50 top-full mt-1 ${
+                msg.isMine ? "right-0" : "left-0"
+              } bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-32 animate-in fade-in zoom-in-95`}
+            >
+              <button
+                onClick={() => {
+                  setReplyingTo({
+                    id: msg.id,
+                    text: "Photo",
+                    isMine: msg.isMine,
+                    timestamp: msg.timestamp,
+                  });
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                  />
+                </svg>
+                Reply
+              </button>
+            </div>
+          )}
+        </div>
+
+        {msg.replyTo && (
+          <div className="px-1.5 pt-1.5 pb-0.5">
+            <ReplyBubbleContext replyTo={msg.replyTo} isMine={msg.isMine} />
+          </div>
+        )}
+
+        <div className="relative">
+          <img
+            src={msg.text}
+            alt="p2p-attachment"
+            className="rounded-xl max-w-full w-auto object-contain"
+            style={{ maxHeight: "350px" }}
+          />
+          <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-black/60 text-white/90 backdrop-blur-sm pointer-events-none">
+            {formatTime(msg.timestamp)}
+          </span>
+        </div>
       </div>
     </div>
   );

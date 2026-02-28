@@ -77,7 +77,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     useCrypto();
 
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
-  const { messageInput, setMessageInput, autoDeleteMode, replyingTo, setReplyingTo } = useSessionStore();
+  const { messageInput, setMessageInput, autoDeleteMode } = useSessionStore();
   const { peerWalletAddress, setPeerWalletAddress } = useWalletStore();
 
   const [isIncomingCall, setIsIncomingCall] = useState(false);
@@ -172,7 +172,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     sweepOldMessages();
   }, [autoDeleteMode]);
@@ -240,7 +242,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
           });
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC, setPeerWalletAddress]);
@@ -335,7 +339,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
    * @param {React.SyntheticEvent} e - The form submission event.
    * @returns {Promise<void>}
    */
-  const handleSendMessage = async (e: React.SyntheticEvent): Promise<void> => {
+
+  const handleSendMessage = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const currentChat = activeChat as string;
     if (
@@ -348,12 +353,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       return;
 
     try {
-      const payloadObj: Record<string, unknown> = { text: messageInput };
+      const payloadObj: any = { text: messageInput };
+
+      const { replyingTo, setReplyingTo } = useSessionStore.getState();
       if (replyingTo) {
         payloadObj.replyTo = {
           id: replyingTo.id,
           text: replyingTo.text,
           isMine: replyingTo.isMine,
+          timestamp: replyingTo.timestamp, // FIX: Inject Timestamp P2P Safe
         };
       }
 
