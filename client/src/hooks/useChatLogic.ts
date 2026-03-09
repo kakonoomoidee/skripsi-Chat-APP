@@ -31,26 +31,51 @@ export const useChatLogic = ({
   relayUrl,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
-  const [activeChat, setActiveChat] = useState<string | null>(null);
-  const [activeUsername, setActiveUsername] = useState<string>("");
+
+  // LIFETIME SESSION: Baca dari localStorage
+  const [activeChat, setActiveChat] = useState<string | null>(() => {
+    return localStorage.getItem("webrtc_active_chat") || null;
+  });
+
+  const [activeUsername, setActiveUsername] = useState<string>(() => {
+    return localStorage.getItem("webrtc_active_username") || "";
+  });
+
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => {
+    const saved = localStorage.getItem("webrtc_active_sessions");
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [myUsername, setMyUsername] = useState<string>("Loading...");
   const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>(
     [],
   );
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [initiators, setInitiators] = useState<Record<string, boolean>>({});
-
   const [searchError, setSearchError] = useState<string>("");
-
-  // Nambah state khusus buat nyimpen status ngetik lawan chat
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
 
+  // LIFETIME SESSION: Auto-save ke localStorage tiap ada perubahan
   useEffect(() => {
+    localStorage.setItem(
+      "webrtc_active_sessions",
+      JSON.stringify(activeSessions),
+    );
     activeSessionsRef.current = activeSessions;
   }, [activeSessions]);
+
+  useEffect(() => {
+    if (activeChat) localStorage.setItem("webrtc_active_chat", activeChat);
+    else localStorage.removeItem("webrtc_active_chat");
+  }, [activeChat]);
+
+  useEffect(() => {
+    if (activeUsername)
+      localStorage.setItem("webrtc_active_username", activeUsername);
+    else localStorage.removeItem("webrtc_active_username");
+  }, [activeUsername]);
 
   useEffect(() => {
     setSearchError("");

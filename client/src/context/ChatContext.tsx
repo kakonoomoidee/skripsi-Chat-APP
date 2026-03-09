@@ -83,6 +83,24 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isDuplicateTab, setIsDuplicateTab] = useState(false);
+
+  // TAB CONCURRENCY CONTROL: Bikin tab baru auto-lock
+  useEffect(() => {
+    const channel = new BroadcastChannel("webrtc_chat_concurrency");
+
+    channel.postMessage({ type: "NEW_TAB_OPENED" });
+
+    channel.onmessage = (event) => {
+      if (event.data.type === "NEW_TAB_OPENED") {
+        channel.postMessage({ type: "TAB_ALREADY_ACTIVE" });
+      } else if (event.data.type === "TAB_ALREADY_ACTIVE") {
+        setIsDuplicateTab(true);
+      }
+    };
+
+    return () => channel.close();
+  }, []);
 
   const {
     targetUsername,
@@ -249,10 +267,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     checkIncomingForWalletRequests();
   }, [messages, activeChat, encrypt, sendDataViaWebRTC, setPeerWalletAddress]);
 
-  /**
-   * Dispatches a wallet address request to the active peer.
-   * @returns {void}
-   */
   const requestPeerWallet = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !hasSecret(currentChat) || !isWebRTCConnected) return;
@@ -261,11 +275,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (encryptedPayload) sendDataViaWebRTC(currentChat, encryptedPayload);
   };
 
-  /**
-   * Executes a cryptocurrency transaction using MetaMask.
-   * @param {string} amount - The amount of ETH to send.
-   * @returns {Promise<void>}
-   */
   const handleSendCrypto = async (amount: string): Promise<void> => {
     if (!peerWalletAddress)
       throw new Error("Peer wallet address not resolved yet.");
@@ -334,12 +343,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Dispatches a text message over the active WebRTC data channel.
-   * @param {React.SyntheticEvent} e - The form submission event.
-   * @returns {Promise<void>}
-   */
-
   const handleSendMessage = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const currentChat = activeChat as string;
@@ -354,14 +357,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const payloadObj: any = { text: messageInput };
-
       const { replyingTo, setReplyingTo } = useSessionStore.getState();
       if (replyingTo) {
         payloadObj.replyTo = {
           id: replyingTo.id,
           text: replyingTo.text,
           isMine: replyingTo.isMine,
-          timestamp: replyingTo.timestamp, // FIX: Inject Timestamp P2P Safe
+          timestamp: replyingTo.timestamp,
         };
       }
 
@@ -386,11 +388,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Processes and dispatches an image file over WebRTC.
-   * @param {React.ChangeEvent<HTMLInputElement>} e - The file input change event.
-   * @returns {Promise<void>}
-   */
   const handleSendImage = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ): Promise<void> => {
@@ -424,12 +421,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(file);
   };
 
-  /**
-   * Dispatches a document file payload over WebRTC.
-   * @param {string} fileName - Original file name.
-   * @param {string} base64 - Base64 encoded file data.
-   * @returns {Promise<void>}
-   */
   const handleSendDocument = async (
     fileName: string,
     base64: string,
@@ -463,11 +454,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Dispatches base64 image data captured from the local camera.
-   * @param {string} base64 - Base64 encoded image data.
-   * @returns {Promise<void>}
-   */
   const handleSendCameraPhoto = async (base64: string): Promise<void> => {
     const currentChat = activeChat as string;
     if (
@@ -495,11 +481,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Dispatches recorded audio blob data.
-   * @param {Blob} audioBlob - The recorded audio media blob.
-   * @returns {Promise<void>}
-   */
   const handleSendAudio = async (audioBlob: Blob): Promise<void> => {
     const currentChat = activeChat as string;
     if (!audioBlob || !currentChat || !isWebRTCConnected || !address) return;
@@ -525,10 +506,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     reader.readAsDataURL(audioBlob);
   };
 
-  /**
-   * Dispatches a silent typing status payload.
-   * @returns {void}
-   */
   const handleTyping = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
@@ -537,10 +514,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (encryptedTyping) sendDataViaWebRTC(currentChat, encryptedTyping);
   };
 
-  /**
-   * Triggers the voice call initiation process.
-   * @returns {void}
-   */
   const initiateCall = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
@@ -552,10 +525,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Accepts an incoming voice call and establishes media streams.
-   * @returns {Promise<void>}
-   */
   const acceptCall = async (): Promise<void> => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
@@ -575,10 +544,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Declines an incoming voice call.
-   * @returns {void}
-   */
   const declineCall = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat || !isWebRTCConnected) return;
@@ -590,10 +555,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Terminates an active voice call and releases media streams.
-   * @returns {void}
-   */
   const endCall = (): void => {
     const currentChat = activeChat as string;
     if (!currentChat) return;
@@ -609,31 +570,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setIsMuted(false);
   };
 
-  /**
-   * Toggles local microphone mute status during an active call.
-   * @returns {void}
-   */
   const toggleMute = (): void => {
     const mutedStatus = toggleMicMute();
     setIsMuted(mutedStatus);
   };
 
-  /**
-   * Wraps switch chat handler with cleanup operations.
-   * @param {any} session - Target session data.
-   * @returns {void}
-   */
   const handleSwitchChatWrapped = (session: any): void => {
     switchChat(session);
     setPeerWalletAddress(null);
     setIsMobileSidebarOpen(false);
   };
 
-  /**
-   * Wraps accept request handler with cleanup operations.
-   * @param {any} req - Target request data.
-   * @returns {void}
-   */
   const handleAcceptRequestWrapped = (req: any): void => {
     handleAcceptRequest(req);
     setIsMobileSidebarOpen(false);
@@ -684,10 +631,41 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     toggleMute,
   };
 
+  if (isDuplicateTab) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#111",
+          color: "#fff",
+          textAlign: "center",
+          padding: "20px",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <h2
+          style={{ color: "#ff4d4f", fontSize: "24px", marginBottom: "16px" }}
+        >
+          Aplikasi Terbuka di Tab Lain
+        </h2>
+        <p style={{ color: "#a0aab2", maxWidth: "400px", lineHeight: "1.5" }}>
+          Sistem Peer-to-Peer murni tidak mengizinkan multi-tab untuk mencegah
+          konflik port WebRTC dan database kriptografi.
+        </p>
+        <p style={{ color: "#a0aab2", marginTop: "8px" }}>
+          Harap tutup tab ini dan kembali ke tab yang sudah aktif.
+        </p>
+      </div>
+    );
+  }
+
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined)
