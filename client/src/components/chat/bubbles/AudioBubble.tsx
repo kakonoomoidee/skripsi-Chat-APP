@@ -1,4 +1,10 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { formatTime } from "@/utils/format";
 import { PlayIcon, PauseIcon } from "../../icons";
 import { useSessionStore } from "@/store";
@@ -25,6 +31,9 @@ export const AudioBubble = ({
   audioSrc: string;
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const animationRef = useRef<number | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -55,20 +64,33 @@ export const AudioBubble = ({
     };
   }, [showMenu]);
 
-  const toggleAudio = () => {
-    if (audioRef.current) {
-      if (isPlaying) audioRef.current.pause();
-      else audioRef.current.play();
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleTimeUpdate = () => {
+  const updateProgress = useCallback(() => {
     if (audioRef.current) {
       const current = audioRef.current.currentTime;
       const total = audioRef.current.duration || 1;
       setCurrentTime(current);
       setProgress((current / total) * 100);
+
+      animationRef.current = requestAnimationFrame(updateProgress);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, []);
+
+  const toggleAudio = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      } else {
+        audioRef.current.play();
+        animationRef.current = requestAnimationFrame(updateProgress);
+      }
+      setIsPlaying(!isPlaying);
     }
   };
 
@@ -86,6 +108,7 @@ export const AudioBubble = ({
     setIsPlaying(false);
     setProgress(0);
     setCurrentTime(0);
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,7 +213,6 @@ export const AudioBubble = ({
         <audio
           ref={audioRef}
           src={audioSrc}
-          onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
           className="hidden"
@@ -199,13 +221,19 @@ export const AudioBubble = ({
         <div className="flex items-center gap-3 w-full relative z-10 mt-1">
           <button
             onClick={cyclePlaybackRate}
-            className={`h-9 w-10 shrink-0 rounded-[10px] flex items-center justify-center font-bold text-xs transition-colors shadow-sm ${msg.isMine ? "bg-indigo-400/30 text-indigo-50 hover:bg-indigo-400/50" : "bg-zinc-700/50 text-zinc-300 hover:bg-zinc-700/80"}`}
+            className={`h-9 w-10 shrink-0 rounded-[10px] flex items-center justify-center font-bold text-xs transition-colors shadow-sm ${
+              msg.isMine
+                ? "bg-indigo-400/30 text-indigo-50 hover:bg-indigo-400/50"
+                : "bg-zinc-700/50 text-zinc-300 hover:bg-zinc-700/80"
+            }`}
           >
             {playbackRate}x
           </button>
           <button
             onClick={toggleAudio}
-            className={`w-8 h-8 shrink-0 flex items-center justify-center transition-transform active:scale-90 ${msg.isMine ? "text-indigo-100" : "text-zinc-300"}`}
+            className={`w-8 h-8 shrink-0 flex items-center justify-center transition-transform active:scale-90 ${
+              msg.isMine ? "text-indigo-100" : "text-zinc-300"
+            }`}
           >
             {isPlaying ? (
               <PauseIcon className="w-7 h-7" />
@@ -222,7 +250,15 @@ export const AudioBubble = ({
                 return (
                   <div
                     key={i}
-                    className={`w-0.5 rounded-full ${isActive ? (msg.isMine ? "bg-white" : "bg-indigo-500") : msg.isMine ? "bg-indigo-300/40" : "bg-zinc-600"}`}
+                    className={`w-0.5 rounded-full ${
+                      isActive
+                        ? msg.isMine
+                          ? "bg-white"
+                          : "bg-indigo-500"
+                        : msg.isMine
+                          ? "bg-indigo-300/40"
+                          : "bg-zinc-600"
+                    }`}
                     style={{ height: `${height}px` }}
                   />
                 );
@@ -238,7 +274,9 @@ export const AudioBubble = ({
               title="Scrub Audio"
             />
             <div
-              className={`absolute h-3 w-3 rounded-full shadow-sm pointer-events-none ${msg.isMine ? "bg-white" : "bg-indigo-500"}`}
+              className={`absolute h-3 w-3 rounded-full shadow-sm pointer-events-none ${
+                msg.isMine ? "bg-white" : "bg-indigo-500"
+              }`}
               style={{ left: `calc(${progress}% - 6px)`, opacity: 1 }}
             />
           </div>
@@ -246,13 +284,17 @@ export const AudioBubble = ({
 
         <div className="flex items-center justify-between pl-21 mt-0.5">
           <span
-            className={`text-[11px] font-medium font-mono tracking-tight ${msg.isMine ? "text-indigo-200" : "text-zinc-400"}`}
+            className={`text-[11px] font-medium font-mono tracking-tight ${
+              msg.isMine ? "text-indigo-200" : "text-zinc-400"
+            }`}
           >
             {formatDuration(currentTime > 0 ? currentTime : duration)}
           </span>
           <div className="flex items-center gap-1">
             <span
-              className={`text-[10px] font-medium ${msg.isMine ? "text-indigo-200" : "text-zinc-400"}`}
+              className={`text-[10px] font-medium ${
+                msg.isMine ? "text-indigo-200" : "text-zinc-400"
+              }`}
             >
               {formatTime(msg.timestamp)}
             </span>

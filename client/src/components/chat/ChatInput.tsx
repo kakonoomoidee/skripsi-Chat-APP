@@ -86,6 +86,9 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
+  // --- STATE BARU: Cek ketersediaan MetaMask ---
+  const [hasLinkedWallet, setHasLinkedWallet] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,6 +98,24 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>(0);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  // --- EFFECT BARU: Mantau localStorage secara real-time ---
+  useEffect(() => {
+    const checkWallet = () => {
+      setHasLinkedWallet(!!localStorage.getItem("linked_metamask"));
+    };
+
+    checkWallet(); // Cek saat komponen dimuat pertama kali
+    window.addEventListener("storage", checkWallet); // Cek kalau ada perubahan storage antar tab
+
+    // Interval reaktif buat nangkep perubahan kalau diset di tab/halaman yang sama
+    const interval = setInterval(checkWallet, 1500);
+
+    return () => {
+      window.removeEventListener("storage", checkWallet);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -378,14 +399,18 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
             >
               {!isRecording && (
                 <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    onClick={onOpenTransferModal}
-                    disabled={!isWebRTCConnected}
-                    className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
-                  >
-                    <CryptoIcon className="w-5 h-5" />
-                  </button>
+                  {/* --- LOGIKA BARU: TOMBOL CRYPTO CUMA MUNCUL KALAU METAMASK UDAH DI-LINK --- */}
+                  {hasLinkedWallet && (
+                    <button
+                      type="button"
+                      onClick={onOpenTransferModal}
+                      disabled={!isWebRTCConnected}
+                      title="Send Crypto via MetaMask"
+                      className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                    >
+                      <CryptoIcon className="w-5 h-5" />
+                    </button>
+                  )}
 
                   <div className="relative" ref={attachMenuRef}>
                     <button
