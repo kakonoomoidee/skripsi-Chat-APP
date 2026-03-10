@@ -28,12 +28,28 @@ export const useAuth = () => {
     setLoading(true);
     setError(null);
     try {
+      // --- Registration & Local Wallet Generation ---
+      console.log("=========================================");
+      console.log("[Phase 1: Registration & Local Wallet Generation]");
+      console.log("[SSI PROOF] Public Key (Address):", wallet.address);
+      console.log(
+        "[SSI PROOF] Private Key (Remains Local):",
+        wallet.privateKey,
+      );
+
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "string", "string"],
         [wallet.address, username, "PUBKEY_PLACEHOLDER"],
       );
+      console.log("[ECDSA PROOF] Registration Message Hash:", messageHash);
 
       const signature = await wallet.signMessage(ethers.getBytes(messageHash));
+      console.log("[ECDSA PROOF] Digital Signature:", signature);
+      console.log(
+        "Transmitting data (excluding Private Key) to Smart Contract / Server...",
+      );
+      console.log("=========================================");
+      // ----------------------------------------------
 
       const response = await axios.post(`${relayUrl}/auth/register`, {
         userAddress: wallet.address,
@@ -42,6 +58,7 @@ export const useAuth = () => {
         signature,
       });
 
+      console.log("[REGISTRATION SUCCESS] Server response:", response.data);
       return response.data;
     } catch (err: unknown) {
       let msg = "An unknown error occurred";
@@ -67,13 +84,34 @@ export const useAuth = () => {
     setLoading(true);
     setError(null);
     try {
+      console.log("=========================================");
+      console.log("[Phase 2: Challenge-Response Authentication (Login)]");
+      console.log(
+        "Requesting Challenge from server for address:",
+        wallet.address,
+      );
+
       const resNonce = await axios.post(`${relayUrl}/auth/challenge`, {
         address: wallet.address,
       });
       const { nonce } = resNonce.data;
 
+      // --- (CHALLENGE-RESPONSE) ---
+      console.log("[SSI PROOF] Challenge (Nonce) received from server:", nonce);
+
       const nonceHash = ethers.solidityPackedKeccak256(["string"], [nonce]);
+      console.log("[ECDSA PROOF] Hashing Nonce:", nonceHash);
+
       const signature = await wallet.signMessage(ethers.getBytes(nonceHash));
+      console.log(
+        "[ECDSA PROOF] Response: Digital Signature of Nonce:",
+        signature,
+      );
+      console.log(
+        "Sending Signature back to server for verification (ecrecover)...",
+      );
+      console.log("=========================================");
+      // ----------------------------------------------
 
       const resLogin = await axios.post(`${relayUrl}/auth/login`, {
         address: wallet.address,
@@ -81,6 +119,9 @@ export const useAuth = () => {
       });
 
       const { token: newToken } = resLogin.data;
+      console.log(
+        "[LOGIN SUCCESS] Verification successful, JWT Token received!",
+      );
 
       localStorage.setItem("auth_token", newToken);
       setToken(newToken);
@@ -106,6 +147,7 @@ export const useAuth = () => {
   const logout = () => {
     localStorage.removeItem("auth_token");
     setToken(null);
+    console.log("[LOGOUT] Session cleared from local storage.");
   };
 
   return {

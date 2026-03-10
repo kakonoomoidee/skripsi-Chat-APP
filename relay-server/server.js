@@ -95,9 +95,7 @@ console.log(`Relayer Address: ${relayerWallet.address}`);
 
 const io = new Server(httpServer, {
   cors:
-    allowedOrigins.length > 0
-      ? { origin: allowedOrigins }
-      : { origin: "*" },
+    allowedOrigins.length > 0 ? { origin: allowedOrigins } : { origin: "*" },
 });
 
 // Nonce TTL: auto-expire after 5 minutes
@@ -264,6 +262,10 @@ app.get("/health", (req, res) => {
     knownRelays: knownRelays.length,
     uptime: process.uptime(),
   });
+});
+
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
 });
 
 app.post("/admin/register-relay", async (req, res) => {

@@ -371,6 +371,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const encryptedMsg = encrypt(currentChat, stringifiedPayload);
       if (!encryptedMsg) throw new Error("Encryption failed");
 
+      // --- LOG BUKTI AES ENCRYPTION ---
+      console.log("=========================================");
+      console.log("[Phase 4: AES-256 Encryption - Sending Message]");
+      console.log(
+        "[AES PROOF] Original Payload (Plaintext):",
+        stringifiedPayload,
+      );
+      console.log("[AES PROOF] Encrypted Payload (Ciphertext):", encryptedMsg);
+      console.log(
+        "[AES PROOF] Transmitting Ciphertext via WebRTC Data Channel...",
+      );
+      console.log("=========================================");
+      // ----------------------------------------
+
       sendDataViaWebRTC(currentChat, encryptedMsg);
 
       await db.messages.add({
@@ -439,6 +453,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const stringifiedPayload = JSON.stringify(payloadObj);
       const encryptedDoc = encrypt(currentChat, stringifiedPayload);
       if (!encryptedDoc) throw new Error("Encryption failed");
+
+      // --- LOG BUKTI AES ENCRYPTION (DOKUMEN) ---
+      console.log("=========================================");
+      console.log("[Phase 4: AES-256 Encryption - Sending Document]");
+      console.log(
+        "[AES PROOF] Encrypted Document Data (Ciphertext):",
+        encryptedDoc.substring(0, 100) + "...",
+      );
+      console.log("[AES PROOF] Transmitting Document via WebRTC...");
+      console.log("=========================================");
+      // ----------------------------------------
 
       sendDataViaWebRTC(currentChat, encryptedDoc);
 

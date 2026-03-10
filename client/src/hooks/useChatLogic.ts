@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
+/**
+ * Interface defining the properties required for the useChatLogic hook.
+ */
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
@@ -11,17 +14,28 @@ interface UseChatLogicProps {
   relayUrl: string;
 }
 
+/**
+ * Interface defining the structure of a Handshake Request.
+ */
 export interface HandshakeRequest {
   from: string;
   ephemeralPublicKey: string;
   username?: string;
 }
 
+/**
+ * Interface defining an Active Session.
+ */
 export interface ActiveSession {
   address: string;
   username: string;
 }
 
+/**
+ * Custom hook to manage peer discovery, handshaking (ECDH setup), and active chat sessions.
+ * @param {UseChatLogicProps} props - The configuration properties including socket and crypto methods.
+ * @returns Chat logic state and handler functions.
+ */
 export const useChatLogic = ({
   address,
   socket,
@@ -32,19 +46,10 @@ export const useChatLogic = ({
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
 
-  // LIFETIME SESSION: Baca dari localStorage
-  const [activeChat, setActiveChat] = useState<string | null>(() => {
-    return localStorage.getItem("webrtc_active_chat") || null;
-  });
-
-  const [activeUsername, setActiveUsername] = useState<string>(() => {
-    return localStorage.getItem("webrtc_active_username") || "";
-  });
-
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => {
-    const saved = localStorage.getItem("webrtc_active_sessions");
-    return saved ? JSON.parse(saved) : [];
-  });
+  // FIX BUG HANTU HANDSHAKE: Hapus localStorage, biarkan default kosong saat refresh!
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [activeUsername, setActiveUsername] = useState<string>("");
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
 
   const [myUsername, setMyUsername] = useState<string>("Loading...");
   const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>(
@@ -57,30 +62,23 @@ export const useChatLogic = ({
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
 
-  // LIFETIME SESSION: Auto-save ke localStorage tiap ada perubahan
+  /**
+   * Sync active sessions to ref for access inside socket callbacks.
+   */
   useEffect(() => {
-    localStorage.setItem(
-      "webrtc_active_sessions",
-      JSON.stringify(activeSessions),
-    );
     activeSessionsRef.current = activeSessions;
   }, [activeSessions]);
 
-  useEffect(() => {
-    if (activeChat) localStorage.setItem("webrtc_active_chat", activeChat);
-    else localStorage.removeItem("webrtc_active_chat");
-  }, [activeChat]);
-
-  useEffect(() => {
-    if (activeUsername)
-      localStorage.setItem("webrtc_active_username", activeUsername);
-    else localStorage.removeItem("webrtc_active_username");
-  }, [activeUsername]);
-
+  /**
+   * Clear search error when the target username input changes.
+   */
   useEffect(() => {
     setSearchError("");
   }, [targetUsername]);
 
+  /**
+   * Fetch the current user's profile from the relay server.
+   */
   useEffect(() => {
     if (address && relayUrl) {
       axios
@@ -90,6 +88,9 @@ export const useChatLogic = ({
     }
   }, [address, relayUrl]);
 
+  /**
+   * Socket event listeners for handling ECDH Handshake Offers and Answers.
+   */
   useEffect(() => {
     if (!socket) return;
 
@@ -99,12 +100,26 @@ export const useChatLogic = ({
     }) => {
       const peerAddress = data.from.toLowerCase();
 
+      // --- LOG BUKTI ECDH (MENERIMA OFFER) ---
+      console.log("=========================================");
+      console.log("[Phase 3: ECDH Handshake - Offer Received]");
+      console.log(
+        "[ECDH PROOF] Received Ephemeral Public Key from:",
+        peerAddress,
+      );
+      // ----------------------------------------------
+
       const existingSession = activeSessionsRef.current.find(
         (s) => s.address === peerAddress,
       );
 
       if (existingSession && ephemeralPublicKey) {
+        console.log("[ECDH PROOF] Computing Shared Secret internally...");
         computeSecret(peerAddress, data.ephemeralPublicKey);
+
+        console.log(
+          "[ECDH PROOF] Sending our Ephemeral Public Key as response.",
+        );
         socket.emit("handshake_response", {
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
@@ -132,7 +147,17 @@ export const useChatLogic = ({
       from: string;
       ephemeralPublicKey: string;
     }) => {
+      // --- LOG BUKTI ECDH (MENERIMA ANSWER) ---
+      console.log("=========================================");
+      console.log("[Phase 3: ECDH Handshake - Answer Received]");
+      console.log("[ECDH PROOF] Received Ephemeral Public Key from responder.");
+      console.log("[ECDH PROOF] Computing final Shared Secret locally...");
       computeSecret(data.from, data.ephemeralPublicKey);
+      console.log(
+        "[ECDH SUCCESS] Shared Secret established! Ready for AES Encryption.",
+      );
+      console.log("=========================================");
+      // ----------------------------------------------
     };
 
     socket.on("handshake_offer", onHandshakeOffer);
@@ -144,7 +169,12 @@ export const useChatLogic = ({
     };
   }, [socket, computeSecret, relayUrl, ephemeralPublicKey]);
 
-  const handleConnectPeer = async () => {
+  /**
+   * Initiates a connection request to a target peer by username.
+   * Emits an ECDH handshake initialization.
+   * @returns {Promise<void>}
+   */
+  const handleConnectPeer = async (): Promise<void> => {
     if (!targetUsername.trim()) return;
     setIsSearching(true);
     setSearchError("");
@@ -174,6 +204,14 @@ export const useChatLogic = ({
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {
+        // --- LOG BUKTI ECDH (INISIASI) ---
+        console.log("=========================================");
+        console.log("[Phase 3: ECDH Handshake - Initiating]");
+        console.log(
+          "[ECDH PROOF] Emitting Handshake Init with our Ephemeral Public Key.",
+        );
+        console.log("=========================================");
+        // ----------------------------------------------
         socket.emit("handshake_init", {
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
@@ -187,13 +225,24 @@ export const useChatLogic = ({
     }
   };
 
-  const handleAcceptRequest = async (request: HandshakeRequest) => {
+  /**
+   * Accepts an incoming handshake request and computes the shared secret.
+   * @param {HandshakeRequest} request - The incoming handshake payload.
+   * @returns {Promise<void>}
+   */
+  const handleAcceptRequest = async (
+    request: HandshakeRequest,
+  ): Promise<void> => {
+    console.log(
+      "[ECDH PROOF] Computing Shared Secret from accepted request...",
+    );
     computeSecret(request.from, request.ephemeralPublicKey);
     const peerAddress = request.from.toLowerCase();
 
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
+      console.log("[ECDH PROOF] Sending Handshake Response...");
       socket.emit("handshake_response", {
         to: request.from,
         ephemeralPublicKey: ephemeralPublicKey,
@@ -218,13 +267,23 @@ export const useChatLogic = ({
     setActiveUsername(finalUsername);
   };
 
-  const handleRejectRequest = (requestAddress: string) => {
+  /**
+   * Rejects an incoming handshake request and removes it from the pending list.
+   * @param {string} requestAddress - The address of the peer to reject.
+   * @returns {void}
+   */
+  const handleRejectRequest = (requestAddress: string): void => {
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),
     );
   };
 
-  const switchChat = (session: ActiveSession) => {
+  /**
+   * Switches the active chat window to a different session.
+   * @param {ActiveSession} session - The session to switch to.
+   * @returns {void}
+   */
+  const switchChat = (session: ActiveSession): void => {
     setActiveChat(session.address);
     setActiveUsername(session.username);
   };

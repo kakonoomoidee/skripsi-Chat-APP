@@ -15,7 +15,9 @@ export const useRelayPing = (activeRelay: string) => {
       if (!activeRelay) return;
       if (isMounted) setIsPinging(true);
       try {
-        const httpUrl = activeRelay.replace(/^ws/, "http");
+        const baseUrl = activeRelay.replace(/^ws/, "http");
+        const httpUrl = `${baseUrl}/ping`;
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
