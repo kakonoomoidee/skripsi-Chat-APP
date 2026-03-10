@@ -1,12 +1,39 @@
-import { useState } from "react";
-import axios from "axios";
+import { useState, useCallback } from "react";
+import axios, { AxiosError } from "axios";
 import { ethers } from "ethers";
 
 /**
- * Custom hook to manage Web3 authentication state and logic.
- * @returns Auth state and methods (register, login, logout).
+ * Interface representing the standard authentication response payload.
  */
-export const useAuth = () => {
+export interface AuthResponse {
+  token?: string;
+  [key: string]: any;
+}
+
+/**
+ * Interface representing the hook's return values and methods.
+ */
+export interface UseAuthReturn {
+  token: string | null;
+  loading: boolean;
+  error: string | null;
+  register: (
+    wallet: ethers.Wallet,
+    username: string,
+    relayUrl: string,
+  ) => Promise<AuthResponse>;
+  login: (wallet: ethers.Wallet, relayUrl: string) => Promise<string>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+/**
+ * Custom hook to manage Web3-based authentication state and logic.
+ * Handles identity registration, challenge-response login via ECDSA, and session management.
+ *
+ * @returns {UseAuthReturn} Authentication state and handler functions.
+ */
+export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(
@@ -14,60 +41,66 @@ export const useAuth = () => {
   );
 
   /**
-   * Registers a new user via gasless meta-transaction by signing a payload.
-   * @param {ethers.Wallet} wallet - The user's wallet instance.
-   * @param {string} username - The chosen username.
-   * @param {string} relayUrl - The active relay server URL.
-   * @returns {Promise<any>} The server response data.
+   * Registers a new decentralized identity via a gasless meta-transaction payload signature.
+   *
+   * @param {ethers.Wallet} wallet - The user's active wallet instance used for signing.
+   * @param {string} username - The chosen alphanumeric username.
+   * @param {string} relayUrl - The HTTP URL of the active relay server.
+   * @returns {Promise<AuthResponse>} The server's registration response data.
+   * @throws {Error} Throws an error if the network request or signing process fails.
    */
   const register = async (
     wallet: ethers.Wallet,
     username: string,
     relayUrl: string,
-  ) => {
+  ): Promise<AuthResponse> => {
     setLoading(true);
     setError(null);
     try {
-      // --- Registration & Local Wallet Generation ---
       console.log("=========================================");
-      console.log("[Phase 1: Registration & Local Wallet Generation]");
-      console.log("[SSI PROOF] Public Key (Address):", wallet.address);
-      console.log(
-        "[SSI PROOF] Private Key (Remains Local):",
-        wallet.privateKey,
-      );
+      console.log("[AUTH LOG] Phase 1: Registration Initiated");
+      console.log(`[AUTH LOG] Target Relay: ${relayUrl}`);
+      console.log(`[AUTH LOG] Target Username: ${username}`);
+      console.log(`[AUTH LOG] Signer Address: ${wallet.address}`);
 
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "string", "string"],
         [wallet.address, username, "PUBKEY_PLACEHOLDER"],
       );
-      console.log("[ECDSA PROOF] Registration Message Hash:", messageHash);
+
+      console.log("[AUTH LOG] Constructed Message Hash:", messageHash);
 
       const signature = await wallet.signMessage(ethers.getBytes(messageHash));
-      console.log("[ECDSA PROOF] Digital Signature:", signature);
+
+      console.log("[AUTH LOG] ECDSA Signature Generated:", signature);
+      console.log("[AUTH LOG] Transmitting payload to relay server...");
+
+      const response = await axios.post<AuthResponse>(
+        `${relayUrl}/auth/register`,
+        {
+          userAddress: wallet.address,
+          username,
+          publicKey: "PUBKEY_PLACEHOLDER",
+          signature,
+        },
+      );
+
       console.log(
-        "Transmitting data (excluding Private Key) to Smart Contract / Server...",
+        "[AUTH LOG] Registration Successful. Response:",
+        response.data,
       );
       console.log("=========================================");
-      // ----------------------------------------------
 
-      const response = await axios.post(`${relayUrl}/auth/register`, {
-        userAddress: wallet.address,
-        username,
-        publicKey: "PUBKEY_PLACEHOLDER",
-        signature,
-      });
-
-      console.log("[REGISTRATION SUCCESS] Server response:", response.data);
       return response.data;
     } catch (err: unknown) {
-      let msg = "An unknown error occurred";
-      if (axios.isAxiosError(err)) {
+      let msg = "An unknown error occurred during registration.";
+      if (err instanceof AxiosError) {
         msg = err.response?.data?.error || err.message;
       } else if (err instanceof Error) {
         msg = err.message;
       }
       setError(msg);
+      console.error("[AUTH ERROR] Registration Failed:", msg);
       throw new Error(msg);
     } finally {
       setLoading(false);
@@ -75,66 +108,71 @@ export const useAuth = () => {
   };
 
   /**
-   * Authenticates a user using a cryptographic challenge-response mechanism.
-   * @param {ethers.Wallet} wallet - The user's wallet instance.
-   * @param {string} relayUrl - The active relay server URL.
-   * @returns {Promise<string>} The generated JWT token.
+   * Authenticates a user using a cryptographic challenge-response protocol.
+   * Fetches a nonce, signs it locally, and verifies the signature on the server.
+   *
+   * @param {ethers.Wallet} wallet - The user's active wallet instance used for signing.
+   * @param {string} relayUrl - The HTTP URL of the active relay server.
+   * @returns {Promise<string>} The generated JSON Web Token (JWT) string upon successful login.
+   * @throws {Error} Throws an error if the challenge fetch, signature, or verification fails.
    */
-  const login = async (wallet: ethers.Wallet, relayUrl: string) => {
+  const login = async (
+    wallet: ethers.Wallet,
+    relayUrl: string,
+  ): Promise<string> => {
     setLoading(true);
     setError(null);
     try {
       console.log("=========================================");
-      console.log("[Phase 2: Challenge-Response Authentication (Login)]");
+      console.log("[AUTH LOG] Phase 2: Login Initiated (Challenge-Response)");
+      console.log(`[AUTH LOG] Signer Address: ${wallet.address}`);
       console.log(
-        "Requesting Challenge from server for address:",
-        wallet.address,
+        `[AUTH LOG] Requesting nonce from: ${relayUrl}/auth/challenge`,
       );
 
-      const resNonce = await axios.post(`${relayUrl}/auth/challenge`, {
-        address: wallet.address,
-      });
+      const resNonce = await axios.post<{ nonce: string }>(
+        `${relayUrl}/auth/challenge`,
+        {
+          address: wallet.address,
+        },
+      );
       const { nonce } = resNonce.data;
 
-      // --- (CHALLENGE-RESPONSE) ---
-      console.log("[SSI PROOF] Challenge (Nonce) received from server:", nonce);
+      console.log(`[AUTH LOG] Nonce Received: ${nonce}`);
 
       const nonceHash = ethers.solidityPackedKeccak256(["string"], [nonce]);
-      console.log("[ECDSA PROOF] Hashing Nonce:", nonceHash);
-
       const signature = await wallet.signMessage(ethers.getBytes(nonceHash));
-      console.log(
-        "[ECDSA PROOF] Response: Digital Signature of Nonce:",
-        signature,
-      );
-      console.log(
-        "Sending Signature back to server for verification (ecrecover)...",
-      );
-      console.log("=========================================");
-      // ----------------------------------------------
 
-      const resLogin = await axios.post(`${relayUrl}/auth/login`, {
-        address: wallet.address,
-        signature,
-      });
+      console.log(
+        "[AUTH LOG] Nonce signed successfully. Transmitting signature for verification...",
+      );
+
+      const resLogin = await axios.post<{ token: string }>(
+        `${relayUrl}/auth/login`,
+        {
+          address: wallet.address,
+          signature,
+        },
+      );
 
       const { token: newToken } = resLogin.data;
-      console.log(
-        "[LOGIN SUCCESS] Verification successful, JWT Token received!",
-      );
+
+      console.log("[AUTH LOG] Server Verification Passed. JWT Token acquired :", newToken);
+      console.log("=========================================");
 
       localStorage.setItem("auth_token", newToken);
       setToken(newToken);
 
       return newToken;
     } catch (err: unknown) {
-      let msg = "An unknown error occurred";
-      if (axios.isAxiosError(err)) {
+      let msg = "An unknown error occurred during login.";
+      if (err instanceof AxiosError) {
         msg = err.response?.data?.error || err.message;
       } else if (err instanceof Error) {
         msg = err.message;
       }
       setError(msg);
+      console.error("[AUTH ERROR] Login Failed:", msg);
       throw new Error(msg);
     } finally {
       setLoading(false);
@@ -142,13 +180,18 @@ export const useAuth = () => {
   };
 
   /**
-   * Clears the authentication token from local storage to log the user out.
+   * Terminates the active session by removing the authentication token from local storage
+   * and updating the local state.
+   *
+   * @returns {void}
    */
-  const logout = () => {
+  const logout = useCallback((): void => {
     localStorage.removeItem("auth_token");
     setToken(null);
-    console.log("[LOGOUT] Session cleared from local storage.");
-  };
+    console.log(
+      "[AUTH LOG] Session Terminated. Token removed from local storage.",
+    );
+  }, []);
 
   return {
     token,
