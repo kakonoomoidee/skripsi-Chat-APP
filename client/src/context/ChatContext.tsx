@@ -73,8 +73,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
   const { socket, isConnected } = useSocket(token, activeRelay);
-  const { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret } =
-    useCrypto();
+
+  // EXTRAK FUNGSI ENCRYPT/DECRYPT LOKAL
+  const {
+    ephemeralPublicKey,
+    computeSecret,
+    encrypt,
+    decrypt,
+    encryptLocalDB,
+    decryptLocalDB,
+    hasSecret,
+  } = useCrypto();
 
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { messageInput, setMessageInput, autoDeleteMode } = useSessionStore();
@@ -85,12 +94,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isDuplicateTab, setIsDuplicateTab] = useState(false);
 
-  // TAB CONCURRENCY CONTROL: Bikin tab baru auto-lock
   useEffect(() => {
     const channel = new BroadcastChannel("webrtc_chat_concurrency");
-
     channel.postMessage({ type: "NEW_TAB_OPENED" });
-
     channel.onmessage = (event) => {
       if (event.data.type === "NEW_TAB_OPENED") {
         channel.postMessage({ type: "TAB_ALREADY_ACTIVE" });
@@ -98,7 +104,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setIsDuplicateTab(true);
       }
     };
-
     return () => channel.close();
   }, []);
 
@@ -141,6 +146,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     myAddress: address,
     activeChat,
     decrypt,
+    encryptLocalDB,
     setIsPeerTyping,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
@@ -158,7 +164,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
 
-  const messages = useLiveQuery(
+  // 1. NGAMBIL RAW MESSAGE DARI DATABASE
+  const rawMessages = useLiveQuery(
     () => {
       if (!activeChat || !address) return [];
       return db.messages
@@ -171,6 +178,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     [activeChat, address],
     [],
   );
+
+  // 2. DECRYPT ON THE FLY BUAT DITAMPILIN KE UI
+  const messages = React.useMemo(() => {
+    if (!rawMessages) return [];
+    return rawMessages.map((msg) => ({
+      ...msg,
+      text: decryptLocalDB(msg.text), // DECRYPT AKTIF!
+    }));
+  }, [rawMessages, decryptLocalDB]);
 
   useEffect(() => {
     if (!isAuthenticated) navigate("/login");
@@ -238,7 +254,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.isMine || lastMsg.id === undefined) return;
       try {
-        const payload = JSON.parse(lastMsg.text);
+        const payload = JSON.parse(lastMsg.text); // text udah didecrypt di useMemo
         if (payload.type === "WALLET_REQUEST") {
           const myMetaMask = localStorage.getItem("linked_metamask");
           if (myMetaMask) {
@@ -257,7 +273,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           await db.messages.delete(lastMsg.id);
         } else if (payload.type === "TX_SUCCESS" && lastMsg.id) {
           await db.messages.update(lastMsg.id, {
-            text: `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
+            text: encryptLocalDB(
+              `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
+            ),
           });
         }
       } catch {
@@ -265,7 +283,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     checkIncomingForWalletRequests();
-  }, [messages, activeChat, encrypt, sendDataViaWebRTC, setPeerWalletAddress]);
+  }, [
+    messages,
+    activeChat,
+    encrypt,
+    sendDataViaWebRTC,
+    setPeerWalletAddress,
+    encryptLocalDB,
+  ]);
 
   const requestPeerWallet = (): void => {
     const currentChat = activeChat as string;
@@ -333,7 +358,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       await db.messages.add({
         ownerAddress: address!.toLowerCase(),
         chatId: currentChat.toLowerCase(),
-        text: `[SENT] ${amount} ETH\nTx Hash: ${txHash}`,
+        text: encryptLocalDB(`[SENT] ${amount} ETH\nTx Hash: ${txHash}`), // ENCRYPTED!
         isMine: true,
         timestamp: Date.now(),
       });
@@ -371,7 +396,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const encryptedMsg = encrypt(currentChat, stringifiedPayload);
       if (!encryptedMsg) throw new Error("Encryption failed");
 
-      // --- LOG BUKTI AES ENCRYPTION ---
       console.log("=========================================");
       console.log("[Phase 4: AES-256 Encryption - Sending Message]");
       console.log(
@@ -383,14 +407,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         "[AES PROOF] Transmitting Ciphertext via WebRTC Data Channel...",
       );
       console.log("=========================================");
-      // ----------------------------------------
 
       sendDataViaWebRTC(currentChat, encryptedMsg);
 
       await db.messages.add({
         ownerAddress: address.toLowerCase(),
         chatId: currentChat.toLowerCase(),
-        text: stringifiedPayload,
+        text: encryptLocalDB(stringifiedPayload), // ENCRYPTED LOKAL!
         isMine: true,
         timestamp: Date.now(),
       });
@@ -423,7 +446,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         await db.messages.add({
           ownerAddress: address.toLowerCase(),
           chatId: currentChat.toLowerCase(),
-          text: base64,
+          text: encryptLocalDB(base64), // ENCRYPTED LOKAL!
           isMine: true,
           timestamp: Date.now(),
           isImage: true,
@@ -454,7 +477,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const encryptedDoc = encrypt(currentChat, stringifiedPayload);
       if (!encryptedDoc) throw new Error("Encryption failed");
 
-      // --- LOG BUKTI AES ENCRYPTION (DOKUMEN) ---
       console.log("=========================================");
       console.log("[Phase 4: AES-256 Encryption - Sending Document]");
       console.log(
@@ -463,14 +485,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       );
       console.log("[AES PROOF] Transmitting Document via WebRTC...");
       console.log("=========================================");
-      // ----------------------------------------
 
       sendDataViaWebRTC(currentChat, encryptedDoc);
 
       await db.messages.add({
         ownerAddress: address.toLowerCase(),
         chatId: currentChat.toLowerCase(),
-        text: stringifiedPayload,
+        text: encryptLocalDB(stringifiedPayload), // ENCRYPTED LOKAL!
         isMine: true,
         timestamp: Date.now(),
       });
@@ -496,7 +517,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       await db.messages.add({
         ownerAddress: address.toLowerCase(),
         chatId: currentChat.toLowerCase(),
-        text: base64,
+        text: encryptLocalDB(base64), // ENCRYPTED LOKAL!
         isMine: true,
         timestamp: Date.now(),
         isImage: true,
@@ -520,7 +541,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         await db.messages.add({
           ownerAddress: address.toLowerCase(),
           chatId: currentChat.toLowerCase(),
-          text: base64Audio,
+          text: encryptLocalDB(base64Audio), // ENCRYPTED LOKAL!
           isMine: true,
           timestamp: Date.now(),
         });
@@ -634,7 +655,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleRejectRequest,
     connectedPeers,
     isWebRTCConnected,
-    messages: messages || [],
+    messages: messages || [], // MENGGUNAKAN MESSAGE YG UDAH DI DECRYPT LOKAL
     handleSendMessage,
     handleSendImage,
     handleSendAudio,

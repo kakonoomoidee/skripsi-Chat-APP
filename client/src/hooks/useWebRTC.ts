@@ -9,11 +9,13 @@ const ICE_SERVERS = {
   ],
 };
 
-interface UseWebRTCParams {
+// --- FIX: Tambahin encryptLocalDB di Interface ---
+export interface UseWebRTCParams {
   socket: Socket | null;
   myAddress: string | null;
   activeChat: string | null;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
+  encryptLocalDB: (plainText: string) => string;
   setIsPeerTyping?: (isTyping: boolean) => void;
   onCallOffer?: () => void;
   onCallAccepted?: () => void;
@@ -26,6 +28,7 @@ export const useWebRTC = ({
   myAddress,
   activeChat,
   decrypt,
+  encryptLocalDB,
   setIsPeerTyping,
   onCallOffer,
   onCallAccepted,
@@ -197,7 +200,7 @@ export const useWebRTC = ({
           await db.messages.add({
             ownerAddress: myAddress.toLowerCase(),
             chatId: peerAddress,
-            text: decryptedContent,
+            text: encryptLocalDB(decryptedContent),
             isMine: false,
             timestamp: Date.now(),
             isImage: isReceivedImage,
@@ -238,6 +241,7 @@ export const useWebRTC = ({
     [
       socket,
       decrypt,
+      encryptLocalDB,
       myAddress,
       setIsPeerTyping,
       onCallOffer,
@@ -345,7 +349,7 @@ export const useWebRTC = ({
               await db.messages.add({
                 ownerAddress: myAddress.toLowerCase(),
                 chatId: peerAddress,
-                text: decryptedContent,
+                text: encryptLocalDB(decryptedContent),
                 isMine: false,
                 timestamp: Date.now(),
                 isImage: isReceivedImage,
@@ -431,6 +435,7 @@ export const useWebRTC = ({
   }, [
     socket,
     decrypt,
+    encryptLocalDB,
     myAddress,
     setIsPeerTyping,
     onCallOffer,

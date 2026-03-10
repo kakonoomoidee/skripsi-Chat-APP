@@ -8,12 +8,18 @@ import {
 
 /**
  * Custom hook for handling cryptographic operations including ephemeral keys, shared secrets, and AES encryption.
- * @returns {object} { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret }
+ * @returns {object} { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret, encryptLocalDB, decryptLocalDB }
  */
 export const useCrypto = () => {
   const [ephemeralKeyPair] = useState(() => {
     const keys = generateEphemeralKeys();
-    console.log("[CryptoHook] Ephemeral Keys Ready");
+    console.log("=========================================");
+    console.log("[Phase 3: ECDH Key Generation (Local)]");
+    console.log(
+      "[ECDH PROOF] Ephemeral Private Key generated (Hidden in Memory)",
+    );
+    console.log("[ECDH PROOF] Ephemeral Public Key generated:", keys.publicKey);
+    console.log("=========================================");
     return keys;
   });
 
@@ -21,15 +27,37 @@ export const useCrypto = () => {
     {},
   );
 
-  /**
-   * Computes and stores a shared secret using ECDH.
-   * @param {string} peerAddress - The wallet address of the peer
-   * @param {string} peerPublicKey - The public key of the peer
-   * @returns {void}
-   */
+  // --- JALAN NINJA 2: MASTER KEY LOKAL BUAT INDEXED DB ---
+  const [localDbKey] = useState(() => {
+    let key = localStorage.getItem("securep2p_local_db_key");
+    if (!key) {
+      const array = new Uint8Array(32);
+      window.crypto.getRandomValues(array);
+      key = Array.from(array, (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+      localStorage.setItem("securep2p_local_db_key", key);
+      console.log("=========================================");
+      console.log("[Local Database Security]");
+      console.log(
+        "[DATA AT REST] Master Key Generated for IndexedDB Encryption",
+      );
+      console.log("=========================================");
+    }
+    return key;
+  });
+
   const computeSecret = useCallback(
     (peerAddress: string, peerPublicKey: string) => {
       if (!ephemeralKeyPair) return;
+
+      console.log("=========================================");
+      console.log("[Phase 3: ECDH Shared Secret Computation]");
+      console.log("[ECDH ALGORITHM] Peer Public Key   :", peerPublicKey);
+      console.log("[ECDH ALGORITHM] Local Private Key : [SECURE IN MEMORY]");
+      console.log(
+        "[ECDH ALGORITHM] Executing Elliptic Curve Multiplication...",
+      );
 
       const secret = deriveSharedSecret(
         ephemeralKeyPair.signingKey,
@@ -41,42 +69,54 @@ export const useCrypto = () => {
           ...prev,
           [peerAddress]: secret,
         }));
-        console.log(`[CryptoHook] Secret established with ${peerAddress}`);
+        console.log("[ECDH SUCCESS] Shared Secret successfully derived!");
+        console.log(
+          "[ECDH SUCCESS] Resulting AES-256 Key (Hex):",
+          secret.substring(0, 32) + "...",
+        );
+        console.log("=========================================");
       }
     },
     [ephemeralKeyPair],
   );
 
-  /**
-   * Encrypts a plaintext message using the stored shared secret.
-   * @param {string} peerAddress - The wallet address of the peer
-   * @param {string} plainText - The message to encrypt
-   * @returns {string | null} The encrypted cipher text
-   */
   const encrypt = useCallback(
     (peerAddress: string, plainText: string) => {
       const secret = sharedSecrets[peerAddress];
       if (!secret) throw new Error("Handshake required!");
-
       return encryptAES(plainText, secret);
     },
     [sharedSecrets],
   );
 
-  /**
-   * Decrypts a cipher text message using the stored shared secret.
-   * @param {string} peerAddress - The wallet address of the peer
-   * @param {string} cipherText - The message to decrypt
-   * @returns {string} The decrypted plain text or fallback string
-   */
   const decrypt = useCallback(
     (peerAddress: string, cipherText: string) => {
       const secret = sharedSecrets[peerAddress];
       if (!secret) return "Encrypted (Waiting Handshake...)";
-
       return decryptAES(cipherText, secret);
     },
     [sharedSecrets],
+  );
+
+  // --- FUNGSI ENCRYPT & DECRYPT DATABASE LOKAL ---
+  const encryptLocalDB = useCallback(
+    (plainText: string): string => {
+      const encrypted = encryptAES(plainText, localDbKey);
+      return encrypted || "";
+    },
+    [localDbKey],
+  );
+
+  const decryptLocalDB = useCallback(
+    (cipherText: string): string => {
+      try {
+        const decrypted = decryptAES(cipherText, localDbKey);
+        return decrypted ? decrypted : cipherText;
+      } catch {
+        return cipherText;
+      }
+    },
+    [localDbKey],
   );
 
   return {
@@ -84,6 +124,8 @@ export const useCrypto = () => {
     computeSecret,
     encrypt,
     decrypt,
+    encryptLocalDB,
+    decryptLocalDB,
     hasSecret: (addr: string) => !!sharedSecrets[addr],
   };
 };
