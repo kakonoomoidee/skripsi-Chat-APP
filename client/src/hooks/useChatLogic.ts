@@ -1,10 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
-/**
- * Interface defining the properties required for the useChatLogic hook.
- */
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
@@ -12,6 +9,8 @@ interface UseChatLogicProps {
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   hasSecret: (peerAddress: string) => boolean;
   relayUrl: string;
+  removeSecret: (addr: string) => void;
+  forceDisconnectPeer?: (addr: string) => void;
 }
 
 export interface HandshakeRequest {
@@ -32,6 +31,8 @@ export const useChatLogic = ({
   computeSecret,
   hasSecret,
   relayUrl,
+  removeSecret,
+  forceDisconnectPeer,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
 
@@ -49,10 +50,27 @@ export const useChatLogic = ({
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
+  const activeChatRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeSessionsRef.current = activeSessions;
   }, [activeSessions]);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  const closeChat = useCallback(() => {
+    setActiveChat(null);
+    setActiveUsername("");
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeChat();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [closeChat]);
 
   useEffect(() => {
     setSearchError("");
@@ -75,24 +93,18 @@ export const useChatLogic = ({
       ephemeralPublicKey: string;
     }) => {
       const peerAddress = data.from.toLowerCase();
-
-      console.log("[Phase 3: ECDH Handshake - Offer Received from Peer]");
-
       const existingSession = activeSessionsRef.current.find(
         (s) => s.address === peerAddress,
       );
-
+      // JIKA USER BARU AJA REFRESH TAPI ZOMBIE MASIH AKTIF
       if (existingSession && ephemeralPublicKey) {
-        computeSecret(peerAddress, data.ephemeralPublicKey);
+        if (forceDisconnectPeer) forceDisconnectPeer(peerAddress);
 
-        console.log(
-          "[ECDH PROOF] Transmitting local Ephemeral Public Key to Peer...",
-        );
+        computeSecret(peerAddress, data.ephemeralPublicKey);
         socket.emit("handshake_response", {
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
         });
-
         setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
         return;
       }
@@ -101,9 +113,7 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
-      } catch {
-        console.error("Failed to fetch peer username");
-      }
+      } catch {}
 
       setPendingRequests((prev) => {
         if (prev.find((req) => req.from === data.from)) return prev;
@@ -115,7 +125,6 @@ export const useChatLogic = ({
       from: string;
       ephemeralPublicKey: string;
     }) => {
-      console.log("[Phase 3: ECDH Handshake - Answer Received from Peer]");
       computeSecret(data.from, data.ephemeralPublicKey);
     };
 
@@ -126,7 +135,13 @@ export const useChatLogic = ({
       socket.off("handshake_offer", onHandshakeOffer);
       socket.off("handshake_answer", onHandshakeAnswer);
     };
-  }, [socket, computeSecret, relayUrl, ephemeralPublicKey]);
+  }, [
+    socket,
+    computeSecret,
+    relayUrl,
+    ephemeralPublicKey,
+    forceDisconnectPeer,
+  ]);
 
   const handleConnectPeer = async (): Promise<void> => {
     if (!targetUsername.trim()) return;
@@ -158,9 +173,6 @@ export const useChatLogic = ({
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {
-        console.log(
-          "[Phase 3: ECDH Handshake - Initiating Handshake with Peer]",
-        );
         socket.emit("handshake_init", {
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
@@ -183,9 +195,6 @@ export const useChatLogic = ({
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
-      console.log(
-        "[ECDH PROOF] Transmitting local Ephemeral Public Key to Peer...",
-      );
       socket.emit("handshake_response", {
         to: request.from,
         ephemeralPublicKey: ephemeralPublicKey,
@@ -221,6 +230,29 @@ export const useChatLogic = ({
     setActiveUsername(session.username);
   };
 
+  const removeActiveSession = useCallback(
+    (peerAddress: string) => {
+      const addr = peerAddress.toLowerCase();
+
+      setActiveSessions((prev) =>
+        prev.filter((s) => s.address.toLowerCase() !== addr),
+      );
+
+      setInitiators((prev) => {
+        const next = { ...prev };
+        delete next[addr];
+        return next;
+      });
+
+      removeSecret(addr);
+
+      if (activeChatRef.current?.toLowerCase() === addr) {
+        closeChat();
+      }
+    },
+    [closeChat, removeSecret],
+  );
+
   return {
     targetUsername,
     setTargetUsername,
@@ -230,6 +262,7 @@ export const useChatLogic = ({
     pendingRequests,
     activeSessions,
     switchChat,
+    closeChat,
     isSearching,
     initiators,
     handleConnectPeer,
@@ -238,5 +271,6 @@ export const useChatLogic = ({
     searchError,
     isPeerTyping,
     setIsPeerTyping,
+    removeActiveSession,
   };
 };

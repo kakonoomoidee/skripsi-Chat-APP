@@ -96,7 +96,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <div className="w-80 bg-zinc-950/90 flex flex-col border-r border-zinc-800 backdrop-blur-xl h-full">
+      <div className="w-full h-full flex flex-col bg-zinc-950/90 backdrop-blur-xl">
         <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50 shrink-0">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <LockSessionIcon className="w-5 h-5 text-white" />

@@ -6,10 +6,6 @@ import {
   decryptMessage as decryptAES,
 } from "@/utils/crypto";
 
-/**
- * Custom hook for handling cryptographic operations including ephemeral keys, shared secrets, and AES encryption.
- * @returns {object} { ephemeralPublicKey, computeSecret, encrypt, decrypt, hasSecret, encryptLocalDB, decryptLocalDB }
- */
 export const useCrypto = () => {
   const [ephemeralKeyPair] = useState(() => {
     const keys = generateEphemeralKeys();
@@ -27,7 +23,6 @@ export const useCrypto = () => {
     {},
   );
 
-  // --- JALAN NINJA 2: MASTER KEY LOKAL BUAT INDEXED DB ---
   const [localDbKey] = useState(() => {
     let key = localStorage.getItem("securep2p_local_db_key");
     if (!key) {
@@ -37,12 +32,6 @@ export const useCrypto = () => {
         byte.toString(16).padStart(2, "0"),
       ).join("");
       localStorage.setItem("securep2p_local_db_key", key);
-      console.log("=========================================");
-      console.log("[Local Database Security]");
-      console.log(
-        "[DATA AT REST] Master Key Generated for IndexedDB Encryption",
-      );
-      console.log("=========================================");
     }
     return key;
   });
@@ -50,31 +39,12 @@ export const useCrypto = () => {
   const computeSecret = useCallback(
     (peerAddress: string, peerPublicKey: string) => {
       if (!ephemeralKeyPair) return;
-
-      console.log("=========================================");
-      console.log("[Phase 3: ECDH Shared Secret Computation]");
-      console.log("[ECDH ALGORITHM] Peer Public Key   :", peerPublicKey);
-      console.log("[ECDH ALGORITHM] Local Private Key : [SECURE IN MEMORY]");
-      console.log(
-        "[ECDH ALGORITHM] Executing Elliptic Curve Multiplication...",
-      );
-
       const secret = deriveSharedSecret(
         ephemeralKeyPair.signingKey,
         peerPublicKey,
       );
-
       if (secret) {
-        setSharedSecrets((prev) => ({
-          ...prev,
-          [peerAddress]: secret,
-        }));
-        console.log("[ECDH SUCCESS] Shared Secret successfully derived!");
-        console.log(
-          "[ECDH SUCCESS] Resulting AES-256 Key (Hex):",
-          secret.substring(0, 32) + "...",
-        );
-        console.log("=========================================");
+        setSharedSecrets((prev) => ({ ...prev, [peerAddress]: secret }));
       }
     },
     [ephemeralKeyPair],
@@ -98,7 +68,6 @@ export const useCrypto = () => {
     [sharedSecrets],
   );
 
-  // --- FUNGSI ENCRYPT & DECRYPT DATABASE LOKAL ---
   const encryptLocalDB = useCallback(
     (plainText: string): string => {
       const encrypted = encryptAES(plainText, localDbKey);
@@ -119,6 +88,14 @@ export const useCrypto = () => {
     [localDbKey],
   );
 
+  const removeSecret = useCallback((peerAddress: string) => {
+    setSharedSecrets((prev) => {
+      const next = { ...prev };
+      delete next[peerAddress.toLowerCase()];
+      return next;
+    });
+  }, []);
+
   return {
     ephemeralPublicKey: ephemeralKeyPair?.publicKey,
     computeSecret,
@@ -126,6 +103,7 @@ export const useCrypto = () => {
     decrypt,
     encryptLocalDB,
     decryptLocalDB,
+    removeSecret,
     hasSecret: (addr: string) => !!sharedSecrets[addr],
   };
 };

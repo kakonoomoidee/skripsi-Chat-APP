@@ -9,7 +9,6 @@ const ICE_SERVERS = {
   ],
 };
 
-// --- FIX: Tambahin encryptLocalDB di Interface ---
 export interface UseWebRTCParams {
   socket: Socket | null;
   myAddress: string | null;
@@ -21,6 +20,7 @@ export interface UseWebRTCParams {
   onCallAccepted?: () => void;
   onCallRejected?: () => void;
   onCallEnded?: () => void;
+  onPeerDisconnected?: (peerAddress: string) => void;
 }
 
 export const useWebRTC = ({
@@ -34,18 +34,45 @@ export const useWebRTC = ({
   onCallAccepted,
   onCallRejected,
   onCallEnded,
+  onPeerDisconnected,
 }: UseWebRTCParams) => {
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
   const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
   const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
-
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isWebRTCConnected = activeChat
     ? connectedPeers.includes(activeChat.toLowerCase())
     : false;
+
+  useEffect(() => {
+    const handleUnload = () => {
+      Object.values(dataChannels.current).forEach((dc) => dc.close());
+      Object.values(peerConnections.current).forEach((pc) => pc.close());
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      handleUnload();
+    };
+  }, []);
+
+  const forceDisconnectPeer = useCallback((peerAddress: string) => {
+    const addr = peerAddress.toLowerCase();
+    if (peerConnections.current[addr]) {
+      peerConnections.current[addr].oniceconnectionstatechange = null;
+      peerConnections.current[addr].close();
+      delete peerConnections.current[addr];
+    }
+    if (dataChannels.current[addr]) {
+      dataChannels.current[addr].onclose = null;
+      dataChannels.current[addr].close();
+      delete dataChannels.current[addr];
+    }
+    setConnectedPeers((prev) => prev.filter((p) => p !== addr));
+  }, []);
 
   const startVoiceCall = async (targetPeer: string): Promise<boolean> => {
     try {
@@ -62,17 +89,12 @@ export const useWebRTC = ({
           pc.addTrack(stream.getAudioTracks()[0], stream);
         }
       }
-
       const audioEl = document.getElementById(
         "p2p-audio-stream",
       ) as HTMLAudioElement;
-      if (audioEl) {
-        audioEl.play().catch((e) => console.warn("Paksa play audio gagal:", e));
-      }
-
+      if (audioEl) audioEl.play().catch(() => {});
       return true;
-    } catch (e) {
-      console.error("Mic access denied", e);
+    } catch {
       return false;
     }
   };
@@ -82,7 +104,6 @@ export const useWebRTC = ({
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
-
     const pc = peerConnections.current[targetPeer.toLowerCase()];
     if (pc) {
       const audioSender = pc
@@ -90,13 +111,10 @@ export const useWebRTC = ({
         .find((s) => s.track?.kind === "audio");
       if (audioSender) audioSender.replaceTrack(null);
     }
-
     const audioEl = document.getElementById(
       "p2p-audio-stream",
     ) as HTMLAudioElement;
-    if (audioEl) {
-      audioEl.pause();
-    }
+    if (audioEl) audioEl.pause();
   };
 
   const toggleMicMute = (): boolean => {
@@ -115,9 +133,8 @@ export const useWebRTC = ({
       if (!socket || !targetPeer || !myAddress) return;
       const peerAddress = targetPeer.toLowerCase();
 
-      if (peerConnections.current[peerAddress]) {
+      if (peerConnections.current[peerAddress])
         peerConnections.current[peerAddress].close();
-      }
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
       peerConnections.current[peerAddress] = pc;
@@ -135,17 +152,13 @@ export const useWebRTC = ({
           audioEl.autoplay = true;
           document.body.appendChild(audioEl);
         }
-
         const stream =
           event.streams && event.streams.length > 0
             ? event.streams[0]
             : new MediaStream([event.track]);
-
         if (audioEl.srcObject !== stream) {
           audioEl.srcObject = stream;
-          audioEl
-            .play()
-            .catch((e) => console.warn("Audio play blocked by browser:", e));
+          audioEl.play().catch(() => {});
         }
       };
 
@@ -154,8 +167,10 @@ export const useWebRTC = ({
 
       dc.onopen = () =>
         setConnectedPeers((prev) => [...new Set([...prev, peerAddress])]);
-      dc.onclose = () =>
+      dc.onclose = () => {
         setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
+        if (onPeerDisconnected) onPeerDisconnected(peerAddress);
+      };
 
       dc.onmessage = async (msgEvent) => {
         try {
@@ -172,7 +187,6 @@ export const useWebRTC = ({
               );
               return;
             }
-
             if (parsed.type === "CALL_OFFER" && onCallOffer) {
               onCallOffer();
               return;
@@ -192,9 +206,7 @@ export const useWebRTC = ({
               if (onCallEnded) onCallEnded();
               return;
             }
-          } catch {
-            /* ignore */
-          }
+          } catch {}
 
           const isReceivedImage = decryptedContent.startsWith("data:image");
           await db.messages.add({
@@ -205,9 +217,7 @@ export const useWebRTC = ({
             timestamp: Date.now(),
             isImage: isReceivedImage,
           });
-        } catch {
-          console.error("Failed to decrypt WebRTC message");
-        }
+        } catch {}
       };
 
       pc.onicecandidate = (event) => {
@@ -222,11 +232,13 @@ export const useWebRTC = ({
       pc.oniceconnectionstatechange = () => {
         if (
           pc.iceConnectionState === "disconnected" ||
-          pc.iceConnectionState === "failed"
+          pc.iceConnectionState === "failed" ||
+          pc.iceConnectionState === "closed"
         ) {
           setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
           pc.close();
           delete peerConnections.current[peerAddress];
+          if (onPeerDisconnected) onPeerDisconnected(peerAddress);
         }
       };
 
@@ -248,6 +260,7 @@ export const useWebRTC = ({
       onCallAccepted,
       onCallRejected,
       onCallEnded,
+      onPeerDisconnected,
     ],
   );
 
@@ -283,29 +296,25 @@ export const useWebRTC = ({
             audioEl.autoplay = true;
             document.body.appendChild(audioEl);
           }
-
           const stream =
             event.streams && event.streams.length > 0
               ? event.streams[0]
               : new MediaStream([event.track]);
-
           if (audioEl.srcObject !== stream) {
             audioEl.srcObject = stream;
-            audioEl
-              .play()
-              .catch((e) => console.warn("Audio play blocked by browser:", e));
+            audioEl.play().catch(() => {});
           }
         };
 
         pc.ondatachannel = (event) => {
           const dc = event.channel;
           dataChannels.current[peerAddress] = dc;
-
           dc.onopen = () =>
             setConnectedPeers((prev) => [...new Set([...prev, peerAddress])]);
-          dc.onclose = () =>
+          dc.onclose = () => {
             setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
-
+            if (onPeerDisconnected) onPeerDisconnected(peerAddress);
+          };
           dc.onmessage = async (msgEvent) => {
             try {
               const decryptedContent = decrypt(peerAddress, msgEvent.data);
@@ -321,7 +330,6 @@ export const useWebRTC = ({
                   );
                   return;
                 }
-
                 if (parsed.type === "CALL_OFFER" && onCallOffer) {
                   onCallOffer();
                   return;
@@ -341,10 +349,7 @@ export const useWebRTC = ({
                   if (onCallEnded) onCallEnded();
                   return;
                 }
-              } catch {
-                /* ignore */
-              }
-
+              } catch {}
               const isReceivedImage = decryptedContent.startsWith("data:image");
               await db.messages.add({
                 ownerAddress: myAddress.toLowerCase(),
@@ -354,46 +359,42 @@ export const useWebRTC = ({
                 timestamp: Date.now(),
                 isImage: isReceivedImage,
               });
-            } catch {
-              console.error("Failed to decrypt WebRTC message");
-            }
+            } catch {}
           };
         };
 
         pc.onicecandidate = (event) => {
-          if (event.candidate) {
+          if (event.candidate)
             socket.emit("webrtc_signal", {
               to: peerAddress,
               signal: { type: "ice-candidate", candidate: event.candidate },
             });
-          }
         };
 
         pc.oniceconnectionstatechange = () => {
           if (
             pc.iceConnectionState === "disconnected" ||
-            pc.iceConnectionState === "failed"
+            pc.iceConnectionState === "failed" ||
+            pc.iceConnectionState === "closed"
           ) {
             setConnectedPeers((prev) => prev.filter((p) => p !== peerAddress));
             pc.close();
             delete peerConnections.current[peerAddress];
+            if (onPeerDisconnected) onPeerDisconnected(peerAddress);
           }
         };
       }
 
       const pc = peerConnections.current[peerAddress];
-
       try {
         if (signal.type === "offer") {
           await pc.setRemoteDescription(
             new RTCSessionDescription(signal.offer),
           );
           pc.getTransceivers().forEach((t) => (t.direction = "sendrecv"));
-
           if (iceQueues.current[peerAddress]) {
-            for (const cand of iceQueues.current[peerAddress]) {
+            for (const cand of iceQueues.current[peerAddress])
               await pc.addIceCandidate(new RTCIceCandidate(cand));
-            }
             iceQueues.current[peerAddress] = [];
           }
           const answer = await pc.createAnswer();
@@ -408,16 +409,15 @@ export const useWebRTC = ({
               new RTCSessionDescription(signal.answer),
             );
             if (iceQueues.current[peerAddress]) {
-              for (const cand of iceQueues.current[peerAddress]) {
+              for (const cand of iceQueues.current[peerAddress])
                 await pc.addIceCandidate(new RTCIceCandidate(cand));
-              }
               iceQueues.current[peerAddress] = [];
             }
           }
         } else if (signal.type === "ice-candidate" && signal.candidate) {
-          if (pc.remoteDescription) {
+          if (pc.remoteDescription)
             await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          } else {
+          else {
             if (!iceQueues.current[peerAddress])
               iceQueues.current[peerAddress] = [];
             iceQueues.current[peerAddress].push(signal.candidate);
@@ -442,6 +442,7 @@ export const useWebRTC = ({
     onCallAccepted,
     onCallRejected,
     onCallEnded,
+    onPeerDisconnected,
   ]);
 
   const sendDataViaWebRTC = (
@@ -461,5 +462,6 @@ export const useWebRTC = ({
     startVoiceCall,
     stopVoiceCall,
     toggleMicMute,
+    forceDisconnectPeer,
   };
 };
