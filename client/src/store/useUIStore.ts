@@ -1,42 +1,78 @@
 import { create } from "zustand";
 
-interface UIState {
+/**
+ * Type definition for available toast notification themes.
+ */
+export type ToastType = "error" | "success" | "info";
+
+/**
+ * Type definition for the seed phrase modal operations.
+ */
+export type SeedModalType = "import" | "export" | "wipe";
+
+/**
+ * Interface representing the state of a toast notification.
+ */
+export interface ToastState {
+  show: boolean;
+  msg: string;
+  type: ToastType;
+}
+
+/**
+ * Interface representing the state of the seed phrase verification modal.
+ */
+export interface SeedModalState {
+  isOpen: boolean;
+  type: SeedModalType;
+  payload?: string;
+}
+
+/**
+ * Interface defining the global UI state and modifier actions.
+ */
+export interface UIState {
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (isOpen: boolean) => void;
-
-  toast: { show: boolean; msg: string; type: "error" | "success" };
-  showToast: (msg: string, type?: "error" | "success") => void;
+  toast: ToastState;
+  showToast: (msg: string, type?: ToastType) => void;
   hideToast: () => void;
-
-  seedModal: {
-    isOpen: boolean;
-    type: "import" | "export" | "wipe";
-    payload?: string;
-  };
-  setSeedModal: (config: {
-    isOpen: boolean;
-    type: "import" | "export" | "wipe";
-    payload?: string;
-  }) => void;
+  seedModal: SeedModalState;
+  setSeedModal: (config: SeedModalState) => void;
   closeSeedModal: () => void;
 }
 
+/**
+ * Zustand store to manage global UI components such as mobile sidebars,
+ * toast notifications, and secure modals.
+ *
+ * @returns {UIState} The global UI state and modifier functions.
+ */
 export const useUIStore = create<UIState>((set) => ({
   isMobileSidebarOpen: true,
+
   setIsMobileSidebarOpen: (isOpen: boolean) =>
     set({ isMobileSidebarOpen: isOpen }),
 
   toast: { show: false, msg: "", type: "error" },
-  showToast: (msg: string, type: "error" | "success" = "error") => {
+
+  showToast: (msg: string, type: ToastType = "error") => {
+    console.log(
+      `[UI Store] Displaying toast notification | Type: ${type} | Message: ${msg}`,
+    );
     set({ toast: { show: true, msg, type } });
+
     setTimeout(() => {
       set((state) => ({ toast: { ...state.toast, show: false } }));
     }, 3500);
   },
+
   hideToast: () => set((state) => ({ toast: { ...state.toast, show: false } })),
 
   seedModal: { isOpen: false, type: "export" },
-  setSeedModal: (config) => set({ seedModal: config }),
+
+  setSeedModal: (config: SeedModalState) => set({ seedModal: config }),
+
   closeSeedModal: () =>
     set({ seedModal: { isOpen: false, type: "export", payload: undefined } }),
 }));
