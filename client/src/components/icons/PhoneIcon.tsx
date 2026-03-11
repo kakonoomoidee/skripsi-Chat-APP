@@ -1,10 +1,16 @@
+import React from "react";
+
 /**
  * Renders a phone/call icon.
- * @param {Object} props - The component props.
+ * @param {object} props - The component props.
  * @param {string} [props.className] - Optional CSS classes.
- * @returns {JSX.Element} The SVG element.
+ * @returns {React.JSX.Element} The SVG element.
  */
-export const PhoneIcon = ({ className }: { className?: string }) => (
+export const PhoneIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
   <svg
     className={className}
     fill="none"

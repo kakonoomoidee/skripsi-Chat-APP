@@ -3,16 +3,44 @@ import { ethers } from "ethers";
 
 const KEYSTORE_KEY = "chat_app_keystore";
 
+/**
+ * Interface defining the result of a wallet creation operation.
+ */
 export interface CreateWalletResult {
   wallet: ethers.HDNodeWallet;
   seedPhrase: string;
 }
 
 /**
- * 1. Manage local wallet creation, encryption, and decryption
- * @returns {object} { wallet, address, loading, createAndEncryptWallet, decryptWallet, importAndEncryptWallet, resetWallet }
+ * Interface defining the properties and methods returned by the useWallet hook.
  */
-export const useWallet = () => {
+export interface UseWalletReturn {
+  wallet: ethers.Wallet | ethers.HDNodeWallet | null;
+  address: string | null;
+  loading: boolean;
+  createAndEncryptWallet: (password: string) => Promise<CreateWalletResult>;
+  decryptWallet: (
+    password: string,
+  ) => Promise<ethers.Wallet | ethers.HDNodeWallet>;
+  importAndEncryptWallet: (
+    seedPhrase: string,
+    password: string,
+  ) => Promise<ethers.HDNodeWallet>;
+  resetWallet: () => void;
+}
+
+/**
+ * Custom hook to manage local Ethereum wallet creation, encryption, and decryption.
+ * Handles the secure storage of the identity keystore in the browser's local storage.
+ *
+ * @returns {UseWalletReturn} Wallet state and cryptographic management functions.
+ */
+export const useWallet = (): UseWalletReturn => {
+  /**
+   * Retrieves and parses the stored wallet address from the local keystore JSON.
+   *
+   * @returns {string | null} The checksummed Ethereum address, or null if not found/corrupt.
+   */
   const getStoredAddress = (): string | null => {
     const keystore = localStorage.getItem(KEYSTORE_KEY);
     if (keystore) {
@@ -33,24 +61,34 @@ export const useWallet = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   /**
-   * 2. Create a new burner wallet, extract mnemonic, and encrypt it into local storage
-   * @param {string} password - The password to encrypt the keystore
-   * @returns {Promise<CreateWalletResult>} Object containing the new wallet instance and the 12-word seed phrase
+   * Generates a new HD wallet, extracts its mnemonic seed phrase, encrypts the wallet
+   * using the provided password, and persists the keystore JSON to local storage.
+   *
+   * @param {string} password - The password to encrypt the Keystore JSON.
+   * @returns {Promise<CreateWalletResult>} Object containing the new wallet instance and the 12-word seed phrase.
+   * @throws {Error} Throws if encryption or storage fails.
    */
   const createAndEncryptWallet = async (
     password: string,
   ): Promise<CreateWalletResult> => {
     setLoading(true);
     try {
+      console.log("[Wallet Manager] Generating new random HD wallet...");
       const newWallet = ethers.Wallet.createRandom();
       const seedPhrase = newWallet.mnemonic?.phrase || "";
 
+      console.log(
+        "[Wallet Manager] Encrypting private key to Keystore JSON...",
+      );
       const keystoreJson = await newWallet.encrypt(password);
 
       localStorage.setItem(KEYSTORE_KEY, keystoreJson);
       setWallet(newWallet);
       setAddress(newWallet.address);
 
+      console.log(
+        "[Wallet Manager] Wallet successfully generated and encrypted.",
+      );
       return { wallet: newWallet, seedPhrase };
     } finally {
       setLoading(false);
@@ -58,15 +96,26 @@ export const useWallet = () => {
   };
 
   /**
-   * 3. Decrypt an existing wallet from local storage
-   * @param {string} password - The password to decrypt the keystore
-   * @returns {Promise<ethers.Wallet | ethers.HDNodeWallet>} The decrypted wallet instance
+   * Retrieves the encrypted keystore JSON from local storage and decrypts it
+   * using the provided password to instantiate the wallet in memory.
+   *
+   * @param {string} password - The password used to decrypt the Keystore JSON.
+   * @returns {Promise<ethers.Wallet | ethers.HDNodeWallet>} The decrypted wallet instance.
+   * @throws {Error} Throws if the keystore is missing, corrupt, or the password is incorrect.
    */
-  const decryptWallet = async (password: string) => {
+  const decryptWallet = async (
+    password: string,
+  ): Promise<ethers.Wallet | ethers.HDNodeWallet> => {
     setLoading(true);
     try {
+      console.log(
+        "[Wallet Manager] Attempting to decrypt local Keystore JSON...",
+      );
       const keystoreJson = localStorage.getItem(KEYSTORE_KEY);
-      if (!keystoreJson) throw new Error("No Identity found. Please register.");
+
+      if (!keystoreJson) {
+        throw new Error("No Identity found. Please register.");
+      }
 
       const unlockedWallet = await ethers.Wallet.fromEncryptedJson(
         keystoreJson,
@@ -76,8 +125,14 @@ export const useWallet = () => {
       setWallet(unlockedWallet);
       setAddress(unlockedWallet.address);
 
+      console.log(
+        "[Wallet Manager] Wallet successfully decrypted and loaded into memory.",
+      );
       return unlockedWallet;
-    } catch {
+    } catch (error) {
+      console.error(
+        "[Wallet Manager Error] Decryption failed. Invalid password or corrupt keystore.",
+      );
       throw new Error("Invalid password or corrupt Keystore.");
     } finally {
       setLoading(false);
@@ -85,26 +140,38 @@ export const useWallet = () => {
   };
 
   /**
-   * 4. Import an existing wallet using a seed phrase and encrypt it into local storage
-   * @param {string} seedPhrase - The 12-word mnemonic phrase
-   * @param {string} password - The password to encrypt the new keystore
-   * @returns {Promise<ethers.HDNodeWallet>} The imported wallet instance
+   * Restores an HD wallet from a 12-word mnemonic seed phrase, encrypts it
+   * with a new password, and saves the resulting keystore JSON to local storage.
+   *
+   * @param {string} seedPhrase - The 12-word BIP39 mnemonic phrase.
+   * @param {string} password - The new password to encrypt the Keystore JSON.
+   * @returns {Promise<ethers.HDNodeWallet>} The imported wallet instance.
+   * @throws {Error} Throws if the seed phrase is invalid or encryption fails.
    */
   const importAndEncryptWallet = async (
     seedPhrase: string,
     password: string,
-  ) => {
+  ): Promise<ethers.HDNodeWallet> => {
     setLoading(true);
     try {
+      console.log("[Wallet Manager] Restoring wallet from seed phrase...");
       const importedWallet = ethers.Wallet.fromPhrase(seedPhrase.trim());
+
+      console.log(
+        "[Wallet Manager] Encrypting imported wallet to Keystore JSON...",
+      );
       const keystoreJson = await importedWallet.encrypt(password);
 
       localStorage.setItem(KEYSTORE_KEY, keystoreJson);
       setWallet(importedWallet);
       setAddress(importedWallet.address);
 
+      console.log("[Wallet Manager] Wallet successfully imported and secured.");
       return importedWallet;
-    } catch {
+    } catch (error) {
+      console.error(
+        "[Wallet Manager Error] Import failed. Invalid seed phrase format.",
+      );
       throw new Error("Invalid Seed Phrase. Please check your 12 words.");
     } finally {
       setLoading(false);
@@ -112,10 +179,15 @@ export const useWallet = () => {
   };
 
   /**
-   * 5. Wipe wallet data from local storage and reload the app
+   * Erases the keystore data from local storage and forces a hard reload of the application
+   * to clear any remaining sensitive data from memory.
+   *
    * @returns {void}
    */
-  const resetWallet = useCallback(() => {
+  const resetWallet = useCallback((): void => {
+    console.log(
+      "[Wallet Manager] Executing wallet wipe protocol. Purging local storage...",
+    );
     localStorage.removeItem(KEYSTORE_KEY);
     window.location.reload();
   }, []);

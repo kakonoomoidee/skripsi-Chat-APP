@@ -1,6 +1,8 @@
 /**
- * cut addres to be short and readable
- * example : 0x1234567890abcdef -> 0x1234...cdef
+ * Truncates a long cryptographic address into a shorter, readable format for UI presentation.
+ *
+ * @param {string | null | undefined} address - The full wallet address.
+ * @returns {string} The shortened address (e.g., 0x1234...cdef), or an empty string if invalid.
  */
 export const shortenAddress = (address: string | null | undefined): string => {
   if (!address) return "";
@@ -8,8 +10,10 @@ export const shortenAddress = (address: string | null | undefined): string => {
 };
 
 /**
- * format timestamp to human-readable time (HH:mm)
- * example : 1678899 -> 14:30
+ * Converts a raw timestamp into a human-readable 24-hour time format string.
+ *
+ * @param {number | string | null | undefined} timestamp - The raw Unix timestamp or date string.
+ * @returns {string} The formatted time string (e.g., "14:30"), or an empty string if invalid.
  */
 export const formatTime = (
   timestamp: number | string | null | undefined,

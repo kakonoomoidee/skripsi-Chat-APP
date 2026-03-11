@@ -69,8 +69,7 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function",
-      "constant": true
+      "type": "function"
     },
     {
       "inputs": [
@@ -99,8 +98,7 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function",
-      "constant": true
+      "type": "function"
     },
     {
       "inputs": [
@@ -163,8 +161,7 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function",
-      "constant": true
+      "type": "function"
     }
   ],
   "metadata": "{\"compiler\":{\"version\":\"0.8.0+commit.c7dfd78e\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"url\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewRelayRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"RelayDeactivated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"newUrl\",\"type\":\"string\"}],\"name\":\"RelayUrlUpdated\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"deactivateRelay\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllRelays\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"url\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"}],\"internalType\":\"struct RelayRegistry.RelayNode[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"hasRegistered\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_url\",\"type\":\"string\"}],\"name\":\"registerRelay\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"relays\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"url\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_newUrl\",\"type\":\"string\"}],\"name\":\"updateRelayUrl\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"registerRelay(string)\":{\"params\":{\"_url\":\"string - The endpoint URL of the new relay server returns void\"}},\"updateRelayUrl(string)\":{\"params\":{\"_newUrl\":\"string - The new endpoint URL\"}}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"deactivateRelay()\":{\"notice\":\"Deactivate the caller's relay node, removing it from the active pool\"},\"getAllRelays()\":{\"notice\":\"Retrieve all registered relay nodes returns RelayNode[] - Array of all registered relay nodes\"},\"registerRelay(string)\":{\"notice\":\"Register a new relay node URL to the blockchain\"},\"updateRelayUrl(string)\":{\"notice\":\"Update the URL of an already-registered relay node\"}},\"notice\":\"Decentralized registry for storing and retrieving active relay node URLs\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/RelayRegistry.sol\":\"RelayRegistry\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/RelayRegistry.sol\":{\"keccak256\":\"0x29fdfe0f7f8331577a0b574e4e34f7607f5d57d5ccad35c7d540c89a00370bc8\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://11722f1e60ec39f82f7384ccdf5c2dd4702d535f80f1fa1e07e3fec38698a4c7\",\"dweb:/ipfs/QmUPfVeP3LMX5EzQye5CkQF5EzrPgvLj11JewoX4arr46P\"]}},\"version\":1}",
@@ -9340,8 +9337,7 @@
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-03-10T16:45:15.581Z",
-  "networkType": "ethereum",
+  "updatedAt": "2026-03-11T05:33:46.570Z",
   "devdoc": {
     "kind": "dev",
     "methods": {

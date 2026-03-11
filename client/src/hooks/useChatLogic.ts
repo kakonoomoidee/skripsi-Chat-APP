@@ -1,30 +1,44 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
 /**
- * Interface defining the properties required for the useChatLogic hook.
+ * Interface defining the dependencies required by the useChatLogic hook.
  */
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
-  ephemeralPublicKey: string | null;
+  ephemeralPublicKey: string | undefined;
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   hasSecret: (peerAddress: string) => boolean;
   relayUrl: string;
+  removeSecret: (addr: string) => void;
+  forceDisconnectPeer?: (addr: string) => void;
 }
 
+/**
+ * Interface representing an incoming handshake connection request.
+ */
 export interface HandshakeRequest {
   from: string;
   ephemeralPublicKey: string;
   username?: string;
 }
 
+/**
+ * Interface representing an active chat session.
+ */
 export interface ActiveSession {
   address: string;
   username: string;
 }
 
+/**
+ * Custom hook to manage chat sessions, handle peer discovery, and coordinate
+ * cryptographic handshakes via Socket.IO.
+ * * @param {UseChatLogicProps} props - Dependencies including socket instance and crypto functions.
+ * @returns {object} Chat session states and handler functions.
+ */
 export const useChatLogic = ({
   address,
   socket,
@@ -32,6 +46,8 @@ export const useChatLogic = ({
   computeSecret,
   hasSecret,
   relayUrl,
+  removeSecret,
+  forceDisconnectPeer,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
 
@@ -44,15 +60,39 @@ export const useChatLogic = ({
     [],
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
+
   const [initiators, setInitiators] = useState<Record<string, boolean>>({});
   const [searchError, setSearchError] = useState<string>("");
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
+  const activeChatRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeSessionsRef.current = activeSessions;
   }, [activeSessions]);
+
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  /**
+   * Closes the current active chat session and clears the active chat state.
+   * * @returns {void}
+   */
+  const closeChat = useCallback((): void => {
+    setActiveChat(null);
+    setActiveUsername("");
+    console.log("[Chat Logic] Active chat window closed.");
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeChat();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [closeChat]);
 
   useEffect(() => {
     setSearchError("");
@@ -75,24 +115,23 @@ export const useChatLogic = ({
       ephemeralPublicKey: string;
     }) => {
       const peerAddress = data.from.toLowerCase();
-
-      console.log("[Phase 3: ECDH Handshake - Offer Received from Peer]");
+      console.log(`[Handshake] Incoming offer received from: ${peerAddress}`);
 
       const existingSession = activeSessionsRef.current.find(
         (s) => s.address === peerAddress,
       );
 
       if (existingSession && ephemeralPublicKey) {
-        computeSecret(peerAddress, data.ephemeralPublicKey);
-
         console.log(
-          "[ECDH PROOF] Transmitting local Ephemeral Public Key to Peer...",
+          `[Handshake] Auto-accepting offer from known active session: ${peerAddress}`,
         );
+        if (forceDisconnectPeer) forceDisconnectPeer(peerAddress);
+
+        computeSecret(peerAddress, data.ephemeralPublicKey);
         socket.emit("handshake_response", {
           to: peerAddress,
           ephemeralPublicKey: ephemeralPublicKey,
         });
-
         setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
         return;
       }
@@ -101,8 +140,10 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
-      } catch {
-        console.error("Failed to fetch peer username");
+      } catch (err) {
+        console.warn(
+          `[Chat Logic] Failed to fetch username for incoming address: ${data.from}`,
+        );
       }
 
       setPendingRequests((prev) => {
@@ -115,7 +156,9 @@ export const useChatLogic = ({
       from: string;
       ephemeralPublicKey: string;
     }) => {
-      console.log("[Phase 3: ECDH Handshake - Answer Received from Peer]");
+      console.log(
+        `[Handshake] Answer received from: ${data.from}. Computing shared secret...`,
+      );
       computeSecret(data.from, data.ephemeralPublicKey);
     };
 
@@ -126,12 +169,26 @@ export const useChatLogic = ({
       socket.off("handshake_offer", onHandshakeOffer);
       socket.off("handshake_answer", onHandshakeAnswer);
     };
-  }, [socket, computeSecret, relayUrl, ephemeralPublicKey]);
+  }, [
+    socket,
+    computeSecret,
+    relayUrl,
+    ephemeralPublicKey,
+    forceDisconnectPeer,
+  ]);
 
+  /**
+   * Resolves a target username to an address and initiates a handshake request.
+   * * @returns {Promise<void>}
+   */
   const handleConnectPeer = async (): Promise<void> => {
     if (!targetUsername.trim()) return;
+
     setIsSearching(true);
     setSearchError("");
+    console.log(
+      `[Chat Logic] Attempting connection to username: ${targetUsername.trim()}`,
+    );
 
     try {
       const res = await axios.get(
@@ -140,6 +197,7 @@ export const useChatLogic = ({
       const peerAddress = res.data.address.toLowerCase();
 
       if (address && peerAddress === address.toLowerCase()) {
+        console.warn("[Chat Logic] User attempted self-connection. Blocked.");
         setSearchError("Cannot chat with yourself.");
         setIsSearching(false);
         return;
@@ -159,7 +217,7 @@ export const useChatLogic = ({
 
       if (!hasSecret(peerAddress) && socket) {
         console.log(
-          "[Phase 3: ECDH Handshake - Initiating Handshake with Peer]",
+          `[Handshake] Transmitting initial offer to: ${peerAddress}`,
         );
         socket.emit("handshake_init", {
           to: peerAddress,
@@ -167,25 +225,33 @@ export const useChatLogic = ({
         });
       }
       setTargetUsername("");
-    } catch {
+    } catch (err) {
+      console.error(
+        `[Chat Logic] Target user not found on network: ${targetUsername.trim()}`,
+      );
       setSearchError("Username not found on the network.");
     } finally {
       setIsSearching(false);
     }
   };
 
+  /**
+   * Accepts an incoming handshake request and computes the shared secret.
+   * * @param {HandshakeRequest} request - The pending handshake request object.
+   * @returns {Promise<void>}
+   */
   const handleAcceptRequest = async (
     request: HandshakeRequest,
   ): Promise<void> => {
+    console.log(
+      `[Handshake] Accepting connection request from: ${request.from}`,
+    );
     computeSecret(request.from, request.ephemeralPublicKey);
-    const peerAddress = request.from.toLowerCase();
 
+    const peerAddress = request.from.toLowerCase();
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
-      console.log(
-        "[ECDH PROOF] Transmitting local Ephemeral Public Key to Peer...",
-      );
       socket.emit("handshake_response", {
         to: request.from,
         ephemeralPublicKey: ephemeralPublicKey,
@@ -210,16 +276,58 @@ export const useChatLogic = ({
     setActiveUsername(finalUsername);
   };
 
+  /**
+   * Rejects and dismisses an incoming handshake request.
+   * * @param {string} requestAddress - The address of the peer to reject.
+   * @returns {void}
+   */
   const handleRejectRequest = (requestAddress: string): void => {
+    console.log(
+      `[Handshake] Rejected connection request from: ${requestAddress}`,
+    );
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),
     );
   };
 
+  /**
+   * Switches the active chat window to a different existing session.
+   * * @param {ActiveSession} session - The session to switch to.
+   * @returns {void}
+   */
   const switchChat = (session: ActiveSession): void => {
     setActiveChat(session.address);
     setActiveUsername(session.username);
   };
+
+  /**
+   * Completely removes a session from memory and clears its cryptographic secrets.
+   * * @param {string} peerAddress - The address of the peer to disconnect.
+   * @returns {void}
+   */
+  const removeActiveSession = useCallback(
+    (peerAddress: string): void => {
+      const addr = peerAddress.toLowerCase();
+      console.log(`[Chat Logic] Tearing down session and secrets for: ${addr}`);
+
+      setActiveSessions((prev) =>
+        prev.filter((s) => s.address.toLowerCase() !== addr),
+      );
+
+      setInitiators((prev) => {
+        const next = { ...prev };
+        delete next[addr];
+        return next;
+      });
+
+      removeSecret(addr);
+
+      if (activeChatRef.current?.toLowerCase() === addr) {
+        closeChat();
+      }
+    },
+    [closeChat, removeSecret],
+  );
 
   return {
     targetUsername,
@@ -230,6 +338,7 @@ export const useChatLogic = ({
     pendingRequests,
     activeSessions,
     switchChat,
+    closeChat,
     isSearching,
     initiators,
     handleConnectPeer,
@@ -238,5 +347,6 @@ export const useChatLogic = ({
     searchError,
     isPeerTyping,
     setIsPeerTyping,
+    removeActiveSession,
   };
 };

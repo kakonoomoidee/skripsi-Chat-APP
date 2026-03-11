@@ -1,7 +1,13 @@
-import { MenuIcon } from "../icons/index";
+import React from "react";
 import { useUIStore } from "@/store";
+import { MenuIcon, LockIcon } from "@/components/icons";
 
-export const EmptyChatState = () => {
+/**
+ * Renders the placeholder view when no active chat session is selected.
+ *
+ * @returns {React.JSX.Element} The empty state UI.
+ */
+export const EmptyChatState = (): React.JSX.Element => {
   const { setIsMobileSidebarOpen } = useUIStore();
 
   return (
@@ -15,21 +21,10 @@ export const EmptyChatState = () => {
         </button>
         <p className="text-zinc-600 text-sm font-medium">Select a Chat</p>
       </div>
+
       <div className="flex-1 min-h-0 p-8 overflow-y-auto custom-scrollbar flex items-center justify-center flex-col text-zinc-600">
         <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-inner">
-          <svg
-            className="w-8 h-8 text-zinc-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
+          <LockIcon className="w-8 h-8 text-zinc-500" />
         </div>
         <p className="font-medium text-lg text-zinc-300 mb-1">
           Zero Data Retention Area

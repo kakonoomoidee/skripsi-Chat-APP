@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useUIStore } from "@/store";
-import { SendIcon } from "../icons/index";
+import { SendIcon, XIcon, RefreshIcon, CameraIcon } from "@/components/icons";
 
 /**
  * Fullscreen camera modal component with capture and preview functionality.
- * @param {Object} props - Component properties.
- * @param {Function} props.onClose - Trigger modal closure.
- * @param {Function} props.onSend - Process the captured base64 image.
- * @returns {JSX.Element} The React Portal interface.
+ *
+ * @param {object} props - Component properties.
+ * @param {() => void} props.onClose - Trigger modal closure.
+ * @param {(b64: string) => void} props.onSend - Process the captured base64 image.
+ * @returns {React.JSX.Element} The React Portal interface.
  */
 export const CameraModal = ({
   onClose,
@@ -16,7 +17,7 @@ export const CameraModal = ({
 }: {
   onClose: () => void;
   onSend: (b64: string) => void;
-}) => {
+}): React.JSX.Element => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -28,12 +29,13 @@ export const CameraModal = ({
   const { showToast } = useUIStore();
 
   /**
-   * Initializes the camera stream with the specified facing mode.
+   * Initializes the device camera stream with the specified facing mode.
+   *
    * @param {"user" | "environment"} mode - Camera facing mode.
    * @returns {Promise<void>}
    */
   const initCamera = useCallback(
-    async (mode: "user" | "environment") => {
+    async (mode: "user" | "environment"): Promise<void> => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -74,7 +76,8 @@ export const CameraModal = ({
   }, [facingMode, initCamera]);
 
   /**
-   * Toggles between front and rear device cameras.
+   * Toggles the stream between the front and rear device cameras.
+   *
    * @returns {void}
    */
   const handleSwitchCamera = (): void => {
@@ -82,7 +85,8 @@ export const CameraModal = ({
   };
 
   /**
-   * Captures the current frame from the video stream onto a 2D canvas.
+   * Captures the current frame from the live video stream onto a 2D canvas and converts it to base64.
+   *
    * @returns {void}
    */
   const capture = (): void => {
@@ -112,19 +116,7 @@ export const CameraModal = ({
           onClick={onClose}
           className="text-white p-2 hover:bg-white/10 rounded-full transition-colors"
         >
-          <svg
-            className="w-7 h-7 drop-shadow-md"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <XIcon className="w-7 h-7 drop-shadow-md" />
         </button>
 
         {!photo && hasMultipleCameras && (
@@ -132,19 +124,7 @@ export const CameraModal = ({
             onClick={handleSwitchCamera}
             className="text-white p-2 hover:bg-white/10 rounded-full transition-colors"
           >
-            <svg
-              className="w-7 h-7 drop-shadow-md"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RefreshIcon className="w-7 h-7 drop-shadow-md" />
           </button>
         )}
       </div>
@@ -162,7 +142,7 @@ export const CameraModal = ({
         ) : (
           <img
             src={photo}
-            alt="Captured"
+            alt="Captured preview"
             className="w-full h-full object-contain"
           />
         )}
@@ -176,25 +156,7 @@ export const CameraModal = ({
             className="w-19 h-19 rounded-full border-4 border-white/80 flex items-center justify-center hover:scale-95 transition-all group shadow-2xl"
           >
             <div className="w-14.5 h-14.5 bg-white rounded-full flex items-center justify-center group-hover:bg-zinc-200 transition-colors">
-              <svg
-                className="w-8 h-8 text-zinc-900"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+              <CameraIcon className="w-8 h-8 text-zinc-900" />
             </div>
           </button>
         ) : (
@@ -203,25 +165,13 @@ export const CameraModal = ({
               onClick={() => setPhoto(null)}
               className="absolute left-4 md:left-12 flex items-center gap-2 text-white font-medium hover:text-zinc-300 py-2 px-4 rounded-xl hover:bg-white/10 transition-colors"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <RefreshIcon className="w-5 h-5" />
               Retake
             </button>
 
             <button
               onClick={() => {
-                onSend(photo);
+                if (photo) onSend(photo);
                 onClose();
               }}
               className="bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/30 hover:scale-105 z-10"

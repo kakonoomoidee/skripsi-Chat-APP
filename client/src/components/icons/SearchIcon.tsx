@@ -1,12 +1,12 @@
 import React from "react";
 
 /**
- * Renders a lock icon.
- * @param {object} props - The component props.
+ * Renders a magnifying glass search icon.
+ * @param {object} props - Component props.
  * @param {string} [props.className] - Optional CSS classes.
- * @returns {React.JSX.Element} The SVG element.
+ * @returns {React.JSX.Element}
  */
-export const LockIcon = ({
+export const SearchIcon = ({
   className,
 }: {
   className?: string;
@@ -21,8 +21,8 @@ export const LockIcon = ({
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+      strokeWidth={2}
+      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
     />
   </svg>
 );

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { shortenAddress } from "@/utils/format";
 
+/**
+ * Interface defining the properties for the ProfileSection component.
+ */
 export interface ProfileSectionProps {
   myUsername: string;
   address: string | null;
@@ -8,19 +11,25 @@ export interface ProfileSectionProps {
 }
 
 /**
- * 1. Profile Section Component
  * Displays the user's local identity, username, and real-time relay connection status.
- * @param {ProfileSectionProps} props - The profile data and connection state
- * @returns {JSX.Element}
+ * Includes a utility to copy the public key to the clipboard.
+ *
+ * @param {ProfileSectionProps} props - The profile data and connection state.
+ * @returns {React.JSX.Element} The rendered profile section UI.
  */
 export default function ProfileSection({
   myUsername,
   address,
   isConnected,
-}: ProfileSectionProps) {
+}: ProfileSectionProps): React.JSX.Element {
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
-  const handleCopyAddress = () => {
+  /**
+   * Copies the user's wallet address to the system clipboard.
+   *
+   * @returns {void}
+   */
+  const handleCopyAddress = (): void => {
     if (!address) return;
     navigator.clipboard.writeText(address);
     setIsCopied(true);

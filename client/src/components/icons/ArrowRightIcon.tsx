@@ -1,12 +1,12 @@
 import React from "react";
 
 /**
- * Renders a lock icon.
- * @param {object} props - The component props.
+ * Renders a right-pointing arrow icon.
+ * @param {object} props - Component props.
  * @param {string} [props.className] - Optional CSS classes.
- * @returns {React.JSX.Element} The SVG element.
+ * @returns {React.JSX.Element}
  */
-export const LockIcon = ({
+export const ArrowRightIcon = ({
   className,
 }: {
   className?: string;
@@ -21,8 +21,8 @@ export const LockIcon = ({
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+      strokeWidth={2}
+      d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
     />
   </svg>
 );

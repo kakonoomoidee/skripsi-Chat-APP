@@ -1,10 +1,17 @@
+import React from "react";
 import { useChatContext } from "@/context/ChatContext";
-import { MenuIcon, PhoneIcon } from "../icons/index";
+import { MenuIcon, PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
 import { InCallModal } from "./InCallModal";
 
-export const ChatHeader = () => {
+/**
+ * Renders the header section of the active chat interface.
+ * Displays peer information, connection status, typing indicators, and call controls.
+ *
+ * @returns {React.JSX.Element} The chat header UI component.
+ */
+export const ChatHeader = (): React.JSX.Element => {
   const { activeUsername, isWebRTCConnected, isPeerTyping, initiateCall } =
     useChatContext();
   const { setIsMobileSidebarOpen } = useUIStore();

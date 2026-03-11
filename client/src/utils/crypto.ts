@@ -2,11 +2,15 @@ import { ethers } from "ethers";
 import CryptoJS from "crypto-js";
 
 /**
- * 1. Generate pair Ephemeral Keys
- * @returns {object} { privateKey, publicKey, signingKey }
+ * Generates a new pair of ephemeral cryptographic keys using standard secp256k1.
+ * @returns {{ privateKey: string, publicKey: string, signingKey: ethers.SigningKey }} The ephemeral key pair.
  */
 export const generateEphemeralKeys = () => {
+  console.log(
+    "[Crypto Engine] Generating new ephemeral key pair (secp256k1)...",
+  );
   const wallet = ethers.Wallet.createRandom();
+
   return {
     privateKey: wallet.privateKey,
     publicKey: wallet.publicKey,
@@ -15,53 +19,77 @@ export const generateEphemeralKeys = () => {
 };
 
 /**
- * 2. Count Shared Secret (ECDH)
- * compute between my private key with peer's public key, then hash the result to get a fixed-length AES key
+ * Computes the Shared Secret using Elliptic Curve Diffie-Hellman (ECDH) and hashes it.
+ * @param {ethers.SigningKey} mySigningKey - The local ephemeral private signing key.
+ * @param {string} peerPublicKey - The peer's ephemeral public key.
+ * @returns {string | null} The SHA-256 hashed shared secret for AES encryption, or null if computation fails.
  */
 export const deriveSharedSecret = (
   mySigningKey: ethers.SigningKey,
   peerPublicKey: string,
 ): string | null => {
   try {
+    console.log("[Crypto Engine] Computing ECDH shared secret...");
     const rawSecret = mySigningKey.computeSharedSecret(peerPublicKey);
+    console.log(`[Crypto Engine] Raw shared secret: ${rawSecret}`);
 
     const aesKey = ethers.sha256(rawSecret);
+    console.log(
+      `[Crypto Engine] ECDH computation and SHA-256 hashing successful. Derived AES key ready for use : ${aesKey}`,
+    );
+
     return aesKey;
   } catch (error: unknown) {
-    console.error("ECDH Calculation Failed:", error);
+    console.error("[Crypto Engine Error] ECDH Calculation Failed:", error);
     return null;
   }
 };
 
 /**
- * 3. encrypt message with AES using the derived secret key
+ * Encrypts a plaintext string using AES-256 symmetric encryption.
+ * @param {string} plainText - The message to encrypt.
+ * @param {string} secretKey - The symmetric AES key (derived shared secret).
+ * @returns {string | null} The encrypted ciphertext, or null if inputs are invalid.
  */
 export const encryptMessage = (
   plainText: string,
   secretKey: string,
 ): string | null => {
   if (!plainText || !secretKey) return null;
+
   const encrypted = CryptoJS.AES.encrypt(plainText, secretKey).toString();
   return encrypted;
 };
 
 /**
- * 4. decrypt message with AES using the derived secret key
+ * Decrypts an AES-256 encrypted ciphertext back to plaintext.
+ * @param {string} cipherText - The encrypted message.
+ * @param {string} secretKey - The symmetric AES key (derived shared secret).
+ * @returns {string} The decrypted plaintext, or an error placeholder if decryption fails.
  */
 export const decryptMessage = (
   cipherText: string,
   secretKey: string,
 ): string => {
-  if (!cipherText || !secretKey) return "[ERROR]";
+  if (!cipherText || !secretKey) return "[ERROR_INVALID_INPUT]";
+
   try {
     const bytes = CryptoJS.AES.decrypt(cipherText, secretKey);
     const originalText = bytes.toString(CryptoJS.enc.Utf8);
 
-    if (!originalText) return "[DECRYPTION FAILED]";
+    if (!originalText) {
+      console.warn(
+        "[Crypto Engine Warning] Decryption yielded empty string. Possible wrong key or corrupted ciphertext.",
+      );
+      return "[DECRYPTION_FAILED]";
+    }
 
     return originalText;
   } catch (error: unknown) {
-    console.error("Decryption Failed:", error);
-    return "[ERROR]";
+    console.error(
+      "[Crypto Engine Error] Decryption process threw an error:",
+      error,
+    );
+    return "[ERROR_DECRYPTION_EXCEPTION]";
   }
 };

@@ -1,8 +1,8 @@
 import Dexie, { Table } from "dexie";
 
 /**
- * Represents a single chat message entity in the database.
- * @interface Message
+ * Interface representing a single encrypted chat message entity.
+ * Stored locally in the browser's IndexedDB.
  */
 export interface Message {
   id?: number;
@@ -15,8 +15,7 @@ export interface Message {
 }
 
 /**
- * Represents a custom relay server node.
- * @interface RelayNode
+ * Interface representing a custom decentralized relay server node.
  */
 export interface RelayNode {
   id?: number;
@@ -25,9 +24,8 @@ export interface RelayNode {
 }
 
 /**
- * Database class for SecureP2P Chat leveraging Dexie.js.
- * @class SecureP2PDatabase
- * @extends {Dexie}
+ * Database class managing local data persistence using Dexie.js over IndexedDB.
+ * Responsible for handling offline storage of encrypted messages and custom relay configurations.
  */
 export class SecureP2PDatabase extends Dexie {
   messages!: Table<Message, number>;
@@ -35,6 +33,8 @@ export class SecureP2PDatabase extends Dexie {
 
   constructor() {
     super("SecureP2PChatDB");
+
+    console.log("[IndexedDB Manager] Initializing local database schema...");
 
     this.version(2).stores({
       messages: "++id, [ownerAddress+chatId], timestamp",
@@ -44,6 +44,6 @@ export class SecureP2PDatabase extends Dexie {
 }
 
 /**
- * Singleton instance of the SecureP2P database.
+ * Singleton instance of the application's local database.
  */
 export const db = new SecureP2PDatabase();

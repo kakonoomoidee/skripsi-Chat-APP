@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
@@ -6,13 +6,28 @@ import { useUIStore } from "@/store";
 import RelaySelector from "./RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
-import { LockSessionIcon } from "@/components/icons";
+import {
+  LockSessionIcon,
+  SearchIcon,
+  WarningIcon,
+  GhostIcon,
+  ArrowRightIcon,
+} from "@/components/icons";
 
 /**
- * Main sidebar component for navigation and settings.
- * @returns {JSX.Element}
+ * Interface for contact history.
  */
-export default function Sidebar() {
+interface ContactHistory {
+  username: string;
+  address: string;
+}
+
+/**
+ * Main sidebar component for navigation, displaying active sessions, pending requests, and settings.
+ *
+ * @returns {React.JSX.Element} The sidebar UI.
+ */
+export default function Sidebar(): React.JSX.Element {
   const {
     myUsername,
     address,
@@ -42,7 +57,7 @@ export default function Sidebar() {
     "chats",
   );
 
-  const [recentContacts, setRecentContacts] = useState<any[]>(() => {
+  const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
       const saved = localStorage.getItem("securep2p_recent_contacts");
       return saved ? JSON.parse(saved) : [];
@@ -53,9 +68,6 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (activeSessions.length > 0) {
-      // Merging active sessions into recent contacts history requires a direct
-      // setState here (synchronizing derived state from props is an accepted pattern).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecentContacts((prev) => {
         const updated = [...prev];
         let isChanged = false;
@@ -82,7 +94,7 @@ export default function Sidebar() {
     }
   }, [activeSessions]);
 
-  const clearHistory = () => {
+  const clearHistory = (): void => {
     localStorage.removeItem("securep2p_recent_contacts");
     setRecentContacts([]);
   };
@@ -96,7 +108,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <div className="w-80 bg-zinc-950/90 flex flex-col border-r border-zinc-800 backdrop-blur-xl h-full">
+      <div className="w-full h-full flex flex-col bg-zinc-950/90 backdrop-blur-xl">
         <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50 shrink-0">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <LockSessionIcon className="w-5 h-5 text-white" />
@@ -109,13 +121,21 @@ export default function Sidebar() {
         <div className="flex px-4 pt-4 gap-1 border-b border-zinc-800/50 shrink-0">
           <button
             onClick={() => setActiveTab("chats")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${activeTab === "chats" ? "text-indigo-400 border-b-2 border-indigo-500" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
+              activeTab === "chats"
+                ? "text-indigo-400 border-b-2 border-indigo-500"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
           >
             Chats
           </button>
           <button
             onClick={() => setActiveTab("requests")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors flex justify-center items-center gap-1.5 ${activeTab === "requests" ? "text-amber-400 border-b-2 border-amber-500" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors flex justify-center items-center gap-1.5 ${
+              activeTab === "requests"
+                ? "text-amber-400 border-b-2 border-amber-500"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
           >
             Requests
             {pendingRequests.length > 0 && (
@@ -126,7 +146,11 @@ export default function Sidebar() {
           </button>
           <button
             onClick={() => setActiveTab("settings")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${activeTab === "settings" ? "text-zinc-100 border-b-2 border-zinc-300" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
+              activeTab === "settings"
+                ? "text-zinc-100 border-b-2 border-zinc-300"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
           >
             Settings
           </button>
@@ -136,19 +160,7 @@ export default function Sidebar() {
           {activeTab === "chats" && (
             <div className="p-4 flex flex-col h-full">
               <div className="relative mb-4 group shrink-0">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
                 <input
                   type="text"
                   placeholder="Search or start new chat..."
@@ -169,37 +181,13 @@ export default function Sidebar() {
 
                   {isSelfChat ? (
                     <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
+                      <WarningIcon className="w-4 h-4" />
                       Cannot handshake yourself
                     </div>
                   ) : searchError ? (
                     <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-lg flex flex-col items-center justify-center gap-1">
                       <div className="flex items-center gap-1.5">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
+                        <WarningIcon className="w-3.5 h-3.5" />
                         {searchError}
                       </div>
                       <span className="text-[10px] opacity-70">
@@ -230,7 +218,11 @@ export default function Sidebar() {
                   <div
                     key={session.address}
                     onClick={() => switchChat(session)}
-                    className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between group ${activeChat === session.address ? "bg-indigo-600/10 border border-indigo-500/30" : "hover:bg-zinc-900 border border-transparent"}`}
+                    className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between group ${
+                      activeChat === session.address
+                        ? "bg-indigo-600/10 border border-indigo-500/30"
+                        : "hover:bg-zinc-900 border border-transparent"
+                    }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold group-hover:bg-zinc-700 transition-colors">
@@ -246,7 +238,11 @@ export default function Sidebar() {
                       </div>
                     </div>
                     <div
-                      className={`w-2 h-2 rounded-full ${connectedPeers.includes(session.address.toLowerCase()) ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]" : "bg-amber-500 animate-pulse"}`}
+                      className={`w-2 h-2 rounded-full ${
+                        connectedPeers.includes(session.address.toLowerCase())
+                          ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
+                          : "bg-amber-500 animate-pulse"
+                      }`}
                     ></div>
                   </div>
                 ))}
@@ -297,19 +293,7 @@ export default function Sidebar() {
                                   </p>
                                 </div>
                               </div>
-                              <svg
-                                className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-                                />
-                              </svg>
+                              <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
                             </div>
                           ))}
                       </div>
@@ -320,19 +304,7 @@ export default function Sidebar() {
                   recentContacts.length === 0 &&
                   !targetUsername && (
                     <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 mt-10">
-                      <svg
-                        className="w-8 h-8 opacity-20"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                        />
-                      </svg>
+                      <GhostIcon className="w-8 h-8 opacity-20" />
                       <p className="text-xs">No active sessions or history.</p>
                     </div>
                   )}
@@ -392,7 +364,6 @@ export default function Sidebar() {
                 isConnected={isConnected}
               />
 
-              {/* REFACTORED: Layout Order Adjusted via Props Injection */}
               <SecuritySection
                 nodeSelector={
                   <RelaySelector
