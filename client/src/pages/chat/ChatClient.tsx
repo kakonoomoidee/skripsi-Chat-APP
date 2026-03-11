@@ -1,15 +1,29 @@
+import React from "react";
 import { Sidebar } from "@/components/shared";
 import { ChatArea } from "@/components/chat";
-import { ChatProvider } from "@/context/ChatContext";
+import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 /**
  * Responsive Layout Wrapper
  * Controls the sliding drawer sidebar and background overlay for mobile devices.
- * @returns {JSX.Element}
+ * Automatically enforces session timeout due to inactivity.
+ *
+ * @returns {React.JSX.Element} The chat interface layout.
  */
-const ChatLayout = () => {
-  const { isMobileSidebarOpen, setIsMobileSidebarOpen } = useUIStore();
+const ChatLayout = (): React.JSX.Element => {
+  const { isMobileSidebarOpen, setIsMobileSidebarOpen, showToast } =
+    useUIStore();
+  const { logout } = useChatContext();
+
+  useSessionTimeout(() => {
+    logout();
+    showToast(
+      "Session expired due to inactivity. Please login again.",
+      "error",
+    );
+  }, 3600000);
 
   return (
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30 overflow-hidden relative w-full">
@@ -37,10 +51,11 @@ const ChatLayout = () => {
 
 /**
  * Main Chat Client View
- * Minimalist container injecting the global provider.
- * @returns {JSX.Element}
+ * Minimalist container injecting the global context provider.
+ *
+ * @returns {React.JSX.Element} The root chat application view.
  */
-export default function ChatDashboard() {
+export default function ChatDashboard(): React.JSX.Element {
   return (
     <ChatProvider>
       <ChatLayout />
