@@ -19,20 +19,31 @@ declare global {
 }
 
 /**
- * Interface for Security Section props
+ * Interface defining the properties for the SecuritySection component.
  */
 export interface SecuritySectionProps {
   nodeSelector?: React.ReactNode;
 }
 
 /**
- * Renders the settings sidebar section, handling Web3 wallet binding, data imports/exports.
- * @param {SecuritySectionProps} props - Allows injecting components like RelaySelector into the layout order.
- * @returns {JSX.Element}
+ * Interface representing the fetched state of a connected Web3 wallet.
+ */
+interface WalletDetails {
+  balance: string;
+  network: string;
+  chainId: string;
+}
+
+/**
+ * Renders the settings sidebar section dedicated to data security and cryptographic bindings.
+ * Handles Web3 wallet connections, auto-delete policies, and local data import/export/wipe operations.
+ *
+ * @param {SecuritySectionProps} props - Component properties, allowing injection of layout-specific nodes.
+ * @returns {React.JSX.Element} The security configuration UI.
  */
 export default function SecuritySection({
   nodeSelector,
-}: SecuritySectionProps) {
+}: SecuritySectionProps): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +59,7 @@ export default function SecuritySection({
     setSeedInput,
     modalError,
     submitSeedModal,
-    showToast, // Ambil fungsi showToast dari hook
+    showToast,
   } = useSecurityHandlers();
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -58,12 +69,10 @@ export default function SecuritySection({
   const [showBackupInfo, setShowBackupInfo] = useState<boolean>(false);
 
   const [metaMaskAddress, setMetaMaskAddress] = useState<string | null>(null);
-  const [walletDetails, setWalletDetails] = useState<{
-    balance: string;
-    network: string;
-    chainId: string;
-  } | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(
+    null,
+  );
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
 
   const deleteOptions = [
     { value: "never", label: "Auto-Delete: Never" },
@@ -74,7 +83,6 @@ export default function SecuritySection({
     { value: "close", label: "Burn on Close (Incognito)" },
   ];
 
-  // Identifikasi mode incognito
   const isIncognito = autoDeleteMode === "close";
 
   useEffect(() => {
@@ -99,7 +107,13 @@ export default function SecuritySection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchWalletDetails = async (address: string) => {
+  /**
+   * Retrieves the current balance and network information for a connected wallet address.
+   *
+   * @param {string} address - The public Ethereum address to query.
+   * @returns {Promise<void>}
+   */
+  const fetchWalletDetails = async (address: string): Promise<void> => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const network = await provider.getNetwork();
@@ -110,10 +124,17 @@ export default function SecuritySection({
         network: network.name === "unknown" ? "Localhost" : network.name,
         chainId: network.chainId.toString(),
       });
-    } catch { /* ignore */ }
+    } catch {
+      // Gracefully ignore fetch errors
+    }
   };
 
-  const handleConnectMetaMask = async () => {
+  /**
+   * Initiates the MetaMask connection flow via the injected window.ethereum provider.
+   *
+   * @returns {Promise<void>}
+   */
+  const handleConnectMetaMask = async (): Promise<void> => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed. Please install the extension.");
       return;
@@ -133,12 +154,19 @@ export default function SecuritySection({
         localStorage.setItem("linked_metamask", linkedAddress);
         await fetchWalletDetails(linkedAddress);
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      // Gracefully ignore connection cancellation or errors
+    } finally {
       setIsConnecting(false);
     }
   };
 
-  const handleDisconnectWallet = () => {
+  /**
+   * Clears the currently linked wallet address from local state and storage.
+   *
+   * @returns {void}
+   */
+  const handleDisconnectWallet = (): void => {
     setMetaMaskAddress(null);
     setWalletDetails(null);
     localStorage.removeItem("linked_metamask");
@@ -151,7 +179,6 @@ export default function SecuritySection({
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
-        {/* 1. WALLET SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -240,10 +267,8 @@ export default function SecuritySection({
           )}
         </div>
 
-        {/* 2. NETWORK NODE SECTION (Injected via Props to control order) */}
         {nodeSelector && <div>{nodeSelector}</div>}
 
-        {/* 3. AUTO DELETE SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -302,7 +327,6 @@ export default function SecuritySection({
           </div>
         </div>
 
-        {/* 4. DATA BACKUP SECTION */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -328,7 +352,6 @@ export default function SecuritySection({
             )}
           </div>
           <div className="flex gap-2">
-            {/* REFACTORED: Validasi Disabled UI untuk Tombol Import */}
             <button
               type="button"
               onClick={() => {
@@ -362,7 +385,6 @@ export default function SecuritySection({
           />
         </div>
 
-        {/* 5. WIPE SECTION */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
             onClick={handleWipeData}
@@ -373,7 +395,6 @@ export default function SecuritySection({
         </div>
       </div>
 
-      {/* GLOBAL SEED MODAL FOR EXPORT, IMPORT, AND WIPE */}
       {seedModal.isOpen &&
         typeof document !== "undefined" &&
         createPortal(

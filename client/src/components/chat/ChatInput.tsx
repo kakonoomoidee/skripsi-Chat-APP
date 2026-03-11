@@ -10,36 +10,44 @@ import {
   DocumentIcon,
   CameraIcon,
   GalleryIcon,
-} from "../icons/index";
+} from "@/components/icons";
 import { CameraModal } from "./CameraModal";
 
+/**
+ * Interface defining the properties for the ChatInput component.
+ */
 export interface ChatInputProps {
   onOpenTransferModal: () => void;
 }
 
 /**
- * Checks file signature to prevent executable uploads hidden with safe extensions.
- * @param {File} file - The file to evaluate.
- * @returns {Promise<boolean>} Evaluation status.
+ * Evaluates the magic numbers (file signature) of an uploaded file to ensure it matches
+ * its declared MIME type, preventing disguised malicious executables from being transmitted.
+ *
+ * @param {File} file - The raw file object selected by the user.
+ * @returns {Promise<boolean>} Resolves to true if the file signature matches known safe formats.
  */
 const isFileSignatureSafe = (file: File): Promise<boolean> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = (e) => {
       if (!e.target || !e.target.result) return resolve(false);
+
       const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 4);
       let header = "";
       for (let i = 0; i < arr.length; i++) {
         header += arr[i].toString(16);
       }
+
       const safeHeaders = [
-        "25504446",
-        "504b34",
-        "89504e47",
-        "ffd8ffe0",
-        "ffd8ffe1",
-        "ffd8ffe2",
+        "25504446", // PDF
+        "504b34", // ZIP/DOCX/XLSX
+        "89504e47", // PNG
+        "ffd8ffe0", // JPEG
+        "ffd8ffe1", // JPEG EXIF
+        "ffd8ffe2", // JPEG EXIF
       ];
+
       const isSafe = safeHeaders.some((h) =>
         header.toLowerCase().startsWith(h),
       );
@@ -50,7 +58,8 @@ const isFileSignatureSafe = (file: File): Promise<boolean> => {
 };
 
 /**
- * Formats duration time string.
+ * Formats a raw time duration in seconds into a standard MM:SS string representation.
+ *
  * @param {number} time - Duration in seconds.
  * @returns {string} Formatted MM:SS string.
  */
@@ -60,7 +69,16 @@ const formatDuration = (time: number): string => {
   return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 };
 
-export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
+/**
+ * Renders the main input console for the chat interface, handling text input,
+ * media recording, file attachments, and cryptocurrency transfer initialization.
+ *
+ * @param {ChatInputProps} props - Component properties.
+ * @returns {React.JSX.Element} The Chat Input UI.
+ */
+export const ChatInput = ({
+  onOpenTransferModal,
+}: ChatInputProps): React.JSX.Element => {
   const {
     isWebRTCConnected,
     handleSendMessage,
@@ -81,13 +99,11 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-
-  // --- STATE BARU: Cek ketersediaan MetaMask ---
-  const [hasLinkedWallet, setHasLinkedWallet] = useState(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [recordingTime, setRecordingTime] = useState<number>(0);
+  const [showAttachMenu, setShowAttachMenu] = useState<boolean>(false);
+  const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
+  const [hasLinkedWallet, setHasLinkedWallet] = useState<boolean>(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -99,16 +115,14 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   const animationFrameRef = useRef<number>(0);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
 
-  // --- EFFECT BARU: Mantau localStorage secara real-time ---
   useEffect(() => {
     const checkWallet = () => {
       setHasLinkedWallet(!!localStorage.getItem("linked_metamask"));
     };
 
-    checkWallet(); // Cek saat komponen dimuat pertama kali
-    window.addEventListener("storage", checkWallet); // Cek kalau ada perubahan storage antar tab
+    checkWallet();
+    window.addEventListener("storage", checkWallet);
 
-    // Interval reaktif buat nangkep perubahan kalau diset di tab/halaman yang sama
     const interval = setInterval(checkWallet, 1500);
 
     return () => {
@@ -160,8 +174,9 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   }, [replyingTo]);
 
   /**
-   * Key down event manager.
-   * @param {React.KeyboardEvent<HTMLTextAreaElement>} e - Event object.
+   * Intercepts keyboard events within the text area, triggering message transmission on 'Enter'.
+   *
+   * @param {React.KeyboardEvent<HTMLTextAreaElement>} e - The keyboard event object.
    * @returns {void}
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -174,7 +189,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Resets all media recorder processes.
+   * Safely terminates all active media streams, audio contexts, and visualizers.
+   *
    * @returns {void}
    */
   const stopAllMedia = (): void => {
@@ -198,7 +214,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Initializes real time audio visualization element.
+   * Continuously samples audio frequency data and updates the real-time visualizer UI.
+   *
    * @returns {void}
    */
   const drawVisualizer = (): void => {
@@ -222,7 +239,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Initializes audio context and media stream API access.
+   * Requests microphone access, initializes the AudioContext, and begins recording a voice note.
+   *
    * @returns {Promise<void>}
    */
   const startRecording = async (): Promise<void> => {
@@ -235,6 +253,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
       )();
       const analyser = audioCtx.createAnalyser();
       const source = audioCtx.createMediaStreamSource(stream);
+
       source.connect(analyser);
       analyser.fftSize = 128;
       audioCtxRef.current = audioCtx;
@@ -262,7 +281,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Completes the capture sequence and dispatches file.
+   * Finalizes the active recording session and dispatches the compiled WebM audio blob.
+   *
    * @returns {void}
    */
   const sendRecording = (): void => {
@@ -279,7 +299,8 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Terminates active captures safely.
+   * Aborts the active recording session without saving or transmitting the data.
+   *
    * @returns {void}
    */
   const cancelRecording = (): void => {
@@ -290,8 +311,10 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
   };
 
   /**
-   * Processes valid and safe document assignments.
-   * @param {React.ChangeEvent<HTMLInputElement>} e - Upload event payload.
+   * Evaluates and processes an attached document file before transmission.
+   * Enforces size limits and signature verification.
+   *
+   * @param {React.ChangeEvent<HTMLInputElement>} e - The file input change event.
    * @returns {Promise<void>}
    */
   const handleDocumentUpload = async (
@@ -350,19 +373,7 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
                 onClick={() => setReplyingTo(null)}
                 className="text-zinc-500 hover:text-red-400 p-1 bg-zinc-800/50 hover:bg-zinc-800 rounded-full transition-colors"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <TrashIcon className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -399,7 +410,6 @@ export const ChatInput = ({ onOpenTransferModal }: ChatInputProps) => {
             >
               {!isRecording && (
                 <div className="relative flex items-center">
-                  {/* --- LOGIKA BARU: TOMBOL CRYPTO CUMA MUNCUL KALAU METAMASK UDAH DI-LINK --- */}
                   {hasLinkedWallet && (
                     <button
                       type="button"

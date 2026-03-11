@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { ChatHeader } from "./ChatHeader";
 import { EmptyChatState } from "./EmptyChatState";
@@ -7,12 +7,24 @@ import { ChatInput } from "./ChatInput";
 import { TransferModal } from "./TransferModal";
 import { useUIStore } from "@/store";
 
-export default function ChatArea() {
+/**
+ * Main chat area container orchestrating the header, message list, input, and modals.
+ * Conditionally renders the empty state if no active chat session is selected.
+ *
+ * @returns {React.JSX.Element} The composed chat area interface.
+ */
+export default function ChatArea(): React.JSX.Element {
   const { activeChat, requestPeerWallet } = useChatContext();
   const { showToast } = useUIStore();
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] =
+    useState<boolean>(false);
 
-  const handleOpenTransferModal = () => {
+  /**
+   * Validates MetaMask linkage and initiates the peer wallet address request via WebRTC.
+   *
+   * @returns {void}
+   */
+  const handleOpenTransferModal = (): void => {
     if (!localStorage.getItem("linked_metamask")) {
       showToast(
         "Please link your MetaMask wallet in Security Settings first.",

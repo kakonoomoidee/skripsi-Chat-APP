@@ -1,14 +1,29 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useChatContext } from "@/context/ChatContext";
+import { PhoneIcon, MicIcon, MicOffIcon } from "@/components/icons";
+
+/**
+ * Formats elapsed seconds into MM:SS notation.
+ *
+ * @param {number} secs - Total elapsed seconds.
+ * @returns {string} Formatted time string.
+ */
+const formatTime = (secs: number): string => {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
 
 /**
  * Renders a full-screen overlay for active voice calls.
- * @returns {JSX.Element | null} The active call UI overlay.
+ * Displays call duration and controls for muting or ending the session.
+ *
+ * @returns {React.JSX.Element | null} The active call UI overlay, or null if not in a call.
  */
-export const InCallModal = () => {
+export const InCallModal = (): React.JSX.Element | null => {
   const { isInCall, activeUsername, endCall, toggleMute, isMuted } =
     useChatContext();
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState<number>(0);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -22,17 +37,6 @@ export const InCallModal = () => {
   }, [isInCall]);
 
   if (!isInCall) return null;
-
-  /**
-   * Formats elapsed seconds into MM:SS notation.
-   * @param {number} secs - Total elapsed seconds.
-   * @returns {string} Formatted time string.
-   */
-  const formatTime = (secs: number): string => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
 
   return (
     <div className="fixed inset-0 z-99999 bg-zinc-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in duration-300">
@@ -60,41 +64,9 @@ export const InCallModal = () => {
           }`}
         >
           {isMuted ? (
-            <svg
-              className="w-7 h-7"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-              />
-              <line
-                x1="4"
-                y1="4"
-                x2="20"
-                y2="20"
-                strokeWidth={2}
-                strokeLinecap="round"
-              />
-            </svg>
+            <MicOffIcon className="w-7 h-7" />
           ) : (
-            <svg
-              className="w-7 h-7"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-              />
-            </svg>
+            <MicIcon className="w-7 h-7" />
           )}
         </button>
 
@@ -102,19 +74,7 @@ export const InCallModal = () => {
           onClick={endCall}
           className="w-20 h-20 rounded-full bg-red-600 text-white hover:bg-red-500 hover:scale-105 flex items-center justify-center transition-all shadow-xl shadow-red-600/30"
         >
-          <svg
-            className="w-10 h-10 rotate-135"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-            />
-          </svg>
+          <PhoneIcon className="w-10 h-10 rotate-135" />
         </button>
       </div>
     </div>

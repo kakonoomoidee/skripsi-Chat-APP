@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { InfoIcon, ChevronDownIcon } from "@/components/icons";
 
 /**
  * Interface defining the props for the RelaySelector component.
@@ -9,16 +10,23 @@ export interface RelaySelectorProps {
   defaultRelays: string[];
   changeRelay: (url: string) => void;
   addCustomRelay: (url: string) => Promise<void>;
-  size?: "sm" | "md"; // REFACTORED: Added size prop for layout flexibility
+  size?: "sm" | "md";
 }
 
+/**
+ * Component for selecting or adding a custom decentralized relay node.
+ * Includes a dropdown list and an interactive modal for adding new endpoints.
+ *
+ * @param {RelaySelectorProps} props - Component properties.
+ * @returns {React.JSX.Element} The relay selector UI.
+ */
 export default function RelaySelector({
   activeRelay,
   defaultRelays,
   changeRelay,
   addCustomRelay,
-  size = "sm", // Default to 'sm' for Sidebar
-}: RelaySelectorProps) {
+  size = "sm",
+}: RelaySelectorProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [showInfo, setShowInfo] = useState<boolean>(false);
 
@@ -42,7 +50,12 @@ export default function RelaySelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddRelaySubmit = async () => {
+  /**
+   * Processes the addition of a new custom relay URL.
+   *
+   * @returns {Promise<void>}
+   */
+  const handleAddRelaySubmit = async (): Promise<void> => {
     if (customRelayInput.trim()) {
       try {
         await addCustomRelay(customRelayInput.trim());
@@ -50,12 +63,13 @@ export default function RelaySelector({
         setCustomRelayInput("");
         setRelayError("");
       } catch (err) {
-        setRelayError(err instanceof Error ? err.message : "Failed to add relay.");
+        setRelayError(
+          err instanceof Error ? err.message : "Failed to add relay.",
+        );
       }
     }
   };
 
-  // Dynamic styling based on size prop
   const triggerPadding =
     size === "md" ? "py-3 pl-4 pr-10 text-sm" : "py-2.5 pl-3 pr-8 text-xs";
   const buttonPadding =
@@ -79,19 +93,7 @@ export default function RelaySelector({
             }}
             className={`transition-colors focus:outline-none ${showInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
           >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <InfoIcon className="w-3.5 h-3.5" />
           </button>
 
           {showInfo && (
@@ -116,19 +118,9 @@ export default function RelaySelector({
               <span className="truncate">
                 {activeRelay.replace("http://", "").replace("https://", "")}
               </span>
-              <svg
+              <ChevronDownIcon
                 className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-180 text-indigo-400" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+              />
             </button>
 
             {isOpen && (
@@ -183,7 +175,10 @@ export default function RelaySelector({
               <input
                 type="text"
                 value={customRelayInput}
-                onChange={(e) => { setCustomRelayInput(e.target.value); setRelayError(""); }}
+                onChange={(e) => {
+                  setCustomRelayInput(e.target.value);
+                  setRelayError("");
+                }}
                 placeholder="e.g. wss://my-relay.example.com"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all mb-2"
                 autoFocus

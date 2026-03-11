@@ -1,3 +1,4 @@
+import React from "react";
 import {
   AudioBubble,
   CryptoBubble,
@@ -6,14 +7,45 @@ import {
   DocumentBubble,
 } from "./bubbles/index";
 
-export interface MessageBubbleProps {
-  msg: any;
+/**
+ * Interface defining the structure of a chat message.
+ */
+export interface ChatMessage {
+  id?: number;
+  ownerAddress: string;
+  chatId: string;
+  text: string;
+  isMine: boolean;
+  timestamp: number;
+  isImage?: boolean;
+  replyTo?: {
+    id: string | number;
+    text: string;
+    isMine: boolean;
+    timestamp: number;
+  } | null;
 }
 
-export const MessageBubble = ({ msg }: MessageBubbleProps) => {
+/**
+ * Interface defining the properties for the MessageBubble component.
+ */
+export interface MessageBubbleProps {
+  msg: ChatMessage;
+}
+
+/**
+ * A routing component that parses raw message text and delegates rendering
+ * to the appropriate specific bubble component based on the content type.
+ *
+ * @param {MessageBubbleProps} props - Component properties containing the raw message object.
+ * @returns {React.JSX.Element} The appropriately formatted message bubble.
+ */
+export const MessageBubble = ({
+  msg,
+}: MessageBubbleProps): React.JSX.Element => {
   let parsedText = msg.text;
   let replyData = null;
-  let docData = null;
+  let docData: { fileName: string; fileData: string } | null = null;
 
   try {
     const parsed = JSON.parse(msg.text);
@@ -23,15 +55,60 @@ export const MessageBubble = ({ msg }: MessageBubbleProps) => {
       parsedText = parsed.text;
       replyData = parsed.replyTo || null;
     }
-  } catch {
-    // Legacy mapping protection
-  }
+  } catch {}
 
   const isCryptoTx =
     parsedText?.startsWith("[SENT]") || parsedText?.startsWith("[RECEIVED]");
   const isAudio = parsedText?.startsWith("[AUDIO]");
 
-  const cleanMsg = { ...msg, text: parsedText, replyTo: replyData };
+  const cleanMsg: ChatMessage = {
+    ...msg,
+    text: parsedText,
+    replyTo: replyData,
+  };
+
+  let bubbleContent: React.JSX.Element;
+
+  if (isAudio) {
+    bubbleContent = (
+      <AudioBubble
+        msg={cleanMsg}
+        audioSrc={cleanMsg.text.replace("[AUDIO]", "")}
+      />
+    );
+  } else if (isCryptoTx) {
+    const txType = cleanMsg.text.startsWith("[SENT]") ? "SENT" : "RECEIVED";
+    const parts = cleanMsg.text.split("\nTx Hash: ");
+    const rawAmount = parts[0].replace(`[${txType}] `, "");
+    const txHash = parts[1] || "";
+
+    const isVerification = rawAmount.includes("Transfer Verified!");
+    const txAmountOrStatus = isVerification
+      ? "Verified"
+      : rawAmount.replace(" ETH", "");
+
+    bubbleContent = (
+      <CryptoBubble
+        msg={cleanMsg}
+        txType={txType}
+        txAmountOrStatus={txAmountOrStatus}
+        txHash={txHash}
+        isVerification={isVerification}
+      />
+    );
+  } else if (docData) {
+    bubbleContent = (
+      <DocumentBubble
+        msg={cleanMsg}
+        fileName={docData.fileName}
+        fileData={docData.fileData}
+      />
+    );
+  } else if (cleanMsg.isImage) {
+    bubbleContent = <MediaBubble msg={cleanMsg} />;
+  } else {
+    bubbleContent = <TextBubble msg={cleanMsg} />;
+  }
 
   return (
     <div
@@ -40,46 +117,7 @@ export const MessageBubble = ({ msg }: MessageBubbleProps) => {
         msg.isMine ? "justify-end" : "justify-start"
       }`}
     >
-      {isAudio ? (
-        <AudioBubble
-          msg={cleanMsg}
-          audioSrc={cleanMsg.text.replace("[AUDIO]", "")}
-        />
-      ) : isCryptoTx ? (
-        (() => {
-          const txType = cleanMsg.text.startsWith("[SENT]")
-            ? "SENT"
-            : "RECEIVED";
-          const parts = cleanMsg.text.split("\nTx Hash: ");
-          const rawAmount = parts[0].replace(`[${txType}] `, "");
-          const txHash = parts[1] || "";
-
-          const isVerification = rawAmount.includes("Transfer Verified!");
-          const txAmountOrStatus = isVerification
-            ? "Verified"
-            : rawAmount.replace(" ETH", "");
-
-          return (
-            <CryptoBubble
-              msg={cleanMsg}
-              txType={txType}
-              txAmountOrStatus={txAmountOrStatus}
-              txHash={txHash}
-              isVerification={isVerification}
-            />
-          );
-        })()
-      ) : docData ? (
-        <DocumentBubble
-          msg={cleanMsg}
-          fileName={docData.fileName}
-          fileData={docData.fileData}
-        />
-      ) : cleanMsg.isImage ? (
-        <MediaBubble msg={cleanMsg} />
-      ) : (
-        <TextBubble msg={cleanMsg} />
-      )}
+      {bubbleContent}
     </div>
   );
 };

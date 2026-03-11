@@ -1,12 +1,14 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { MessageBubble } from "./MessageBubble";
 
 /**
- * Container for iterating and displaying the list of messages.
- * @returns {JSX.Element}
+ * Container component for iterating over and displaying the active chat's message history.
+ * Automatically scrolls to the bottom of the view when new messages are added to the state.
+ *
+ * @returns {React.JSX.Element} The scrollable message list UI.
  */
-export const MessageList = () => {
+export const MessageList = (): React.JSX.Element => {
   const { messages } = useChatContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

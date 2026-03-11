@@ -8,7 +8,7 @@ import { Socket } from "socket.io-client";
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
-  ephemeralPublicKey: string | null;
+  ephemeralPublicKey: string | undefined;
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   hasSecret: (peerAddress: string) => boolean;
   relayUrl: string;
