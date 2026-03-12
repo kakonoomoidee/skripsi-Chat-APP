@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { ethers } = require("ethers");
 const IdentityRegistryABI = require("../abis/identity_abi.json");
-const RelayRegistryABI = require("..abis/relay_registry_abi.json");
+const RelayRegistryABI = require("../abis/relay_registry_abi.json");
 
 const REQUIRED_ENV_VARS = [
   "PORT",
@@ -50,6 +50,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 const MY_PUBLIC_URL =
   process.env.RELAY_PUBLIC_URL || `http://localhost:${process.env.PORT}`;
 
+/**
+ * Configuration module providing initialized blockchain instances and environment variables.
+ * @returns {Object} The configuration object containing providers, wallets, and constants.
+ */
 module.exports = {
   provider,
   relayerWallet,

@@ -10,8 +10,7 @@ let knownRelays = [];
 
 /**
  * Synchronizes the list of active relay nodes directly from the blockchain smart contract.
- *
- * @returns {Promise<void>}
+ * @returns {Promise<void>} Resolves when synchronization is complete.
  */
 async function syncRelaysFromBlockchain() {
   try {
@@ -29,8 +28,7 @@ async function syncRelaysFromBlockchain() {
 
 /**
  * Automatically checks and registers the relay to the blockchain upon startup.
- *
- * @returns {Promise<void>}
+ * @returns {Promise<void>} Resolves when the registration check is complete.
  */
 async function checkAndAutoRegister() {
   try {
@@ -56,10 +54,9 @@ async function checkAndAutoRegister() {
 
 /**
  * Broadcasts socket events to all known external relay servers.
- *
  * @param {string} event - The socket event name.
  * @param {string} to - The target user's wallet address.
- * @param {object} data - The payload to transmit.
+ * @param {Object} data - The payload to transmit.
  * @returns {void}
  */
 const gossipToOtherRelays = (event, to, data) => {
@@ -79,8 +76,7 @@ const gossipToOtherRelays = (event, to, data) => {
 };
 
 /**
- * Initializes relay registry event listeners.
- *
+ * Initializes relay registry event listeners and triggers initial registration.
  * @returns {void}
  */
 const initRelayService = () => {
@@ -92,9 +88,8 @@ const initRelayService = () => {
 };
 
 /**
- * Retrieves the count of known external relays.
- *
- * @returns {number}
+ * Retrieves the count of currently known external relays.
+ * @returns {number} The integer count of known relays.
  */
 const getKnownRelaysCount = () => knownRelays.length;
 

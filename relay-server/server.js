@@ -51,6 +51,9 @@ initRelayService();
 initSocketManager(io);
 setupRoutes(app, io);
 
+/**
+ * Boots the HTTP server and binds the listener to the configured port.
+ */
 httpServer.listen(PORT, () => {
   console.log(`Relay Server running on port ${PORT}`);
   console.log(`STATUS: WebSocket Active | Decentralized Gossip Active`);

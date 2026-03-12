@@ -5,9 +5,8 @@ const { gossipToOtherRelays } = require("./relayService");
 const activeUsers = new Set();
 
 /**
- * Initializes Socket.IO logic, middleware, and real-time active user tracking.
- *
- * @param {object} io - The Socket.IO server instance.
+ * Initializes Socket.IO logic, authentication middleware, and connection tracking.
+ * @param {Object} io - The Socket.IO server instance.
  * @returns {void}
  */
 const initSocketManager = (io) => {
@@ -90,9 +89,8 @@ const initSocketManager = (io) => {
 };
 
 /**
- * Retrieves the current count of active socket connections.
- *
- * @returns {number} The count of active users.
+ * Retrieves the current count of active WebSocket connections.
+ * @returns {number} The total number of connected users.
  */
 const getActiveUsersCount = () => activeUsers.size;
 

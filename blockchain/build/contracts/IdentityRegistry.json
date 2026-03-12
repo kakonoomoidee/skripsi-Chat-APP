@@ -43,7 +43,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -77,7 +78,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -154,7 +156,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -183,7 +186,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -202,7 +206,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     }
   ],
   "metadata": "{\"compiler\":{\"version\":\"0.8.0+commit.c7dfd78e\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"username\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"name\":\"UserRegistered\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_username\",\"type\":\"string\"}],\"name\":\"getAddressByUsername\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_userAddress\",\"type\":\"address\"}],\"name\":\"getUser\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_user\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_username\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_publicKey\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"_v\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"_r\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"_s\",\"type\":\"bytes32\"}],\"name\":\"registerUser\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"usernameToAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"users\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"username\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"publicKey\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"isRegistered\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"registeredAt\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_signer\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_nonce\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"_v\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"_r\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"_s\",\"type\":\"bytes32\"}],\"name\":\"verifyLoginSignature\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Decentralized identity storage for P2P Chat. Supports gasless registration and challenge-response authentication.\",\"kind\":\"dev\",\"methods\":{\"getAddressByUsername(string)\":{\"params\":{\"_username\":\"The username to query.\"},\"returns\":{\"_0\":\"address The associated user address.\"}},\"getUser(address)\":{\"params\":{\"_userAddress\":\"The address of the user.\"},\"returns\":{\"_0\":\"username, publicKey, and registration timestamp.\"}},\"registerUser(address,string,string,uint8,bytes32,bytes32)\":{\"params\":{\"_publicKey\":\"The user's public key for ECDH.\",\"_r\":\"ECDSA signature parameter r.\",\"_s\":\"ECDSA signature parameter s.\",\"_user\":\"The address of the user to register.\",\"_username\":\"The desired username.\",\"_v\":\"ECDSA signature parameter v.\"}},\"verifyLoginSignature(address,string,uint8,bytes32,bytes32)\":{\"params\":{\"_nonce\":\"The challenge string to be signed.\",\"_r\":\"ECDSA signature parameter r.\",\"_s\":\"ECDSA signature parameter s.\",\"_signer\":\"The address attempting to log in.\",\"_v\":\"ECDSA signature parameter v.\"},\"returns\":{\"_0\":\"bool True if the signature is valid, false otherwise.\"}}},\"title\":\"IdentityRegistry\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"getAddressByUsername(string)\":{\"notice\":\"Retrieves a user's address by their username.\"},\"getUser(address)\":{\"notice\":\"Retrieves user details.\"},\"registerUser(address,string,string,uint8,bytes32,bytes32)\":{\"notice\":\"Registers a new user via meta-transaction (gasless).\"},\"verifyLoginSignature(address,string,uint8,bytes32,bytes32)\":{\"notice\":\"Verifies a login signature based on a challenge nonce.\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/IdentityRegistry.sol\":\"IdentityRegistry\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/IdentityRegistry.sol\":{\"keccak256\":\"0xe597f7117a97575f2655cfdf6b581c06ad5b526232392e0389268f9d747eb80b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://abf7b3067fd09b4d33a83bf10e56919c037b853314a2a3663a0a8989cee744dc\",\"dweb:/ipfs/Qmcu9VsyhFp6AKF6tSKg1njLLB94SU2ddukKLabKFiqqML\"]}},\"version\":1}",
@@ -12515,12 +12520,13 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x064DeABfdd60a9e0bCD4288F22Df17d0B2d547bD",
-      "transactionHash": "0x2691e1e160fe08501b20dadff1e78fcdaf2cacc56275d65c61126403e1f8d7d3"
+      "address": "0x0fbB1b5536b083eC20E2062fD254a4FdDaB86a65",
+      "transactionHash": "0x8a74fd8ebec9eec7af4ffaa1c9c014067f25567f290d5befff969ab4103b9173"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-03-11T05:33:46.551Z",
+  "updatedAt": "2026-03-12T03:48:10.110Z",
+  "networkType": "ethereum",
   "devdoc": {
     "details": "Decentralized identity storage for P2P Chat. Supports gasless registration and challenge-response authentication.",
     "kind": "dev",

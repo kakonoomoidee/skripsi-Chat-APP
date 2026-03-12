@@ -25,10 +25,9 @@ const authLimiter = rateLimit({
 });
 
 /**
- * Mounts all Express routes to the application.
- *
- * @param {object} app - The Express application instance.
- * @param {object} io - The Socket.IO server instance.
+ * Mounts all Express HTTP routes to the application instance.
+ * @param {Object} app - The Express application instance.
+ * @param {Object} io - The Socket.IO server instance.
  * @returns {void}
  */
 const setupRoutes = (app, io) => {

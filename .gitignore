@@ -29,7 +29,6 @@ yarn-error.log*
 coverage/
 
 #--- json ---
-blockchain/build/contracts/IdentityRegistry.json
-blockchain/build/contracts/RelayRegistry.json
-relay-server/identity_abi.json
-relay-server/relay_registry_abi.json
+blockchain/build/
+relay-server/abis/
+
