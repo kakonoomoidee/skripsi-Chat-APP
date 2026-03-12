@@ -18,7 +18,7 @@ module.exports = async function (deployer) {
   const relayInstance = await RelayRegistry.deployed();
   console.log(`RelayRegistry deployed at: ${relayInstance.address}`);
 
-  const relayServerPath = path.join(__dirname, "../../relay-server");
+  const relayServerPath = path.join(__dirname, "../../relay-server/abis");
 
   const targetIdentityAbiPath = path.join(relayServerPath, "identity_abi.json");
   const targetRelayAbiPath = path.join(

@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { ethers } = require("ethers");
-const IdentityRegistryABI = require("./identity_abi.json");
-const RelayRegistryABI = require("./relay_registry_abi.json");
+const IdentityRegistryABI = require("../abis/identity_abi.json");
+const RelayRegistryABI = require("..abis/relay_registry_abi.json");
 
 const REQUIRED_ENV_VARS = [
   "PORT",

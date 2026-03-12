@@ -4,10 +4,15 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-const { PORT, allowedOrigins, RPC_URL, relayerWallet } = require("./config");
-const { initRelayService } = require("./relayService");
-const { initSocketManager } = require("./socketManager");
-const { setupRoutes } = require("./routes");
+const {
+  PORT,
+  allowedOrigins,
+  RPC_URL,
+  relayerWallet,
+} = require("./src/config");
+const { initRelayService } = require("./src/relayService");
+const { initSocketManager } = require("./src/socketManager");
+const { setupRoutes } = require("./src/routes");
 
 if (allowedOrigins.length === 0) {
   console.warn(
