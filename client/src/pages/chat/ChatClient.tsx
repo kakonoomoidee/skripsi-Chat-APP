@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/shared";
 import { ChatArea } from "@/components/chat";
 import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
-import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { useSessionTimeout } from "@/hooks/ui/useSessionTimeout";
 
 /**
  * Responsive Layout Wrapper

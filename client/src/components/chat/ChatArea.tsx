@@ -4,7 +4,7 @@ import { ChatHeader } from "./ChatHeader";
 import { EmptyChatState } from "./EmptyChatState";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
-import { TransferModal } from "./TransferModal";
+import { TransferModal } from "./modals/TransferModal";
 import { useUIStore } from "@/store";
 
 /**

@@ -3,7 +3,7 @@ import { useChatContext } from "@/context/ChatContext";
 import { MenuIcon, PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
-import { InCallModal } from "./InCallModal";
+import { InCallModal } from "./modals/InCallModal";
 
 /**
  * Renders the header section of the active chat interface.

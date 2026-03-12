@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ethers } from "ethers";
-import { useSecurityHandlers } from "@/hooks/useSecurityHandlers";
+import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
 import {
   ChevronDownIcon,
   ImportIcon,

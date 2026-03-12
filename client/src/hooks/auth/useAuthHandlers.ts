@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import axios, { AxiosError } from "axios";
-import { useWallet } from "@/hooks/useWallet";
-import { useAuth } from "@/hooks/useAuth";
-import { useRelay } from "@/hooks/useRelay";
+import { useWallet } from "@/hooks/security/useWallet";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useRelay } from "@/hooks/network/useRelay";
 import { useUIStore } from "@/store";
 
 /**

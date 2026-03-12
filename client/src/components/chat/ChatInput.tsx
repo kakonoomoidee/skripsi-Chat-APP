@@ -11,7 +11,7 @@ import {
   CameraIcon,
   GalleryIcon,
 } from "@/components/icons";
-import { CameraModal } from "./CameraModal";
+import { CameraModal } from "./modals/CameraModal";
 
 /**
  * Interface defining the properties for the ChatInput component.

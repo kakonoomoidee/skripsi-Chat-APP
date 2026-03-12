@@ -10,17 +10,17 @@ import React, {
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/utils/db";
-import { useAuth } from "@/hooks/useAuth";
-import { useWallet } from "@/hooks/useWallet";
-import { useCrypto } from "@/hooks/useCrypto";
-import { useSocket } from "@/hooks/useSocket";
-import { useChatLogic } from "@/hooks/useChatLogic";
-import { useRelay } from "@/hooks/useRelay";
-import { useWebRTC } from "@/hooks/useWebRTC";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useWallet } from "@/hooks/security/useWallet";
+import { useCrypto } from "@/hooks/security/useCrypto";
+import { useSocket } from "@/hooks/network/useSocket";
+import { useChatLogic } from "@/hooks/chat/useChatLogic";
+import { useRelay } from "@/hooks/network/useRelay";
+import { useWebRTC } from "@/hooks/network/useWebRTC";
 import { useUIStore, useSessionStore, useWalletStore } from "@/store";
-import { useDuplicateTab } from "@/hooks/useDuplicateTab";
-import { useCallActions } from "@/hooks/useCallActions";
-import { useMessageSender } from "@/hooks/useMessageSender";
+import { useDuplicateTab } from "@/hooks/ui/useDuplicateTab";
+import { useCallActions } from "@/hooks/chat/useCallActions";
+import { useMessageSender } from "@/hooks/chat/useMessageSender";
 
 export interface ChatContextValue {
   isAuthenticated: boolean;

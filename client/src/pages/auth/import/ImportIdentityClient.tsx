@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useWallet } from "@/hooks/useWallet";
-import { useAuth } from "@/hooks/useAuth";
-import { useRelay } from "@/hooks/useRelay";
-import { useImportHandler } from "@/hooks/useAuthHandlers";
-import { useRelayPing } from "@/hooks/useRelayPing";
+import { useWallet } from "@/hooks/security/useWallet";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useRelay } from "@/hooks/network/useRelay";
+import { useImportHandler } from "@/hooks/auth/useAuthHandlers";
+import { useRelayPing } from "@/hooks/network/useRelayPing";
 import AuthLayout from "../components/AuthLayout";
 import WalletDisplay from "../components/WalletDisplay";
 import {

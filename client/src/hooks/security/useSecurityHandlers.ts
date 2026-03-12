@@ -2,7 +2,7 @@ import { useState, ChangeEvent } from "react";
 import { ethers } from "ethers";
 import { db } from "@/utils/db";
 import { formatTime } from "@/utils/format";
-import { useWallet } from "@/hooks/useWallet";
+import { useWallet } from "@/hooks/security/useWallet";
 import { useUIStore, useSessionStore, useWalletStore } from "@/store";
 
 /**

@@ -1,7 +1,7 @@
 import { formatTime } from "@/utils/format";
 import { useUIStore, useSessionStore } from "@/store";
 import { useState, useRef, useEffect } from "react";
-import { ReplyBubbleContext } from "./ReplyBubbleContext";
+import { ReplyBubbleContext } from "../context/ReplyBubbleContext";
 
 export const CryptoBubble = ({
   msg,
