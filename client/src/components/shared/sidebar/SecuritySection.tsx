@@ -2,8 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ethers } from "ethers";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
+import GlassDropdown from "@/components/shared/GlassDropdown";
 import {
-  ChevronDownIcon,
   ImportIcon,
   ExportIcon,
   InfoIcon,
@@ -18,29 +18,16 @@ declare global {
   }
 }
 
-/**
- * Interface defining the properties for the SecuritySection component.
- */
 export interface SecuritySectionProps {
   nodeSelector?: React.ReactNode;
 }
 
-/**
- * Interface representing the fetched state of a connected Web3 wallet.
- */
 interface WalletDetails {
   balance: string;
   network: string;
   chainId: string;
 }
 
-/**
- * Renders the settings sidebar section dedicated to data security and cryptographic bindings.
- * Handles Web3 wallet connections, auto-delete policies, and local data import/export/wipe operations.
- *
- * @param {SecuritySectionProps} props - Component properties, allowing injection of layout-specific nodes.
- * @returns {React.JSX.Element} The security configuration UI.
- */
 export default function SecuritySection({
   nodeSelector,
 }: SecuritySectionProps): React.JSX.Element {
@@ -62,7 +49,6 @@ export default function SecuritySection({
     showToast,
   } = useSecurityHandlers();
 
-  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
   const [showWalletInfoTooltip, setShowWalletInfoTooltip] =
     useState<boolean>(false);
@@ -73,6 +59,7 @@ export default function SecuritySection({
     null,
   );
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [autoBackupMode, setAutoBackupMode] = useState<string>("never");
 
   const deleteOptions = [
     { value: "never", label: "Auto-Delete: Never" },
@@ -81,6 +68,14 @@ export default function SecuritySection({
     { value: "3", label: "Delete Older than 3 Days" },
     { value: "1", label: "Delete Older than 24 Hours" },
     { value: "close", label: "Burn on Close (Incognito)" },
+  ];
+
+  const backupOptions = [
+    { value: "never", label: "Auto-Backup: Never" },
+    { value: "1", label: "Daily (Every 24 Hours)" },
+    { value: "3", label: "Every 3 Days" },
+    { value: "7", label: "Weekly (Every 7 Days)" },
+    { value: "30", label: "Monthly (Every 30 Days)" },
   ];
 
   const isIncognito = autoDeleteMode === "close";
@@ -92,12 +87,16 @@ export default function SecuritySection({
       fetchWalletDetails(savedAddress);
     }
 
+    const savedBackupMode = localStorage.getItem("securep2p_auto_backup_mode");
+    if (savedBackupMode) {
+      setAutoBackupMode(savedBackupMode);
+    }
+
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
       ) {
-        setIsOpen(false);
         setShowSecurityInfo(false);
         setShowWalletInfoTooltip(false);
         setShowBackupInfo(false);
@@ -107,12 +106,6 @@ export default function SecuritySection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /**
-   * Retrieves the current balance and network information for a connected wallet address.
-   *
-   * @param {string} address - The public Ethereum address to query.
-   * @returns {Promise<void>}
-   */
   const fetchWalletDetails = async (address: string): Promise<void> => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -129,11 +122,6 @@ export default function SecuritySection({
     }
   };
 
-  /**
-   * Initiates the MetaMask connection flow via the injected window.ethereum provider.
-   *
-   * @returns {Promise<void>}
-   */
   const handleConnectMetaMask = async (): Promise<void> => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed. Please install the extension.");
@@ -161,24 +149,16 @@ export default function SecuritySection({
     }
   };
 
-  /**
-   * Clears the currently linked wallet address from local state and storage.
-   *
-   * @returns {void}
-   */
   const handleDisconnectWallet = (): void => {
     setMetaMaskAddress(null);
     setWalletDetails(null);
     localStorage.removeItem("linked_metamask");
   };
 
-  const activeLabel =
-    deleteOptions.find((opt) => opt.value === autoDeleteMode)?.label ||
-    "Select Mode";
-
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
+        {/* --- WEB3 WALLET SECTION --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -190,7 +170,6 @@ export default function SecuritySection({
                 setShowWalletInfoTooltip(!showWalletInfoTooltip);
                 setShowSecurityInfo(false);
                 setShowBackupInfo(false);
-                setIsOpen(false);
               }}
               className={`transition-colors focus:outline-none ${showWalletInfoTooltip ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
             >
@@ -269,6 +248,7 @@ export default function SecuritySection({
 
         {nodeSelector && <div>{nodeSelector}</div>}
 
+        {/* --- AUTO DELETE SECTION (DI SINI PAKE GLASSDROPDOWN + TOAST) --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -280,7 +260,6 @@ export default function SecuritySection({
                 setShowSecurityInfo(!showSecurityInfo);
                 setShowWalletInfoTooltip(false);
                 setShowBackupInfo(false);
-                setIsOpen(false);
               }}
               className={`transition-colors focus:outline-none ${showSecurityInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
             >
@@ -293,40 +272,21 @@ export default function SecuritySection({
               </div>
             )}
           </div>
-          <div className="relative">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className={`w-full bg-zinc-900 border ${isOpen ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"} text-zinc-300 text-xs rounded-xl pl-3 pr-8 py-2.5 outline-none text-left transition-all shadow-sm flex items-center justify-between`}
-            >
-              <span className="truncate">{activeLabel}</span>
-              <ChevronDownIcon
-                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 absolute right-3 ${isOpen ? "rotate-0 text-indigo-400" : "rotate-180"}`}
-              />
-            </button>
-            {isOpen && (
-              <div className="absolute z-100 bottom-full mb-2 w-full bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
-                <ul className="py-1">
-                  {deleteOptions.map((opt) => (
-                    <li key={opt.value}>
-                      <button
-                        onClick={() => {
-                          handleModeChange({
-                            target: { value: opt.value },
-                          } as any);
-                          setIsOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${autoDeleteMode === opt.value ? "bg-indigo-600/10 text-indigo-400 font-medium" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}
-                      >
-                        {opt.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+
+          <GlassDropdown
+            value={autoDeleteMode}
+            options={deleteOptions}
+            onChange={(val) => {
+              handleModeChange({ target: { value: val } } as any);
+              const selectedOpt = deleteOptions.find(
+                (opt) => opt.value === val,
+              );
+              showToast(`Policy updated: ${selectedOpt?.label}`, "success");
+            }}
+          />
         </div>
 
+        {/* --- DATA BACKUP & AUTO BACKUP SECTION --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -338,7 +298,6 @@ export default function SecuritySection({
                 setShowBackupInfo(!showBackupInfo);
                 setShowWalletInfoTooltip(false);
                 setShowSecurityInfo(false);
-                setIsOpen(false);
               }}
               className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
             >
@@ -351,6 +310,7 @@ export default function SecuritySection({
               </div>
             )}
           </div>
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -383,8 +343,25 @@ export default function SecuritySection({
             onChange={handleImportChat}
             className="hidden"
           />
+
+          {/* AUTO BACKUP DROPDOWN (PAKE GLASSDROPDOWN + TOAST) */}
+          <div className="mt-3">
+            <GlassDropdown
+              value={autoBackupMode}
+              options={backupOptions}
+              onChange={(val) => {
+                setAutoBackupMode(val);
+                localStorage.setItem("securep2p_auto_backup_mode", val);
+                const selectedOpt = backupOptions.find(
+                  (opt) => opt.value === val,
+                );
+                showToast(`Schedule set: ${selectedOpt?.label}`, "success");
+              }}
+            />
+          </div>
         </div>
 
+        {/* --- WIPE DATA SECTION --- */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
             onClick={handleWipeData}
@@ -395,6 +372,7 @@ export default function SecuritySection({
         </div>
       </div>
 
+      {/* --- SEED MODAL FOR EXPORT/IMPORT/WIPE --- */}
       {seedModal.isOpen &&
         typeof document !== "undefined" &&
         createPortal(
