@@ -77,13 +77,15 @@ contract IdentityRegistry {
     }
 
     /**
-     * @notice Verifies a login signature based on a challenge nonce.
+     * @notice Verifies a login signature based on a challenge nonce and checks user registration status.
+     * @dev The state mutability is upgraded from `pure` to `view` to allow reading from the contract's state.
+     * IMPORTANT: Replace `registeredUsers` with your actual state variable name for user registration.
      * @param _signer The address attempting to log in.
      * @param _nonce The challenge string to be signed.
      * @param _v ECDSA signature parameter v.
      * @param _r ECDSA signature parameter r.
      * @param _s ECDSA signature parameter s.
-     * @return bool True if the signature is valid, false otherwise.
+     * @return bool True if the signature is valid AND the user exists in the registry, false otherwise.
      */
     function verifyLoginSignature(
         address _signer,
@@ -91,7 +93,12 @@ contract IdentityRegistry {
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) public pure returns (bool) {
+    ) public view returns (bool) {
+        require(
+            users[_signer].isRegistered,
+            "Access Denied: User is not registered in this contract."
+        );
+
         bytes32 messageHash = keccak256(abi.encodePacked(_nonce));
 
         bytes32 ethSignedMessageHash = keccak256(
@@ -99,6 +106,7 @@ contract IdentityRegistry {
         );
 
         address recoveredAddress = ecrecover(ethSignedMessageHash, _v, _r, _s);
+
         return (recoveredAddress == _signer);
     }
 
