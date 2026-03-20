@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useUIStore } from "@/store";
 
 /**
  * Interface defining the return values for the useSocket hook.
@@ -10,8 +12,8 @@ export interface UseSocketReturn {
 }
 
 /**
- * Custom hook to initialize and manage the Socket.IO connection to the active relay server.
- * Handles connection state, authentication payload, and automated cleanup upon unmount.
+ * Custom hook to initialize and manage the Socket.IO connection.
+ * Handles connection state, cross-device session revocation, and automated cleanup.
  *
  * @param {string | null} token - The JWT authentication token for socket authorization.
  * @param {string} relayUrl - The HTTP/WS URL of the active relay server.
@@ -22,6 +24,8 @@ export const useSocket = (
   relayUrl: string,
 ): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const { logout } = useAuth();
+  const { showToast } = useUIStore();
 
   const socket = useMemo<Socket | null>(() => {
     if (!token || !relayUrl) return null;
@@ -50,7 +54,7 @@ export const useSocket = (
     };
 
     const onDisconnect = (reason: string) => {
-      console.log(
+      console.warn(
         `[Socket Manager] Disconnected from relay server. Reason: ${reason}`,
       );
       setIsConnected(false);
@@ -61,9 +65,24 @@ export const useSocket = (
       setIsConnected(false);
     };
 
+    const onSessionRevoked = (data: { reason: string }) => {
+      console.warn(
+        `[Socket Manager] Session Revoked by Server: ${data.reason}`,
+      );
+      showToast(data.reason, "error");
+
+      socket.disconnect();
+      logout();
+
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1500);
+    };
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onError);
+    socket.on("session_revoked", onSessionRevoked);
 
     return () => {
       console.log(
@@ -72,9 +91,10 @@ export const useSocket = (
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onError);
+      socket.off("session_revoked", onSessionRevoked);
       socket.disconnect();
     };
-  }, [socket, relayUrl]);
+  }, [socket, relayUrl, logout, showToast]);
 
   return { socket, isConnected };
 };

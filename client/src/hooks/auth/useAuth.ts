@@ -144,7 +144,8 @@ export const useAuth = (): UseAuthReturn => {
       const signature = await wallet.signMessage(ethers.getBytes(nonceHash));
 
       console.log(
-        "[AUTH LOG] Nonce signed successfully. Transmitting signature for verification...",
+        "[AUTH LOG] Nonce signed successfully. Transmitting signature for verification to relay server ->",
+        signature,
       );
 
       const resLogin = await axios.post<{ token: string }>(
@@ -157,7 +158,10 @@ export const useAuth = (): UseAuthReturn => {
 
       const { token: newToken } = resLogin.data;
 
-      console.log("[AUTH LOG] Server Verification Passed. JWT Token acquired :", newToken);
+      console.log(
+        "[AUTH LOG] Server Verification Passed. JWT Token acquired :",
+        newToken,
+      );
       console.log("=========================================");
 
       localStorage.setItem("auth_token", newToken);

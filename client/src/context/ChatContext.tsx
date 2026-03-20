@@ -21,6 +21,7 @@ import { useUIStore, useSessionStore, useWalletStore } from "@/store";
 import { useDuplicateTab } from "@/hooks/ui/useDuplicateTab";
 import { useCallActions } from "@/hooks/chat/useCallActions";
 import { useMessageSender } from "@/hooks/chat/useMessageSender";
+import { DuplicateTabWarning } from "@/components/chat/index";
 
 export interface ChatContextValue {
   isAuthenticated: boolean;
@@ -379,35 +380,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   if (isDuplicateTab) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          height: "100vh",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#111",
-          color: "#fff",
-          textAlign: "center",
-          padding: "20px",
-          fontFamily: "sans-serif",
-        }}
-      >
-        <h2
-          style={{ color: "#ff4d4f", fontSize: "24px", marginBottom: "16px" }}
-        >
-          Aplikasi Terbuka di Tab Lain
-        </h2>
-        <p style={{ color: "#a0aab2", maxWidth: "400px", lineHeight: "1.5" }}>
-          Sistem Peer-to-Peer murni tidak mengizinkan multi-tab untuk mencegah
-          konflik port WebRTC dan database kriptografi.
-        </p>
-        <p style={{ color: "#a0aab2", marginTop: "8px" }}>
-          Harap tutup tab ini dan kembali ke tab yang sudah aktif.
-        </p>
-      </div>
-    );
+    return <DuplicateTabWarning />;
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
