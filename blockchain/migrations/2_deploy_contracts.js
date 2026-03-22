@@ -5,47 +5,57 @@ const IdentityRegistry = artifacts.require("IdentityRegistry");
 const RelayRegistry = artifacts.require("RelayRegistry");
 
 /**
- * Deploy Identity and Relay Registry contracts, then sync ABIs and addresses to relay-server
- * @param {object} deployer - The Truffle deployer object
+ * Deploys Identity and Relay Registry contracts, synchronizes ABIs, and updates environment variables.
+ * Defers all deployment logs to the end of the execution stream for a cleaner CLI output format.
+ *
+ * @param {object} deployer - The Truffle deployer object.
  * @returns {Promise<void>}
  */
 module.exports = async function (deployer) {
   await deployer.deploy(IdentityRegistry);
   const identityInstance = await IdentityRegistry.deployed();
-  console.log(`IdentityRegistry deployed at: ${identityInstance.address}`);
 
   await deployer.deploy(RelayRegistry);
   const relayInstance = await RelayRegistry.deployed();
-  console.log(`RelayRegistry deployed at: ${relayInstance.address}`);
 
-  const relayServerPath = path.join(__dirname, "../../relay-server/abis");
+  const relayServerRootPath = path.join(__dirname, "../../relay-server");
+  const abisFolderPath = path.join(relayServerRootPath, "abis");
 
-  const targetIdentityAbiPath = path.join(relayServerPath, "identity_abi.json");
+  if (!fs.existsSync(abisFolderPath)) {
+    fs.mkdirSync(abisFolderPath, { recursive: true });
+  }
+
+  const targetIdentityAbiPath = path.join(abisFolderPath, "identity_abi.json");
   const targetRelayAbiPath = path.join(
-    relayServerPath,
+    abisFolderPath,
     "relay_registry_abi.json",
   );
-  const targetEnvPath = path.join(relayServerPath, ".env");
+  const targetEnvPath = path.join(relayServerRootPath, ".env");
 
   fs.writeFileSync(
     targetIdentityAbiPath,
     JSON.stringify(IdentityRegistry.abi, null, 2),
   );
-  console.log("Identity ABI synced from memory!");
 
   fs.writeFileSync(
     targetRelayAbiPath,
     JSON.stringify(RelayRegistry.abi, null, 2),
   );
-  console.log("Relay ABI synced from memory!");
+
+  let isEnvUpdated = false;
+  let envWarningMsg = "";
 
   if (fs.existsSync(targetEnvPath)) {
     let envContent = fs.readFileSync(targetEnvPath, "utf8");
 
-    envContent = envContent.replace(
-      /CONTRACT_ADDRESS=.*/g,
-      `CONTRACT_ADDRESS="${identityInstance.address}"`,
-    );
+    if (envContent.match(/CONTRACT_ADDRESS=.*/)) {
+      envContent = envContent.replace(
+        /CONTRACT_ADDRESS=.*/g,
+        `CONTRACT_ADDRESS="${identityInstance.address}"`,
+      );
+    } else {
+      envContent += `\nCONTRACT_ADDRESS="${identityInstance.address}"`;
+    }
 
     if (envContent.match(/RELAY_REGISTRY_ADDRESS=.*/)) {
       envContent = envContent.replace(
@@ -57,6 +67,25 @@ module.exports = async function (deployer) {
     }
 
     fs.writeFileSync(targetEnvPath, envContent);
-    console.log("Contract addresses updated in .env!");
+    isEnvUpdated = true;
+  } else {
+    envWarningMsg = `[Deployer Warning] Environment file not found at path: ${targetEnvPath}`;
   }
+
+  console.log("\n========================================================");
+  console.log("[Deployer] POST-DEPLOYMENT SYNCHRONIZATION SUMMARY");
+  console.log("========================================================");
+  console.log(
+    `[Deployer] IdentityRegistry Address : ${identityInstance.address}`,
+  );
+  console.log(`[Deployer] RelayRegistry Address    : ${relayInstance.address}`);
+  console.log(`[Deployer] Identity ABI             : Synchronized`);
+  console.log(`[Deployer] Relay ABI                : Synchronized`);
+
+  if (isEnvUpdated) {
+    console.log(`[Deployer] Environment Variables    : Updated Successfully`);
+  } else {
+    console.warn(envWarningMsg);
+  }
+  console.log("========================================================\n");
 };

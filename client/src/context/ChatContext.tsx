@@ -77,7 +77,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { address, resetWallet } = useWallet();
   const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
     useRelay();
-  const { socket, isConnected } = useSocket(token, activeRelay);
+  const { socket, isConnected, isSessionRevoked } = useSocket(
+    token,
+    activeRelay,
+  );
 
   const {
     ephemeralPublicKey,
@@ -381,6 +384,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   if (isDuplicateTab) {
     return <DuplicateTabWarning />;
+  }
+
+  if (isSessionRevoked) {
+    return (
+      <DuplicateTabWarning
+        title="Session Revoked"
+        message="Your account was accessed from another device. To prevent split-brain routing in the P2P network, this session has been terminated."
+      />
+    );
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

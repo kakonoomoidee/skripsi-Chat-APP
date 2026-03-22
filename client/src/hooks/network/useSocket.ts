@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
-import { useAuth } from "@/hooks/auth/useAuth";
 import { useUIStore } from "@/store";
 
 /**
@@ -9,6 +8,7 @@ import { useUIStore } from "@/store";
 export interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
+  isSessionRevoked: boolean;
 }
 
 /**
@@ -17,14 +17,14 @@ export interface UseSocketReturn {
  *
  * @param {string | null} token - The JWT authentication token for socket authorization.
  * @param {string} relayUrl - The HTTP/WS URL of the active relay server.
- * @returns {UseSocketReturn} The socket instance and its current connection status.
+ * @returns {UseSocketReturn} The socket instance, connection status, and session revocation state.
  */
 export const useSocket = (
   token: string | null,
   relayUrl: string,
 ): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const { logout } = useAuth();
+  const [isSessionRevoked, setIsSessionRevoked] = useState<boolean>(false);
   const { showToast } = useUIStore();
 
   const socket = useMemo<Socket | null>(() => {
@@ -72,11 +72,7 @@ export const useSocket = (
       showToast(data.reason, "error");
 
       socket.disconnect();
-      logout();
-
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1500);
+      setIsSessionRevoked(true);
     };
 
     socket.on("connect", onConnect);
@@ -94,7 +90,7 @@ export const useSocket = (
       socket.off("session_revoked", onSessionRevoked);
       socket.disconnect();
     };
-  }, [socket, relayUrl, logout, showToast]);
+  }, [socket, relayUrl, showToast]);
 
-  return { socket, isConnected };
+  return { socket, isConnected, isSessionRevoked };
 };
