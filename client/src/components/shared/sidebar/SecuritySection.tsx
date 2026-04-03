@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ethers } from "ethers";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
+import { useCrypto } from "@/hooks/security/useCrypto";
 import GlassDropdown from "@/components/shared/GlassDropdown";
 import {
   ImportIcon,
@@ -28,12 +29,20 @@ interface WalletDetails {
   chainId: string;
 }
 
+/**
+ * Renders the security and wallet management interface.
+ * Handles generation and importation of internal wallets, and connection to external Web3 providers.
+ *
+ * @param {SecuritySectionProps} props - The component properties.
+ * @returns {React.JSX.Element} The rendered Security Section component.
+ */
 export default function SecuritySection({
   nodeSelector,
 }: SecuritySectionProps): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const { encryptLocalDB } = useCrypto();
   const {
     autoDeleteMode,
     handleModeChange,
@@ -54,11 +63,20 @@ export default function SecuritySection({
     useState<boolean>(false);
   const [showBackupInfo, setShowBackupInfo] = useState<boolean>(false);
 
-  const [metaMaskAddress, setMetaMaskAddress] = useState<string | null>(null);
+  const [txWalletAddress, setTxWalletAddress] = useState<string | null>(null);
+  const [txWalletType, setTxWalletType] = useState<
+    "internal" | "external" | null
+  >(null);
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(
     null,
   );
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+
+  const [newInternalSeed, setNewInternalSeed] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [importSeedInput, setImportSeedInput] = useState<string>("");
+  const [importError, setImportError] = useState<string>("");
+
   const [autoBackupMode, setAutoBackupMode] = useState<string>("never");
 
   const deleteOptions = [
@@ -81,10 +99,17 @@ export default function SecuritySection({
   const isIncognito = autoDeleteMode === "close";
 
   useEffect(() => {
-    const savedAddress = localStorage.getItem("linked_metamask");
-    if (savedAddress && typeof window.ethereum !== "undefined") {
-      setMetaMaskAddress(savedAddress);
-      fetchWalletDetails(savedAddress);
+    const savedExternal = localStorage.getItem("linked_metamask");
+    const savedInternal = localStorage.getItem("internal_tx_wallet");
+
+    if (savedInternal) {
+      setTxWalletAddress(savedInternal);
+      setTxWalletType("internal");
+      fetchWalletDetails(savedInternal, false);
+    } else if (savedExternal && typeof window.ethereum !== "undefined") {
+      setTxWalletAddress(savedExternal);
+      setTxWalletType("external");
+      fetchWalletDetails(savedExternal, true);
     }
 
     const savedBackupMode = localStorage.getItem("securep2p_auto_backup_mode");
@@ -106,25 +131,109 @@ export default function SecuritySection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchWalletDetails = async (address: string): Promise<void> => {
+  /**
+   * Fetches the network and balance details for a given Ethereum address.
+   *
+   * @param {string} address - The wallet address to query.
+   * @param {boolean} isExternal - Indicates if the request should use the injected provider.
+   * @returns {Promise<void>} Resolves when the state is updated.
+   */
+  const fetchWalletDetails = async (
+    address: string,
+    isExternal: boolean,
+  ): Promise<void> => {
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      let provider;
+      if (isExternal && typeof window.ethereum !== "undefined") {
+        provider = new ethers.BrowserProvider(window.ethereum);
+      } else {
+        provider = new ethers.JsonRpcProvider(
+          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
+        );
+      }
+
       const network = await provider.getNetwork();
       const balanceWei = await provider.getBalance(address);
       const balanceEth = ethers.formatEther(balanceWei);
+
       setWalletDetails({
         balance: parseFloat(balanceEth).toFixed(4),
         network: network.name === "unknown" ? "Localhost" : network.name,
         chainId: network.chainId.toString(),
       });
     } catch {
-      // Gracefully ignore fetch errors
+      setWalletDetails({
+        balance: "0.0000",
+        network: "Unknown",
+        chainId: "0",
+      });
     }
   };
 
-  const handleConnectMetaMask = async (): Promise<void> => {
+  /**
+   * Generates a new random HD wallet to serve as the internal transaction wallet.
+   *
+   * @returns {void}
+   */
+  const handleCreateInternalWallet = (): void => {
+    setIsConnecting(true);
+    try {
+      const newWallet = ethers.Wallet.createRandom();
+      if (newWallet.mnemonic) {
+        const address = newWallet.address;
+        const phrase = newWallet.mnemonic.phrase;
+        const privateKey = newWallet.privateKey;
+
+        localStorage.setItem("internal_tx_wallet", address);
+        localStorage.setItem("internal_tx_pk", encryptLocalDB(privateKey));
+
+        setTxWalletAddress(address);
+        setTxWalletType("internal");
+        setNewInternalSeed(phrase);
+        fetchWalletDetails(address, false);
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  /**
+   * Restores an internal transaction wallet using a provided mnemonic phrase.
+   *
+   * @param {string} phrase - The 12-word seed phrase.
+   * @returns {void}
+   */
+  const handleImportInternalWallet = (phrase: string): void => {
+    setIsConnecting(true);
+    setImportError("");
+    try {
+      const importedWallet = ethers.Wallet.fromPhrase(phrase.trim());
+      const address = importedWallet.address;
+      const privateKey = importedWallet.privateKey;
+
+      localStorage.setItem("internal_tx_wallet", address);
+      localStorage.setItem("internal_tx_pk", encryptLocalDB(privateKey));
+
+      setTxWalletAddress(address);
+      setTxWalletType("internal");
+      fetchWalletDetails(address, false);
+      setIsImportModalOpen(false);
+      setImportSeedInput("");
+    } catch (error) {
+      setImportError("Invalid seed phrase. Please check your 12 words.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  /**
+   * Requests connection to an injected Web3 provider to link an external wallet.
+   *
+   * @returns {Promise<void>}
+   */
+  const handleConnectExternalWallet = async (): Promise<void> => {
     if (typeof window.ethereum === "undefined") {
-      alert("MetaMask is not installed. Please install the extension.");
+      showToast("MetaMask is not installed.", "error");
       return;
     }
     setIsConnecting(true);
@@ -138,31 +247,40 @@ export default function SecuritySection({
       });
       if (accounts && accounts.length > 0) {
         const linkedAddress = accounts[0];
-        setMetaMaskAddress(linkedAddress);
+        setTxWalletAddress(linkedAddress);
+        setTxWalletType("external");
         localStorage.setItem("linked_metamask", linkedAddress);
-        await fetchWalletDetails(linkedAddress);
+        localStorage.removeItem("internal_tx_wallet");
+        localStorage.removeItem("internal_tx_pk");
+        await fetchWalletDetails(linkedAddress, true);
       }
     } catch {
-      // Gracefully ignore connection cancellation or errors
     } finally {
       setIsConnecting(false);
     }
   };
 
+  /**
+   * Disconnects the currently active transaction wallet and clears local storage.
+   *
+   * @returns {void}
+   */
   const handleDisconnectWallet = (): void => {
-    setMetaMaskAddress(null);
+    setTxWalletAddress(null);
+    setTxWalletType(null);
     setWalletDetails(null);
     localStorage.removeItem("linked_metamask");
+    localStorage.removeItem("internal_tx_wallet");
+    localStorage.removeItem("internal_tx_pk");
   };
 
   return (
     <>
       <div ref={containerRef} className="flex flex-col gap-6">
-        {/* --- WEB3 WALLET SECTION --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-              Web3 Wallet (Payment)
+              Web3 Wallet (Transaction)
             </label>
             <button
               type="button"
@@ -177,31 +295,52 @@ export default function SecuritySection({
             </button>
             {showWalletInfoTooltip && (
               <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
-                Link your MetaMask wallet to send and receive direct P2P crypto
-                transfers in chat.
+                Create or import an internal wallet, or link an external wallet
+                (e.g., MetaMask) for P2P transfers.
               </div>
             )}
           </div>
-          {!metaMaskAddress ? (
-            <button
-              onClick={handleConnectMetaMask}
-              disabled={isConnecting}
-              className="w-full text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl border border-indigo-500 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
-            >
-              {isConnecting ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <WalletIcon className="w-4 h-4" />
-              )}
-              {isConnecting ? "Connecting..." : "Link MetaMask Wallet"}
-            </button>
+
+          {!txWalletAddress ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateInternalWallet}
+                  disabled={isConnecting}
+                  className="flex-1 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-white py-2.5 rounded-xl border border-zinc-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  Create Internal
+                </button>
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  disabled={isConnecting}
+                  className="flex-1 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-white py-2.5 rounded-xl border border-zinc-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  <ImportIcon className="w-4 h-4" /> Import Internal
+                </button>
+              </div>
+              <button
+                onClick={handleConnectExternalWallet}
+                disabled={isConnecting}
+                className="w-full text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl border border-indigo-500 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isConnecting ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <WalletIcon className="w-4 h-4" />
+                )}
+                Link External Wallet
+              </button>
+            </div>
           ) : (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-inner">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                   <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
-                    Connected
+                    {txWalletType === "internal"
+                      ? "Internal Wallet"
+                      : "External Wallet"}
                   </span>
                 </div>
                 <button
@@ -217,7 +356,7 @@ export default function SecuritySection({
                     ADDRESS
                   </span>
                   <span className="text-xs text-zinc-200 font-mono break-all bg-zinc-950 p-1.5 rounded-md border border-zinc-800/50 block">
-                    {metaMaskAddress}
+                    {txWalletAddress}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -228,8 +367,7 @@ export default function SecuritySection({
                     <span
                       className={`text-xs font-bold ${walletDetails?.chainId === "1" ? "text-red-400" : "text-indigo-400"}`}
                     >
-                      {walletDetails?.network || "Loading..."}{" "}
-                      {walletDetails?.chainId === "1" && "(Mainnet!)"}
+                      {walletDetails?.network || "Loading..."}
                     </span>
                   </div>
                   <div className="flex-1 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50">
@@ -248,7 +386,6 @@ export default function SecuritySection({
 
         {nodeSelector && <div>{nodeSelector}</div>}
 
-        {/* --- AUTO DELETE SECTION (DI SINI PAKE GLASSDROPDOWN + TOAST) --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -286,7 +423,6 @@ export default function SecuritySection({
           />
         </div>
 
-        {/* --- DATA BACKUP & AUTO BACKUP SECTION --- */}
         <div>
           <div className="flex items-center gap-1.5 mb-2 relative">
             <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
@@ -344,7 +480,6 @@ export default function SecuritySection({
             className="hidden"
           />
 
-          {/* AUTO BACKUP DROPDOWN (PAKE GLASSDROPDOWN + TOAST) */}
           <div className="mt-3">
             <GlassDropdown
               value={autoBackupMode}
@@ -361,7 +496,6 @@ export default function SecuritySection({
           </div>
         </div>
 
-        {/* --- WIPE DATA SECTION --- */}
         <div className="pt-2 border-t border-zinc-800/50">
           <button
             onClick={handleWipeData}
@@ -372,7 +506,79 @@ export default function SecuritySection({
         </div>
       </div>
 
-      {/* --- SEED MODAL FOR EXPORT/IMPORT/WIPE --- */}
+      {newInternalSeed &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+            <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <h3 className="text-lg font-bold text-emerald-400 mb-2">
+                Internal Wallet Created
+              </h3>
+              <p className="text-xs text-zinc-400 mb-4">
+                Please save this 12-word seed phrase securely. This is the only
+                way to recover your internal transaction wallet.
+              </p>
+              <div className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-200 font-mono text-center leading-relaxed">
+                {newInternalSeed}
+              </div>
+              <button
+                onClick={() => setNewInternalSeed(null)}
+                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors shadow-lg shadow-emerald-500/20"
+              >
+                I have saved this phrase
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {isImportModalOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-200 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <h3 className="text-lg font-bold text-zinc-100 mb-2">
+                Import Internal Wallet
+              </h3>
+              <p className="text-xs text-zinc-400 mb-4">
+                Enter the 12-word seed phrase of your previously created
+                internal wallet.
+              </p>
+              <textarea
+                value={importSeedInput}
+                onChange={(e) => setImportSeedInput(e.target.value)}
+                placeholder="e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon"
+                className="w-full h-24 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 outline-none transition-all resize-none mb-2 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+              {importError && (
+                <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                  {importError}
+                </p>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    setImportSeedInput("");
+                    setImportError("");
+                  }}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleImportInternalWallet(importSeedInput)}
+                  disabled={!importSeedInput.trim() || isConnecting}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+                >
+                  {isConnecting ? "Importing..." : "Import"}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {seedModal.isOpen &&
         typeof document !== "undefined" &&
         createPortal(

@@ -180,7 +180,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     },
   });
 
-  // Sambungin Ref-nya
   useEffect(() => {
     forceDisconnectPeerRef.current = forceDisconnectPeer;
   }, [forceDisconnectPeer]);
@@ -206,6 +205,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     hasSecret,
     encrypt,
     encryptLocalDB,
+    decryptLocalDB,
     sendDataViaWebRTC,
     showToast,
     peerWalletAddress: useWalletStore.getState().peerWalletAddress,
@@ -302,11 +302,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       try {
         const payload = JSON.parse(lastMsg.text);
         if (payload.type === "WALLET_REQUEST") {
-          const myMetaMask = localStorage.getItem("linked_metamask");
-          if (myMetaMask) {
+          const activeWallet =
+            localStorage.getItem("linked_metamask") ||
+            localStorage.getItem("internal_tx_wallet");
+
+          if (activeWallet) {
             const responsePayload = JSON.stringify({
               type: "WALLET_RESPONSE",
-              address: myMetaMask,
+              address: activeWallet,
             });
             const encryptedPayload = encrypt(activeChat, responsePayload);
             if (encryptedPayload && lastMsg.id) {

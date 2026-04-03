@@ -15,7 +15,7 @@ export interface TransferModalProps {
 
 /**
  * Renders a modal overlay for executing cryptocurrency transfers over the P2P network.
- * Handles peer wallet resolution, balance validation, and timeout states.
+ * Handles peer wallet resolution, balance validation, and timeout states for both internal and external wallets.
  *
  * @param {TransferModalProps} props - Component properties.
  * @returns {React.JSX.Element | null} The transfer modal UI, or null if closed.
@@ -33,11 +33,29 @@ export const TransferModal = ({
 
   useEffect(() => {
     const getBalance = async (): Promise<void> => {
-      const savedAddress = localStorage.getItem("linked_metamask");
-      if (isOpen && savedAddress && typeof window.ethereum !== "undefined") {
+      const externalAddress = localStorage.getItem("linked_metamask");
+      const internalAddress = localStorage.getItem("internal_tx_wallet");
+
+      const activeAddress = internalAddress || externalAddress;
+
+      if (isOpen && activeAddress) {
         try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const balanceWei = await provider.getBalance(savedAddress);
+          let provider;
+
+          if (internalAddress) {
+            provider = new ethers.JsonRpcProvider(
+              import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
+            );
+          } else if (
+            externalAddress &&
+            typeof window.ethereum !== "undefined"
+          ) {
+            provider = new ethers.BrowserProvider(window.ethereum);
+          } else {
+            throw new Error("No valid provider found");
+          }
+
+          const balanceWei = await provider.getBalance(activeAddress);
           const balanceEth = ethers.formatEther(balanceWei);
           setCurrentBalance(parseFloat(balanceEth).toFixed(4));
         } catch (err) {
@@ -109,7 +127,7 @@ export const TransferModal = ({
                   Request Timeout
                 </p>
                 <p className="text-xs text-zinc-400 text-center px-4">
-                  {activeUsername} has not linked a MetaMask wallet or is not
+                  {activeUsername} has not linked a transaction wallet or is not
                   responding.
                 </p>
               </>
@@ -199,7 +217,7 @@ export const TransferModal = ({
                     : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
                 }`}
               >
-                Send via MetaMask
+                Send Crypto
               </button>
             </div>
           </>

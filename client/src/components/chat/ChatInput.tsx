@@ -117,7 +117,9 @@ export const ChatInput = ({
 
   useEffect(() => {
     const checkWallet = () => {
-      setHasLinkedWallet(!!localStorage.getItem("linked_metamask"));
+      const hasExternal = !!localStorage.getItem("linked_metamask");
+      const hasInternal = !!localStorage.getItem("internal_tx_wallet");
+      setHasLinkedWallet(hasExternal || hasInternal);
     };
 
     checkWallet();

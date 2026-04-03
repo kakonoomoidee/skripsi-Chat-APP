@@ -20,18 +20,22 @@ export default function ChatArea(): React.JSX.Element {
     useState<boolean>(false);
 
   /**
-   * Validates MetaMask linkage and initiates the peer wallet address request via WebRTC.
+   * Validates transaction wallet linkage and initiates the peer wallet address request via WebRTC.
    *
    * @returns {void}
    */
   const handleOpenTransferModal = (): void => {
-    if (!localStorage.getItem("linked_metamask")) {
+    const hasExternal = !!localStorage.getItem("linked_metamask");
+    const hasInternal = !!localStorage.getItem("internal_tx_wallet");
+
+    if (!hasExternal && !hasInternal) {
       showToast(
-        "Please link your MetaMask wallet in Security Settings first.",
+        "Please link a transaction wallet in Security Settings first.",
         "error",
       );
       return;
     }
+
     requestPeerWallet();
     setIsTransferModalOpen(true);
   };
