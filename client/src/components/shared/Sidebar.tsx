@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
@@ -66,33 +66,34 @@ export default function Sidebar(): React.JSX.Element {
     }
   });
 
-  useEffect(() => {
+  const [prevSessions, setPrevSessions] = useState(activeSessions);
+
+  if (activeSessions !== prevSessions) {
+    setPrevSessions(activeSessions);
+
     if (activeSessions.length > 0) {
-      setRecentContacts((prev) => {
-        const updated = [...prev];
-        let isChanged = false;
+      let isChanged = false;
+      const updated = [...recentContacts];
 
-        activeSessions.forEach((session) => {
-          if (!updated.find((c) => c.username === session.username)) {
-            updated.push({
-              username: session.username,
-              address: session.address,
-            });
-            isChanged = true;
-          }
-        });
-
-        if (isChanged) {
-          localStorage.setItem(
-            "securep2p_recent_contacts",
-            JSON.stringify(updated),
-          );
-          return updated;
+      activeSessions.forEach((session) => {
+        if (!updated.find((c) => c.username === session.username)) {
+          updated.push({
+            username: session.username,
+            address: session.address,
+          });
+          isChanged = true;
         }
-        return prev;
       });
+
+      if (isChanged) {
+        localStorage.setItem(
+          "securep2p_recent_contacts",
+          JSON.stringify(updated),
+        );
+        setRecentContacts(updated);
+      }
     }
-  }, [activeSessions]);
+  }
 
   const clearHistory = (): void => {
     localStorage.removeItem("securep2p_recent_contacts");
