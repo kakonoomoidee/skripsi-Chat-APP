@@ -86,7 +86,7 @@ export default function Web3Wallet(): React.JSX.Element {
         provider = new ethers.BrowserProvider(window.ethereum);
       } else {
         provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
+          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
         );
       }
 
