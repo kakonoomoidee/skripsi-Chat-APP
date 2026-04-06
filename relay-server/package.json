@@ -5,9 +5,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "start:relay1": "cross-env PORT=3001 RELAYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 node server.js",
-    "start:relay2": "cross-env PORT=3002 RELAYER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d node server.js",
-    "start:relay3": "cross-env PORT=3003 RELAYER_PRIVATE_KEY=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a node server.js"
+    "start:relayprod1": "cross-env PORT=3001 RELAYER_PRIVATE_KEY=0x7bbbc8af12df0f9bace251b96a581aea92d21d46d19fc16f050f3e216b3b3284 node server.js",
+    "start:relayprod2": "cross-env PORT=3002 RELAYER_PRIVATE_KEY=0x0e760fcf12ece7408de41f8f3510201c9f74cd685383d714ebc578198b9d4b56 node server.js",
+    "start:relayprod3": "cross-env PORT=3003 RELAYER_PRIVATE_KEY=0xf408f30363934f5574257a8d2cf77a69660a3018ba408ab2aa8299567d0bc340 node server.js",
+    "start:relaydev1": "cross-env PORT=3001 RELAYER_PRIVATE_KEY=0x5ed4ff1a209b5c3279a8c72644bc4f453f9979a4f296024ad987aba6e9cf8b8d node server.js",
+    "start:relaydev2": "cross-env PORT=3002 RELAYER_PRIVATE_KEY=0xa1007c6a2c6d5c7815c6da6f530d6cf8a04a1454e09592ce36b0f57bd2f0823c node server.js",
+    "start:relaydev3": "cross-env PORT=3003 RELAYER_PRIVATE_KEY=0x576ab2cae6c01f0a567b3cc45d4ffa2f23d1c6f73a31754ded668d43e3cef3ce node server.js"
   },
   "keywords": [],
   "author": "",

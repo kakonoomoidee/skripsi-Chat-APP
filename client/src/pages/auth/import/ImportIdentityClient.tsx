@@ -32,7 +32,7 @@ export default function ImportIdentityClient() {
     walletLoading,
     authLoading,
     handleImport,
-  } = useImportHandler();
+  } = useImportHandler(activeRelay);
 
   const showPasswordError =
     confirmPassword.length > 0 && password !== confirmPassword;

@@ -41,7 +41,7 @@ export default function RegisterPage() {
     walletLoading,
     authLoading,
     handleRegister,
-  } = useRegisterHandler();
+  } = useRegisterHandler(activeRelay);
 
   const [isCopied, setIsCopied] = useState(false);
 

@@ -76,10 +76,9 @@ export const useLoginHandler = () => {
  * Custom hook to handle the registration flow, including username availability checks.
  * @returns {object} Registration state and handler function.
  */
-export const useRegisterHandler = () => {
+export const useRegisterHandler = (activeRelay: any) => {
   const { createAndEncryptWallet, loading: walletLoading } = useWallet();
   const { login, register, loading: authLoading } = useAuth();
-  const { activeRelay } = useRelay();
   const { showToast } = useUIStore();
 
   const [username, setUsername] = useState<string>("");
@@ -178,11 +177,10 @@ export const useRegisterHandler = () => {
  * Custom hook to handle the identity recovery flow via seed phrase.
  * @returns {object} Import state and handler function.
  */
-export const useImportHandler = () => {
+export const useImportHandler = (activeRelay: any) => {
   const navigate = useNavigate();
   const { importAndEncryptWallet, loading: walletLoading } = useWallet();
   const { login, loading: authLoading } = useAuth();
-  const { activeRelay } = useRelay();
   const { showToast } = useUIStore();
 
   const [seedImport, setSeedImport] = useState<string>("");
