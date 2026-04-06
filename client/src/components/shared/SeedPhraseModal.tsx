@@ -13,7 +13,7 @@ interface SeedPhraseModalProps {
 }
 
 /**
- * Renders a modal overlay displaying the seed phrase grid.
+ * Renders a modal overlay displaying the seed phrase grid with a clipboard copy fallback.
  * @param {SeedPhraseModalProps} props - The modal properties.
  * @returns {React.JSX.Element | null} The modal portal or null if document is undefined.
  */
@@ -29,16 +29,47 @@ export default function SeedPhraseModal({
 
   if (typeof document === "undefined") return null;
 
-  const handleCopyAndProceed = () => {
-    navigator.clipboard.writeText(seedPhrase);
-    setIsCopied(true);
-    setTimeout(() => {
-      if (onProceed) {
-        onProceed();
+  /**
+   * Copies the seed phrase to the clipboard with a fallback for insecure HTTP environments and executes the proceed action.
+   * @returns {void}
+   */
+  const handleCopyAndProceed = (): void => {
+    if (!seedPhrase) return;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(seedPhrase);
       } else {
-        onClose();
+        const textArea = document.createElement("textarea");
+        textArea.value = seedPhrase;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
       }
-    }, 1500);
+
+      setIsCopied(true);
+      setTimeout(() => {
+        if (onProceed) {
+          onProceed();
+        } else {
+          onClose();
+        }
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to copy phrase", err);
+      setIsCopied(true);
+      setTimeout(() => {
+        if (onProceed) {
+          onProceed();
+        } else {
+          onClose();
+        }
+      }, 1500);
+    }
   };
 
   return createPortal(

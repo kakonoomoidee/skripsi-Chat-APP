@@ -52,13 +52,36 @@ export default function RegisterPage() {
     if (isAuthenticated && !seedPhrase) navigate("/chat");
   }, [isAuthenticated, navigate, seedPhrase]);
 
-  const handleCopyAndProceed = () => {
-    if (seedPhrase) {
+/**
+ * Handles copying the seed phrase to the clipboard with a fallback for insecure HTTP contexts.
+ * @returns {void}
+ */
+const handleCopyAndProceed = () => {
+  if (!seedPhrase) return;
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(seedPhrase);
-      setIsCopied(true);
-      setTimeout(() => navigate("/chat"), 1500);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = seedPhrase;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
     }
-  };
+    
+    setIsCopied(true);
+    setTimeout(() => navigate("/chat"), 1500);
+  } catch (err) {
+    console.error("Failed to copy phrase", err);
+    setIsCopied(true);
+    setTimeout(() => navigate("/chat"), 1500);
+  }
+};
 
   if (seedPhrase) {
     return (
