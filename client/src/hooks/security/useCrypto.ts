@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   generateEphemeralKeys,
   deriveSharedSecret,
@@ -10,7 +10,7 @@ import {
  * Interface defining the return methods and state for the useCrypto hook.
  */
 export interface UseCryptoReturn {
-  ephemeralPublicKey: string | undefined;
+  generateHandshakeKeys: (peerAddress: string) => string;
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   encrypt: (peerAddress: string, plainText: string) => string | null;
   decrypt: (peerAddress: string, cipherText: string) => string;
@@ -22,20 +22,11 @@ export interface UseCryptoReturn {
 
 /**
  * Custom hook to manage cryptographic operations for end-to-end encryption (E2EE) and local storage.
- * Handles ECDH ephemeral key generation, shared secret derivation, and AES encryption/decryption.
- * * @returns {UseCryptoReturn} Cryptographic state and helper functions.
+ * Handles handshake-wide ECDH ephemeral key generation, shared secret derivation, and AES encryption/decryption.
+ * @returns {UseCryptoReturn} Cryptographic state and helper functions.
  */
 export const useCrypto = (): UseCryptoReturn => {
-  const [ephemeralKeyPair] = useState(() => {
-    const keys = generateEphemeralKeys();
-    console.log("=========================================");
-    console.log("[Crypto] Phase 3: ECDH Key Generation (Local)");
-    console.log("[Crypto] Ephemeral Private Key generated (Secured in memory)");
-    console.log(`[Crypto] Ephemeral Public Key generated: ${keys.publicKey}`);
-    console.log("=========================================");
-    return keys;
-  });
-
+  const pendingPrivateKeys = useRef<Record<string, any>>({});
   const [sharedSecrets, setSharedSecrets] = useState<Record<string, string>>(
     {},
   );
@@ -55,22 +46,44 @@ export const useCrypto = (): UseCryptoReturn => {
   });
 
   /**
+   * Generates disposable keys for a specific handshake.
+   * @param {string} peerAddress - The target peer address.
+   * @returns {string} The public key to be sent to the peer.
+   */
+  const generateHandshakeKeys = useCallback((peerAddress: string): string => {
+    const keys = generateEphemeralKeys();
+    console.log("=========================================");
+    console.log("[Crypto] Phase 3: ECDH Key Generation (Handshake-Wide)");
+    console.log("[Crypto] Ephemeral Private Key generated (Secured in memory)");
+    console.log(`[Crypto] Ephemeral Public Key generated: ${keys.publicKey}`);
+    console.log("=========================================");
+
+    pendingPrivateKeys.current[peerAddress] = keys.signingKey;
+    return keys.publicKey;
+  }, []);
+
+  /**
    * Derives and stores a shared secret using ECDH with the peer's public key.
-   * * @param {string} peerAddress - The address of the target peer.
+   * @param {string} peerAddress - The address of the target peer.
    * @param {string} peerPublicKey - The ephemeral public key provided by the peer.
+   * @returns {void}
    */
   const computeSecret = useCallback(
-    (peerAddress: string, peerPublicKey: string) => {
-      if (!ephemeralKeyPair) return;
+    (peerAddress: string, peerPublicKey: string): void => {
+      const mySigningKey = pendingPrivateKeys.current[peerAddress];
+      if (!mySigningKey) {
+        console.error(
+          `[Crypto Error] No pending private key found for peer: ${peerAddress}`,
+        );
+        return;
+      }
 
       console.log(`[Crypto] Deriving shared secret for peer: ${peerAddress}`);
-      const secret = deriveSharedSecret(
-        ephemeralKeyPair.signingKey,
-        peerPublicKey,
-      );
+      const secret = deriveSharedSecret(mySigningKey, peerPublicKey);
 
       if (secret) {
         setSharedSecrets((prev) => ({ ...prev, [peerAddress]: secret }));
+        delete pendingPrivateKeys.current[peerAddress];
         console.log(
           `[Crypto] Shared secret successfully established for peer: ${peerAddress}`,
         );
@@ -80,12 +93,12 @@ export const useCrypto = (): UseCryptoReturn => {
         );
       }
     },
-    [ephemeralKeyPair],
+    [],
   );
 
   /**
    * Encrypts a plaintext message using the shared secret established with the peer.
-   * * @param {string} peerAddress - The address of the target peer.
+   * @param {string} peerAddress - The address of the target peer.
    * @param {string} plainText - The message to encrypt.
    * @returns {string | null} The encrypted ciphertext, or null if encryption fails.
    * @throws {Error} Throws if no shared secret exists for the peer.
@@ -106,7 +119,7 @@ export const useCrypto = (): UseCryptoReturn => {
 
   /**
    * Decrypts a ciphertext message using the shared secret established with the peer.
-   * * @param {string} peerAddress - The address of the sender.
+   * @param {string} peerAddress - The address of the sender.
    * @param {string} cipherText - The encrypted message.
    * @returns {string} The decrypted plaintext, or a fallback string if decryption fails.
    */
@@ -116,7 +129,11 @@ export const useCrypto = (): UseCryptoReturn => {
       if (!secret) return "Encrypted (Waiting Handshake...)";
 
       const decrypted = decryptAES(cipherText, secret);
-      if (!decrypted) {
+      if (
+        !decrypted ||
+        decrypted.includes("FAILED") ||
+        decrypted.includes("ERROR")
+      ) {
         console.warn(
           `[Crypto Warning] Decryption failed or yielded empty result for peer: ${peerAddress}`,
         );
@@ -129,7 +146,7 @@ export const useCrypto = (): UseCryptoReturn => {
 
   /**
    * Encrypts data for secure storage in the local IndexedDB.
-   * * @param {string} plainText - The data to store.
+   * @param {string} plainText - The data to store.
    * @returns {string} The encrypted ciphertext.
    */
   const encryptLocalDB = useCallback(
@@ -142,7 +159,7 @@ export const useCrypto = (): UseCryptoReturn => {
 
   /**
    * Decrypts data retrieved from the local IndexedDB.
-   * * @param {string} cipherText - The encrypted data from storage.
+   * @param {string} cipherText - The encrypted data from storage.
    * @returns {string} The decrypted plaintext, or the original ciphertext if decryption fails.
    */
   const decryptLocalDB = useCallback(
@@ -159,9 +176,10 @@ export const useCrypto = (): UseCryptoReturn => {
 
   /**
    * Deletes the shared secret for a specific peer from memory.
-   * * @param {string} peerAddress - The address of the peer to remove.
+   * @param {string} peerAddress - The address of the peer to remove.
+   * @returns {void}
    */
-  const removeSecret = useCallback((peerAddress: string) => {
+  const removeSecret = useCallback((peerAddress: string): void => {
     setSharedSecrets((prev) => {
       const next = { ...prev };
       delete next[peerAddress.toLowerCase()];
@@ -173,7 +191,7 @@ export const useCrypto = (): UseCryptoReturn => {
   }, []);
 
   return {
-    ephemeralPublicKey: ephemeralKeyPair?.publicKey,
+    generateHandshakeKeys,
     computeSecret,
     encrypt,
     decrypt,

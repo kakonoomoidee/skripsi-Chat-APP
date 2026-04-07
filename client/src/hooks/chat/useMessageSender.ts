@@ -108,7 +108,8 @@ export const useMessageSender = ({
 
       setMessageInput("");
       setReplyingTo(null);
-    } catch (error) {
+    } catch (err) {
+      console.error("[Message Sender] Text send error:", err);
       showToast("Failed to send message. Is WebRTC connected?", "error");
     }
   };
@@ -148,7 +149,8 @@ export const useMessageSender = ({
           timestamp: Date.now(),
           isImage: true,
         });
-      } catch (error) {
+      } catch (err) {
+        console.error("[Message Sender] Image send error:", err);
         showToast("Encryption failed.", "error");
       }
     };
@@ -185,7 +187,8 @@ export const useMessageSender = ({
         isMine: true,
         timestamp: Date.now(),
       });
-    } catch (error) {
+    } catch (err) {
+      console.error("[Message Sender] Document send error:", err);
       showToast("Document encryption failed.", "error");
     }
   };
@@ -214,7 +217,8 @@ export const useMessageSender = ({
         timestamp: Date.now(),
         isImage: true,
       });
-    } catch (error) {
+    } catch (err) {
+      console.error("[Message Sender] Camera photo send error:", err);
       showToast("Camera image encryption failed.", "error");
     }
   };
@@ -245,7 +249,8 @@ export const useMessageSender = ({
           isMine: true,
           timestamp: Date.now(),
         });
-      } catch (error) {
+      } catch (err) {
+        console.error("[Message Sender] Audio send error:", err);
         showToast("Audio encryption failed.", "error");
       }
     };
@@ -349,8 +354,10 @@ export const useMessageSender = ({
         isMine: true,
         timestamp: Date.now(),
       });
-    } catch (error: any) {
-      throw error;
+    } catch (err: any) {
+      console.error("[Message Sender] Transaction failed:", err);
+      showToast(err.message || "Crypto transfer failed", "error");
+      throw err;
     }
   };
 

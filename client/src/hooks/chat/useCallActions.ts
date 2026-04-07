@@ -29,7 +29,7 @@ export interface UseCallActionsReturn {
 /**
  * Custom hook to manage WebRTC voice call signaling and actions.
  * Encapsulates the logic for offering, answering, rejecting, and ending calls.
- * * @param {UseCallActionsParams} params - Dependencies injected from the ChatContext.
+ * @param {UseCallActionsParams} params - Dependencies injected from the ChatContext.
  * @returns {UseCallActionsReturn} Object containing call action methods.
  */
 export const useCallActions = ({

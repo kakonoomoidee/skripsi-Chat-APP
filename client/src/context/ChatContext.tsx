@@ -83,7 +83,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const {
-    ephemeralPublicKey,
+    generateHandshakeKeys,
     computeSecret,
     encrypt,
     decrypt,
@@ -138,7 +138,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   } = useChatLogic({
     address,
     socket,
-    ephemeralPublicKey,
+    generateHandshakeKeys,
     computeSecret,
     hasSecret,
     relayUrl: activeRelay,
@@ -161,6 +161,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     activeChat,
     decrypt,
     encryptLocalDB,
+    generateHandshakeKeys,
+    computeSecret,
+    hasSecret,
     setIsPeerTyping,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
@@ -253,7 +256,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch {}
+      } catch (error) {
+        console.error("[ChatContext] Error sweeping old messages:", error);
+      }
     };
     sweepOldMessages();
   }, [autoDeleteMode]);
@@ -327,7 +332,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             ),
           });
         }
-      } catch {}
+      } catch (error) {
+        console.error(
+          "[ChatContext] Error checking incoming wallet requests:",
+          error,
+        );
+      }
     };
     checkIncomingForWalletRequests();
   }, [
@@ -401,6 +411,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined)

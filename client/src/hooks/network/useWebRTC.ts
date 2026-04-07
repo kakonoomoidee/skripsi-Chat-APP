@@ -18,6 +18,9 @@ export interface UseWebRTCParams {
   activeChat: string | null;
   decrypt: (peerAddress: string, encryptedMessage: string) => string;
   encryptLocalDB: (plainText: string) => string;
+  generateHandshakeKeys: (peerAddress: string) => string;
+  computeSecret: (peerAddress: string, peerPublicKey: string) => void;
+  hasSecret: (peerAddress: string) => boolean;
   setIsPeerTyping?: (isTyping: boolean) => void;
   onCallOffer?: () => void;
   onCallAccepted?: () => void;
@@ -43,7 +46,6 @@ export interface UseWebRTCReturn {
 /**
  * Custom hook to orchestrate WebRTC Peer-to-Peer connections.
  * Handles signaling, Data Channels, and Media Streams.
- *
  * @param {UseWebRTCParams} params - Dependencies and event callbacks.
  * @returns {UseWebRTCReturn} WebRTC control methods and connection states.
  */
@@ -53,6 +55,8 @@ export const useWebRTC = ({
   activeChat,
   decrypt,
   encryptLocalDB,
+  generateHandshakeKeys,
+  computeSecret,
   setIsPeerTyping,
   onCallOffer,
   onCallAccepted,
@@ -89,7 +93,6 @@ export const useWebRTC = ({
 
   /**
    * Forcibly closes the connection and data channels for a specific peer.
-   *
    * @param {string} peerAddress - The address of the peer to disconnect.
    * @returns {void}
    */
@@ -112,7 +115,6 @@ export const useWebRTC = ({
 
   /**
    * Requests media access and attaches the local audio stream to the peer connection.
-   *
    * @param {string} targetPeer - The target peer address.
    * @returns {Promise<boolean>} True if microphone access was granted and stream started.
    */
@@ -144,6 +146,7 @@ export const useWebRTC = ({
     } catch (error) {
       console.error(
         "[WebRTC Media Error] Microphone access denied or unavailable.",
+        error,
       );
       return false;
     }
@@ -151,7 +154,6 @@ export const useWebRTC = ({
 
   /**
    * Stops the local audio stream and detaches it from the peer connection.
-   *
    * @param {string} targetPeer - The target peer address.
    * @returns {void}
    */
@@ -178,7 +180,6 @@ export const useWebRTC = ({
 
   /**
    * Toggles the mute state of the local microphone stream.
-   *
    * @returns {boolean} The new muted state (true if muted).
    */
   const toggleMicMute = (): boolean => {
@@ -194,81 +195,89 @@ export const useWebRTC = ({
 
   /**
    * Parses and handles incoming messages from the DataChannel.
-   *
    * @param {string} peerAddress - The sender's address.
    * @param {string} encryptedData - The encrypted payload received.
    * @returns {Promise<void>}
    */
-  const handleIncomingMessage = async (
-    peerAddress: string,
-    encryptedData: string,
-  ): Promise<void> => {
-    try {
-      const decryptedContent = decrypt(peerAddress, encryptedData);
-
+  const handleIncomingMessage = useCallback(
+    async (peerAddress: string, encryptedData: string): Promise<void> => {
       try {
-        const parsed = JSON.parse(decryptedContent);
+        const decryptedContent = decrypt(peerAddress, encryptedData);
 
-        if (parsed.type === "TYPING" && setIsPeerTyping) {
-          setIsPeerTyping(true);
-          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          typingTimeoutRef.current = setTimeout(
-            () => setIsPeerTyping(false),
-            2500,
-          );
-          return;
+        try {
+          const parsed = JSON.parse(decryptedContent);
+
+          if (parsed.type === "TYPING" && setIsPeerTyping) {
+            setIsPeerTyping(true);
+            if (typingTimeoutRef.current)
+              clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(
+              () => setIsPeerTyping(false),
+              2500,
+            );
+            return;
+          }
+          if (parsed.type === "CALL_OFFER" && onCallOffer) {
+            console.log(
+              "[WebRTC Signaling] Call offer received via DataChannel.",
+            );
+            onCallOffer();
+            return;
+          }
+          if (parsed.type === "CALL_ACCEPTED") {
+            console.log("[WebRTC Signaling] Call accepted by peer.");
+            startVoiceCall(peerAddress).then((success) => {
+              if (success && onCallAccepted) onCallAccepted();
+            });
+            return;
+          }
+          if (parsed.type === "CALL_REJECTED" && onCallRejected) {
+            console.log("[WebRTC Signaling] Call rejected by peer.");
+            onCallRejected();
+            return;
+          }
+          if (parsed.type === "CALL_ENDED") {
+            console.log("[WebRTC Signaling] Call terminated by peer.");
+            stopVoiceCall(peerAddress);
+            if (onCallEnded) onCallEnded();
+            return;
+          }
+        } catch {
+          console.log("[WebRTC DataChannel] Parsing standard chat payload.");
         }
-        if (parsed.type === "CALL_OFFER" && onCallOffer) {
-          console.log(
-            "[WebRTC Signaling] Call offer received via DataChannel.",
-          );
-          onCallOffer();
-          return;
-        }
-        if (parsed.type === "CALL_ACCEPTED") {
-          console.log("[WebRTC Signaling] Call accepted by peer.");
-          startVoiceCall(peerAddress).then((success) => {
-            if (success && onCallAccepted) onCallAccepted();
-          });
-          return;
-        }
-        if (parsed.type === "CALL_REJECTED" && onCallRejected) {
-          console.log("[WebRTC Signaling] Call rejected by peer.");
-          onCallRejected();
-          return;
-        }
-        if (parsed.type === "CALL_ENDED") {
-          console.log("[WebRTC Signaling] Call terminated by peer.");
-          stopVoiceCall(peerAddress);
-          if (onCallEnded) onCallEnded();
-          return;
-        }
-      } catch {
-        console.log("[WebRTC DataChannel] Parsing standard chat payload.");
+
+        if (!myAddress) return;
+        const isReceivedImage = decryptedContent.startsWith("data:image");
+
+        await db.messages.add({
+          ownerAddress: myAddress.toLowerCase(),
+          chatId: peerAddress,
+          text: encryptLocalDB(decryptedContent),
+          isMine: false,
+          timestamp: Date.now(),
+          isImage: isReceivedImage,
+        });
+      } catch (error) {
+        console.error(
+          "[WebRTC DataChannel Error] Failed to parse or save incoming message.",
+          error,
+        );
       }
-
-      if (!myAddress) return;
-      const isReceivedImage = decryptedContent.startsWith("data:image");
-
-      await db.messages.add({
-        ownerAddress: myAddress.toLowerCase(),
-        chatId: peerAddress,
-        text: encryptLocalDB(decryptedContent),
-        isMine: false,
-        timestamp: Date.now(),
-        isImage: isReceivedImage,
-      });
-    } catch (error) {
-      console.error(
-        "[WebRTC DataChannel Error] Failed to parse or save incoming message.",
-        error,
-      );
-    }
-  };
+    },
+    [
+      decrypt,
+      setIsPeerTyping,
+      onCallOffer,
+      onCallAccepted,
+      onCallRejected,
+      onCallEnded,
+      myAddress,
+      encryptLocalDB,
+    ],
+  );
 
   /**
    * Initiates a new WebRTC connection as the offerer.
-   *
    * @param {string} targetPeer - The peer address to connect to.
    * @returns {Promise<void>}
    */
@@ -357,9 +366,12 @@ export const useWebRTC = ({
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
+        // Bikin Ephemeral Public Key buat handshake spesifik ini
+        const myEphemeralPub = generateHandshakeKeys(peerAddress);
+
         socket.emit("webrtc_signal", {
           to: peerAddress,
-          signal: { type: "offer", offer },
+          signal: { type: "offer", offer, ephemeralPublicKey: myEphemeralPub },
         });
         console.log(
           "[WebRTC] Local SDP Offer generated and dispatched via signaling server.",
@@ -373,15 +385,10 @@ export const useWebRTC = ({
     },
     [
       socket,
-      decrypt,
-      encryptLocalDB,
       myAddress,
-      setIsPeerTyping,
-      onCallOffer,
-      onCallAccepted,
-      onCallRejected,
-      onCallEnded,
       onPeerDisconnected,
+      handleIncomingMessage,
+      generateHandshakeKeys,
     ],
   );
 
@@ -481,6 +488,11 @@ export const useWebRTC = ({
           );
           pc.getTransceivers().forEach((t) => (t.direction = "sendrecv"));
 
+          // Computasi ECDH dari kunci publik sender yang dateng sama SDP Offer
+          if (computeSecret && signal.ephemeralPublicKey) {
+            computeSecret(peerAddress, signal.ephemeralPublicKey);
+          }
+
           if (iceQueues.current[peerAddress]) {
             for (const cand of iceQueues.current[peerAddress]) {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -491,9 +503,16 @@ export const useWebRTC = ({
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
+          // Bikin kunci balesan buat Handshake-Wide
+          const myEphemeralPub = generateHandshakeKeys(peerAddress);
+
           socket.emit("webrtc_signal", {
             to: peerAddress,
-            signal: { type: "answer", answer },
+            signal: {
+              type: "answer",
+              answer,
+              ephemeralPublicKey: myEphemeralPub,
+            },
           });
           console.log("[WebRTC] Local SDP Answer generated and dispatched.");
         } catch (err) {
@@ -512,6 +531,12 @@ export const useWebRTC = ({
             await pc.setRemoteDescription(
               new RTCSessionDescription(signal.answer),
             );
+
+            // Computasi ECDH dari balasan Receiver
+            if (computeSecret && signal.ephemeralPublicKey) {
+              computeSecret(peerAddress, signal.ephemeralPublicKey);
+            }
+
             if (iceQueues.current[peerAddress]) {
               for (const cand of iceQueues.current[peerAddress]) {
                 await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -553,19 +578,14 @@ export const useWebRTC = ({
   }, [
     socket,
     myAddress,
-    decrypt,
-    encryptLocalDB,
-    setIsPeerTyping,
-    onCallOffer,
-    onCallAccepted,
-    onCallRejected,
-    onCallEnded,
+    computeSecret,
+    generateHandshakeKeys,
+    handleIncomingMessage,
     onPeerDisconnected,
   ]);
 
   /**
    * Transmits encrypted data over the active DataChannel to the target peer.
-   *
    * @param {string} targetPeer - The address of the peer.
    * @param {string} encryptedData - The AES-encrypted payload.
    * @returns {void}

@@ -8,7 +8,7 @@ import { Socket } from "socket.io-client";
 interface UseChatLogicProps {
   address: string | null;
   socket: Socket | null;
-  ephemeralPublicKey: string | undefined;
+  generateHandshakeKeys: (peerAddress: string) => string;
   computeSecret: (peerAddress: string, peerPublicKey: string) => void;
   hasSecret: (peerAddress: string) => boolean;
   relayUrl: string;
@@ -36,13 +36,13 @@ export interface ActiveSession {
 /**
  * Custom hook to manage chat sessions, handle peer discovery, and coordinate
  * cryptographic handshakes via Socket.IO.
- * * @param {UseChatLogicProps} props - Dependencies including socket instance and crypto functions.
+ * @param {UseChatLogicProps} props - Dependencies including socket instance and crypto functions.
  * @returns {object} Chat session states and handler functions.
  */
 export const useChatLogic = ({
   address,
   socket,
-  ephemeralPublicKey,
+  generateHandshakeKeys,
   computeSecret,
   hasSecret,
   relayUrl,
@@ -78,7 +78,7 @@ export const useChatLogic = ({
 
   /**
    * Closes the current active chat session and clears the active chat state.
-   * * @returns {void}
+   * @returns {void}
    */
   const closeChat = useCallback((): void => {
     setActiveChat(null);
@@ -121,16 +121,21 @@ export const useChatLogic = ({
         (s) => s.address === peerAddress,
       );
 
-      if (existingSession && ephemeralPublicKey) {
+      if (existingSession) {
         console.log(
           `[Handshake] Auto-accepting offer from known active session: ${peerAddress}`,
         );
         if (forceDisconnectPeer) forceDisconnectPeer(peerAddress);
 
+        const myNewPubKey = generateHandshakeKeys(peerAddress);
+        console.log(
+          `[Crypto PROOF] Re-Handshake Auto. Ephemeral PubKey generated for ${peerAddress}: ${myNewPubKey.substring(0, 15)}...`,
+        );
+
         computeSecret(peerAddress, data.ephemeralPublicKey);
         socket.emit("handshake_response", {
           to: peerAddress,
-          ephemeralPublicKey: ephemeralPublicKey,
+          ephemeralPublicKey: myNewPubKey,
         });
         setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
         return;
@@ -142,7 +147,7 @@ export const useChatLogic = ({
         incomingUser = res.data.username;
       } catch (err) {
         console.warn(
-          `[Chat Logic] Failed to fetch username for incoming address: ${data.from}`,
+          `[Chat Logic] Failed to fetch username for incoming address: ${data.from}. Error: ${err}`,
         );
       }
 
@@ -173,13 +178,13 @@ export const useChatLogic = ({
     socket,
     computeSecret,
     relayUrl,
-    ephemeralPublicKey,
+    generateHandshakeKeys,
     forceDisconnectPeer,
   ]);
 
   /**
    * Resolves a target username to an address and initiates a handshake request.
-   * * @returns {Promise<void>}
+   * @returns {Promise<void>}
    */
   const handleConnectPeer = async (): Promise<void> => {
     if (!targetUsername.trim()) return;
@@ -216,18 +221,22 @@ export const useChatLogic = ({
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
       if (!hasSecret(peerAddress) && socket) {
+        const myNewPubKey = generateHandshakeKeys(peerAddress);
+        console.log(
+          `[Crypto PROOF] Handshake Init. Ephemeral PubKey generated for ${peerAddress}: ${myNewPubKey.substring(0, 15)}...`,
+        );
         console.log(
           `[Handshake] Transmitting initial offer to: ${peerAddress}`,
         );
         socket.emit("handshake_init", {
           to: peerAddress,
-          ephemeralPublicKey: ephemeralPublicKey,
+          ephemeralPublicKey: myNewPubKey,
         });
       }
       setTargetUsername("");
     } catch (err) {
       console.error(
-        `[Chat Logic] Target user not found on network: ${targetUsername.trim()}`,
+        `[Chat Logic] Target user not found on network: ${targetUsername.trim()}. Error: ${err}`,
       );
       setSearchError("Username not found on the network.");
     } finally {
@@ -237,7 +246,7 @@ export const useChatLogic = ({
 
   /**
    * Accepts an incoming handshake request and computes the shared secret.
-   * * @param {HandshakeRequest} request - The pending handshake request object.
+   * @param {HandshakeRequest} request - The pending handshake request object.
    * @returns {Promise<void>}
    */
   const handleAcceptRequest = async (
@@ -246,15 +255,22 @@ export const useChatLogic = ({
     console.log(
       `[Handshake] Accepting connection request from: ${request.from}`,
     );
-    computeSecret(request.from, request.ephemeralPublicKey);
 
     const peerAddress = request.from.toLowerCase();
+    const myNewPubKey = generateHandshakeKeys(peerAddress);
+
+    console.log(
+      `[Crypto PROOF] Handshake Accept. Ephemeral PubKey generated for ${peerAddress}: ${myNewPubKey.substring(0, 15)}...`,
+    );
+
+    computeSecret(peerAddress, request.ephemeralPublicKey);
+
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
       socket.emit("handshake_response", {
-        to: request.from,
-        ephemeralPublicKey: ephemeralPublicKey,
+        to: peerAddress,
+        ephemeralPublicKey: myNewPubKey,
       });
     }
 
@@ -278,7 +294,7 @@ export const useChatLogic = ({
 
   /**
    * Rejects and dismisses an incoming handshake request.
-   * * @param {string} requestAddress - The address of the peer to reject.
+   * @param {string} requestAddress - The address of the peer to reject.
    * @returns {void}
    */
   const handleRejectRequest = (requestAddress: string): void => {
@@ -292,7 +308,7 @@ export const useChatLogic = ({
 
   /**
    * Switches the active chat window to a different existing session.
-   * * @param {ActiveSession} session - The session to switch to.
+   * @param {ActiveSession} session - The session to switch to.
    * @returns {void}
    */
   const switchChat = (session: ActiveSession): void => {
@@ -302,7 +318,7 @@ export const useChatLogic = ({
 
   /**
    * Completely removes a session from memory and clears its cryptographic secrets.
-   * * @param {string} peerAddress - The address of the peer to disconnect.
+   * @param {string} peerAddress - The address of the peer to disconnect.
    * @returns {void}
    */
   const removeActiveSession = useCallback(
