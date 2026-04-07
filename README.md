@@ -207,7 +207,7 @@ sudo ln -s /etc/nginx/sites-available/chat-app /etc/nginx/sites-enabled/
 sudo nginx -t && sudo nginx -s reload
 ```
 
-> **Note:** Browser akan menampilkan warning "Not Secure" karena self-signed certificate. Klik **Advanced → Proceed** untuk melanjutkan. Setelah itu akses mikrofon dan kamera akan berfungsi normal karena koneksi sudah HTTPS.
+> **Note**: Your browser may display a "Not Secure" warning because a self-signed certificate is being used. Click **Advanced → Proceed** to continue. After that, microphone and camera access should work normally since the connection is already using HTTPS.
 
 ---
 
