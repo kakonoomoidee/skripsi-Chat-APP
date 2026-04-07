@@ -60,11 +60,15 @@ By completely removing the central database from the equation, SecureP2P leverag
 
 - Node.js (v18+)
 - Redis Server (Running on default port `6379`)
-- Ganache or any local EVM network
+- Ganache CLI (`npm install -g ganache`)
+- PM2 (`npm install -g pm2`) — for production
+- Nginx — for production
+
+---
 
 ### 1. Smart Contract Setup
 
-Choose your preferred Ethereum development environment to deploy the registry contract:
+Deploy the registry contract using your preferred environment:
 
 **Option A: Using Hardhat**
 
@@ -72,7 +76,7 @@ Choose your preferred Ethereum development environment to deploy the registry co
 cd apps/contracts
 npm install
 npx hardhat compile
-npx hardhat node # Leave this running in a separate terminal, or use Ganache GUI
+npx hardhat node
 npx hardhat run scripts/deploy.ts --network localhost
 ```
 
@@ -84,30 +88,128 @@ npm install
 truffle migrate --reset
 ```
 
-### 2. Relay Servers Setup
+---
 
-Open two separate terminal instances to simulate a multi-node environment.
+### 2. Running Services
+
+#### 🧪 Development
+
+Run each service manually in separate terminals:
 
 ```bash
-cd apps/relay-server
-npm install
+# Ganache (local EVM)
+ganache -h 127.0.0.1 -p 8545 -m "check tongue that exhaust miss voyage maple velvet wheel learn food scare"
 
-# Terminal 1
+# Relay Server 1
+cd apps/relay-server
 npm run start:relay1
 
-# Terminal 2
+# Relay Server 2
+cd apps/relay-server
 npm run start:relay2
-```
 
-### 3. Client Application Setup
-
-```bash
+# Client
 cd apps/client
-npm install
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`.
+The client will be available at `http://localhost:5173`.
+
+---
+
+#### 🚀 Production (PM2 + Nginx)
+
+Use PM2 to keep all backend services alive in the background.
+
+**Start services with PM2:**
+
+```bash
+# Ganache
+pm2 start ganache --name "ganache" -- -h 127.0.0.1 -p 8545 -m "check tongue that exhaust miss voyage maple velvet wheel learn food scare"
+
+# Relay Server 1
+pm2 start npm --name "relay1" -- run start:relayprod1
+
+# Relay Server 2
+pm2 start npm --name "relay2" -- run start:relayprod2
+```
+
+**Build & serve the client via Nginx:**
+
+```bash
+cd apps/client
+npm run build
+# Output goes to dist/, served by Nginx (see below)
+```
+
+**Save PM2 process list & enable auto-start on reboot:**
+
+```bash
+pm2 save
+pm2 startup
+```
+
+**Useful PM2 commands:**
+
+```bash
+pm2 status          # show all running processes
+pm2 logs            # display logs for all processes
+pm2 logs ganache    # display logs for a specific process (ganache)
+pm2 restart all     # restart all processes
+pm2 stop all        # stop all processes
+```
+
+---
+
+### 3. Nginx Setup (Production)
+
+Nginx serves the built client and handles HTTPS via self-signed certificate.
+
+**Generate self-signed certificate:**
+
+```bash
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/selfsigned.key \
+  -out /etc/ssl/certs/selfsigned.crt \
+  -subj "/CN=10.64.24.248" \
+  -addext "subjectAltName=IP:10.64.24.248"
+```
+
+**Nginx config** (`/etc/nginx/sites-available/chat-app`):
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    return 301 https://10.64.24.248$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name 10.64.24.248;
+
+    ssl_certificate /etc/ssl/certs/selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/selfsigned.key;
+
+    root /home/thesis/rizki/skripsi-Chat-APP/client/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**Enable & reload:**
+
+```bash
+sudo ln -s /etc/nginx/sites-available/chat-app /etc/nginx/sites-enabled/
+sudo nginx -t && sudo nginx -s reload
+```
+
+> **Note:** Browser akan menampilkan warning "Not Secure" karena self-signed certificate. Klik **Advanced → Proceed** untuk melanjutkan. Setelah itu akses mikrofon dan kamera akan berfungsi normal karena koneksi sudah HTTPS.
+
+---
 
 ## 💻 Usage Guide
 
