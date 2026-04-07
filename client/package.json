@@ -1,7 +1,8 @@
 {
-  "name": "client",
+  "name": "securep2p-client",
   "private": true,
-  "version": "1.6.5",
+  "version": "1.7.0",
+  "description": "Frontend client for SecureP2P chat application built with Vite, React, and WebRTC.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +10,17 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
+  "keywords": [
+    "react",
+    "vite",
+    "webrtc",
+    "p2p",
+    "e2ee",
+    "chat",
+    "dapp"
+  ],
+  "author": "kakonoomoide",
+  "license": "MIT",
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "axios": "^1.13.5",
@@ -30,7 +42,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.24",
-    "eslint": "^10.0.1",
+    "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",

@@ -1,0 +1,30 @@
+{
+  "name": "securep2p-blockchain",
+  "version": "1.7.0",
+  "description": "Smart contracts and Truffle configuration for SecureP2P decentralized identity and relay management.",
+  "main": "truffle-config.js",
+  "scripts": {
+    "test": "truffle test",
+    "compile": "truffle compile",
+    "migrate:dev": "truffle migrate --network development",
+    "migrate:prod": "truffle migrate --network production",
+    "migrate:sepolia": "truffle migrate --network sepolia",
+    "console:dev": "truffle console --network development",
+    "console:sepolia": "truffle console --network sepolia",
+    "flatten": "truffle-flattener contracts/IdentityRegistry.sol > flat/IdentityRegistry_flat.sol"
+  },
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "smart-contracts",
+    "truffle",
+    "webrtc",
+    "p2p"
+  ],
+  "author": "kakonoomoide",
+  "license": "MIT",
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "dotenv": "^17.4.1"
+  }
+}

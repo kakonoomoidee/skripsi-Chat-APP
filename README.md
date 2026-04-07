@@ -85,7 +85,8 @@ npx hardhat run scripts/deploy.ts --network localhost
 ```bash
 cd apps/contracts
 npm install
-truffle migrate --reset
+npm run migrate:dev             # run database migrations in development mode
+npm run migrate:dev -- --reset  # reset the database and re-run all migrations
 ```
 
 ---
