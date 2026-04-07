@@ -57,6 +57,7 @@ export const useWebRTC = ({
   encryptLocalDB,
   generateHandshakeKeys,
   computeSecret,
+  hasSecret,
   setIsPeerTyping,
   onCallOffer,
   onCallAccepted,
@@ -366,8 +367,9 @@ export const useWebRTC = ({
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Bikin Ephemeral Public Key buat handshake spesifik ini
-        const myEphemeralPub = generateHandshakeKeys(peerAddress);
+        const myEphemeralPub = !hasSecret(peerAddress)
+          ? generateHandshakeKeys(peerAddress)
+          : undefined;
 
         socket.emit("webrtc_signal", {
           to: peerAddress,
@@ -386,6 +388,7 @@ export const useWebRTC = ({
     [
       socket,
       myAddress,
+      hasSecret,
       onPeerDisconnected,
       handleIncomingMessage,
       generateHandshakeKeys,
@@ -488,8 +491,11 @@ export const useWebRTC = ({
           );
           pc.getTransceivers().forEach((t) => (t.direction = "sendrecv"));
 
-          // Computasi ECDH dari kunci publik sender yang dateng sama SDP Offer
-          if (computeSecret && signal.ephemeralPublicKey) {
+          if (
+            !hasSecret(peerAddress) &&
+            computeSecret &&
+            signal.ephemeralPublicKey
+          ) {
             computeSecret(peerAddress, signal.ephemeralPublicKey);
           }
 
@@ -503,8 +509,9 @@ export const useWebRTC = ({
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
-          // Bikin kunci balesan buat Handshake-Wide
-          const myEphemeralPub = generateHandshakeKeys(peerAddress);
+          const myEphemeralPub = signal.ephemeralPublicKey
+            ? generateHandshakeKeys(peerAddress)
+            : undefined;
 
           socket.emit("webrtc_signal", {
             to: peerAddress,
@@ -532,8 +539,11 @@ export const useWebRTC = ({
               new RTCSessionDescription(signal.answer),
             );
 
-            // Computasi ECDH dari balasan Receiver
-            if (computeSecret && signal.ephemeralPublicKey) {
+            if (
+              !hasSecret(peerAddress) &&
+              computeSecret &&
+              signal.ephemeralPublicKey
+            ) {
               computeSecret(peerAddress, signal.ephemeralPublicKey);
             }
 
@@ -578,6 +588,7 @@ export const useWebRTC = ({
   }, [
     socket,
     myAddress,
+    hasSecret,
     computeSecret,
     generateHandshakeKeys,
     handleIncomingMessage,

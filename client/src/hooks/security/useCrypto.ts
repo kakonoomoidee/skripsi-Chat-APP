@@ -112,7 +112,36 @@ export const useCrypto = (): UseCryptoReturn => {
         );
         throw new Error("Handshake required!");
       }
-      return encryptAES(plainText, secret);
+
+      const cipherText = encryptAES(plainText, secret);
+
+      // Mute the annoying logs for system-level messages (Typing, Wallet Requests, etc)
+      const isSystemMessage =
+        plainText.includes('"type":"TYPING"') ||
+        plainText.includes('"type":"WALLET_REQUEST"') ||
+        plainText.includes('"type":"WALLET_RESPONSE"') ||
+        plainText.includes('"type":"CALL_OFFER"') ||
+        plainText.includes('"type":"CALL_ACCEPTED"') ||
+        plainText.includes('"type":"CALL_REJECTED"') ||
+        plainText.includes('"type":"CALL_ENDED"');
+
+      if (!isSystemMessage) {
+        console.log("-----------------------------------------");
+        console.log("[Phase 4: AES-256 Encryption - Sending Message]");
+        console.log(
+          `[AES PROOF] Shared Secret Key  : ${secret.substring(0, 20)}...`,
+        );
+        console.log(
+          `[AES PROOF] Original Plaintext : ${plainText.length > 50 ? plainText.substring(0, 50) + "... [TRUNCATED]" : plainText}`,
+        );
+        console.log(
+          `[AES PROOF] Ciphertext Output  : ${cipherText ? cipherText.substring(0, 50) + "... [TRUNCATED]" : "null"}`,
+        );
+        console.log("[AES PROOF] Transmitting via WebRTC Data Channel...");
+        console.log("-----------------------------------------");
+      }
+
+      return cipherText;
     },
     [sharedSecrets],
   );
@@ -129,6 +158,7 @@ export const useCrypto = (): UseCryptoReturn => {
       if (!secret) return "Encrypted (Waiting Handshake...)";
 
       const decrypted = decryptAES(cipherText, secret);
+
       if (
         !decrypted ||
         decrypted.includes("FAILED") ||
@@ -137,9 +167,35 @@ export const useCrypto = (): UseCryptoReturn => {
         console.warn(
           `[Crypto Warning] Decryption failed or yielded empty result for peer: ${peerAddress}`,
         );
+        return "Decryption Failed";
       }
 
-      return decrypted || "Decryption Failed";
+      // Mute the annoying logs for system-level messages
+      const isSystemMessage =
+        decrypted.includes('"type":"TYPING"') ||
+        decrypted.includes('"type":"WALLET_REQUEST"') ||
+        decrypted.includes('"type":"WALLET_RESPONSE"') ||
+        decrypted.includes('"type":"CALL_OFFER"') ||
+        decrypted.includes('"type":"CALL_ACCEPTED"') ||
+        decrypted.includes('"type":"CALL_REJECTED"') ||
+        decrypted.includes('"type":"CALL_ENDED"');
+
+      if (!isSystemMessage) {
+        console.log("-----------------------------------------");
+        console.log("[Phase 4: AES-256 Decryption - Receiving Message]");
+        console.log(
+          `[AES PROOF] Shared Secret Key : ${secret.substring(0, 20)}...`,
+        );
+        console.log(
+          `[AES PROOF] Received Ciphertext: ${cipherText.length > 50 ? cipherText.substring(0, 50) + "... [TRUNCATED]" : cipherText}`,
+        );
+        console.log(
+          `[AES PROOF] Decrypted Plaintext: ${decrypted.length > 50 ? decrypted.substring(0, 50) + "... [TRUNCATED]" : decrypted}`,
+        );
+        console.log("-----------------------------------------");
+      }
+
+      return decrypted;
     },
     [sharedSecrets],
   );
@@ -152,6 +208,14 @@ export const useCrypto = (): UseCryptoReturn => {
   const encryptLocalDB = useCallback(
     (plainText: string): string => {
       const encrypted = encryptAES(plainText, localDbKey);
+
+      // Filter out typing indicators from DB storage logs too, just in case
+      if (!plainText.includes('"type":"TYPING"')) {
+        console.log(
+          `[Data-at-Rest PROOF] Storing encrypted data to IndexedDB. Ciphertext: ${encrypted ? encrypted.substring(0, 30) + "... [TRUNCATED]" : ""}`,
+        );
+      }
+
       return encrypted || "";
     },
     [localDbKey],
