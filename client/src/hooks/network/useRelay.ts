@@ -19,7 +19,9 @@ export interface UseRelayReturn {
  * @returns {UseRelayReturn} Relay state and management methods.
  */
 export const useRelay = (): UseRelayReturn => {
-  const baseUrls = ["http://127.0.0.1:3001", "http://127.0.0.1:3002", "http://10.64.24.248:3001"];
+  const rawEnvRelays = import.meta.env.VITE_DEFAULT_RELAYS || "http://127.0.0.1:3001";
+  
+  const baseUrls = rawEnvRelays.split(",").map((url: string) => url.trim());
 
   const [activeRelay, setActiveRelay] = useState<string>(
     localStorage.getItem("active_relay") || baseUrls[0],
