@@ -71,6 +71,14 @@ export interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
+/**
+ * Provides global chat context including state management for messaging, WebRTC connections,
+ * cryptography, and crypto wallet transactions within the P2P application.
+ *
+ * @param {Object} props - Component properties.
+ * @param {ReactNode} props.children - Child components that require access to the chat context.
+ * @returns {React.JSX.Element} The populated Context Provider.
+ */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { token, logout, isAuthenticated } = useAuth();
@@ -300,54 +308,57 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   ]);
 
   useEffect(() => {
-    const checkIncomingForWalletRequests = async () => {
-      if (!messages || messages.length === 0 || !activeChat) return;
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.isMine || lastMsg.id === undefined) return;
-      try {
-        const payload = JSON.parse(lastMsg.text);
-        if (payload.type === "WALLET_REQUEST") {
-          const activeWallet =
-            localStorage.getItem("linked_metamask") ||
-            localStorage.getItem("internal_tx_wallet");
+    const handleProtocolMessages = async () => {
+      if (!messages || messages.length === 0) return;
 
-          if (activeWallet) {
+      const latestMessage = messages[messages.length - 1];
+      if (!latestMessage || !latestMessage.text) return;
+
+      const { peerWalletAddress, setPeerWalletAddress } =
+        useWalletStore.getState();
+
+      try {
+        const parsedData = JSON.parse(latestMessage.text);
+
+        if (parsedData.type === "WALLET_RESPONSE" && parsedData.address) {
+          if (peerWalletAddress !== parsedData.address) {
+            setPeerWalletAddress(parsedData.address);
+          }
+          if (latestMessage.id) {
+            await db.messages.delete(latestMessage.id);
+          }
+        }
+
+        if (parsedData.type === "WALLET_REQUEST") {
+          const txAddress =
+            localStorage.getItem("internal_tx_wallet") ||
+            localStorage.getItem("linked_metamask") ||
+            address;
+
+          if (txAddress && activeChat) {
             const responsePayload = JSON.stringify({
               type: "WALLET_RESPONSE",
-              address: activeWallet,
+              address: txAddress,
             });
-            const encryptedPayload = encrypt(activeChat, responsePayload);
-            if (encryptedPayload && lastMsg.id) {
-              sendDataViaWebRTC(activeChat, encryptedPayload);
-              await db.messages.delete(lastMsg.id);
+
+            const encryptedResponse = encrypt(activeChat, responsePayload);
+            if (encryptedResponse) {
+              sendDataViaWebRTC(activeChat, encryptedResponse);
+            } else {
+              console.warn("[Protocol] Failed to encrypt wallet response.");
             }
           }
-        } else if (payload.type === "WALLET_RESPONSE" && lastMsg.id) {
-          setPeerWalletAddress(payload.address);
-          await db.messages.delete(lastMsg.id);
-        } else if (payload.type === "TX_SUCCESS" && lastMsg.id) {
-          await db.messages.update(lastMsg.id, {
-            text: encryptLocalDB(
-              `[RECEIVED] Transfer Verified!\nTx Hash: ${payload.hash}`,
-            ),
-          });
+          if (latestMessage.id) {
+            await db.messages.delete(latestMessage.id);
+          }
         }
       } catch (error) {
-        console.error(
-          "[ChatContext] Error checking incoming wallet requests:",
-          error,
-        );
+        return;
       }
     };
-    checkIncomingForWalletRequests();
-  }, [
-    messages,
-    activeChat,
-    encrypt,
-    sendDataViaWebRTC,
-    setPeerWalletAddress,
-    encryptLocalDB,
-  ]);
+
+    handleProtocolMessages();
+  }, [messages, activeChat, address, sendDataViaWebRTC]);
 
   const handleSwitchChatWrapped = (session: any): void => {
     switchChat(session);
@@ -411,7 +422,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
+/**
+ * Custom hook to securely access the Chat Context payload.
+ *
+ * @returns {ChatContextValue} The initialized chat context variables and methods.
+ * @throws {Error} Throws if utilized outside of the ChatProvider hierarchy.
+ */
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined)

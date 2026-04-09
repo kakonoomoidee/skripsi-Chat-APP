@@ -46,18 +46,25 @@ export const MessageBubble = ({
   let parsedText = msg.text;
   let replyData = null;
   let docData: { fileName: string; fileData: string } | null = null;
+  let cryptoData: {
+    hash: string;
+    amount: string;
+    isVerification?: boolean;
+  } | null = null;
 
   try {
     const parsed = JSON.parse(msg.text);
     if (parsed.type === "DOCUMENT") {
       docData = { fileName: parsed.fileName, fileData: parsed.fileData };
+    } else if (parsed.type === "TX_SUCCESS") {
+      cryptoData = { hash: parsed.hash, amount: parsed.amount };
     } else if (parsed.text !== undefined) {
       parsedText = parsed.text;
       replyData = parsed.replyTo || null;
     }
   } catch {}
 
-  const isCryptoTx =
+  const isLegacyCryptoTx =
     parsedText?.startsWith("[SENT]") || parsedText?.startsWith("[RECEIVED]");
   const isAudio = parsedText?.startsWith("[AUDIO]");
 
@@ -76,7 +83,17 @@ export const MessageBubble = ({
         audioSrc={cleanMsg.text.replace("[AUDIO]", "")}
       />
     );
-  } else if (isCryptoTx) {
+  } else if (cryptoData) {
+    bubbleContent = (
+      <CryptoBubble
+        msg={cleanMsg}
+        txType={cleanMsg.isMine ? "SENT" : "RECEIVED"}
+        txAmountOrStatus={cryptoData.amount}
+        txHash={cryptoData.hash}
+        isVerification={false}
+      />
+    );
+  } else if (isLegacyCryptoTx) {
     const txType = cleanMsg.text.startsWith("[SENT]") ? "SENT" : "RECEIVED";
     const parts = cleanMsg.text.split("\nTx Hash: ");
     const rawAmount = parts[0].replace(`[${txType}] `, "");
