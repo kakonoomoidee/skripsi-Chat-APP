@@ -14,7 +14,7 @@ import { InCallModal } from "./modals/InCallModal";
 export const ChatHeader = (): React.JSX.Element => {
   const { activeUsername, isWebRTCConnected, isPeerTyping, initiateCall } =
     useChatContext();
-  const { setIsMobileSidebarOpen } = useUIStore();
+  const { setIsMobileSidebarOpen, hasUnread, setHasUnread } = useUIStore();
 
   return (
     <div className="relative h-16 shrink-0 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950 w-full z-10 justify-between">
@@ -23,10 +23,16 @@ export const ChatHeader = (): React.JSX.Element => {
 
       <div className="flex items-center">
         <button
-          onClick={() => setIsMobileSidebarOpen(true)}
-          className="md:hidden p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
+          onClick={() => {
+            setIsMobileSidebarOpen(true);
+            setHasUnread(false);
+          }}
+          className="md:hidden relative p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           <MenuIcon className="w-6 h-6" />
+          {hasUnread && (
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-zinc-950"></span>
+          )}
         </button>
 
         <div className="flex items-center gap-3">

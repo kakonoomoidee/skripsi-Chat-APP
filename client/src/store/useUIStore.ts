@@ -34,6 +34,8 @@ export interface SeedModalState {
 export interface UIState {
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (isOpen: boolean) => void;
+  hasUnread: boolean;
+  setHasUnread: (hasUnread: boolean) => void;
   toast: ToastState;
   showToast: (msg: string, type?: ToastType) => void;
   hideToast: () => void;
@@ -53,6 +55,10 @@ export const useUIStore = create<UIState>((set) => ({
 
   setIsMobileSidebarOpen: (isOpen: boolean) =>
     set({ isMobileSidebarOpen: isOpen }),
+
+  hasUnread: false,
+
+  setHasUnread: (hasUnread: boolean) => set({ hasUnread }),
 
   toast: { show: false, msg: "", type: "error" },
 

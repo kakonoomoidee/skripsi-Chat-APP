@@ -185,7 +185,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setIsMuted(false);
       showToast("Call ended.", "error");
     },
-    onPeerDisconnected: (peerAddress) => {
+    onPeerDisconnected: (peerAddress: string) => {
       showToast("Peer disconnected.", "error");
       removeActiveSession(peerAddress);
     },
