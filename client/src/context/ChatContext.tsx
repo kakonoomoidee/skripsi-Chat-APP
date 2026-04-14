@@ -152,6 +152,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     relayUrl: activeRelay,
     removeSecret,
     forceDisconnectPeer: handleForceDisconnect,
+    showToast,
   });
 
   const {
@@ -264,9 +265,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch (error) {
-        console.error("[ChatContext] Error sweeping old messages:", error);
-      }
+      } catch (error) {}
     };
     sweepOldMessages();
   }, [autoDeleteMode]);
@@ -344,8 +343,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             const encryptedResponse = encrypt(activeChat, responsePayload);
             if (encryptedResponse) {
               sendDataViaWebRTC(activeChat, encryptedResponse);
-            } else {
-              console.warn("[Protocol] Failed to encrypt wallet response.");
             }
           }
           if (latestMessage.id) {
