@@ -1,18 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { PhoneIcon, MicIcon, MicOffIcon } from "@/components/icons";
-
-/**
- * Formats elapsed seconds into MM:SS notation.
- *
- * @param {number} secs - Total elapsed seconds.
- * @returns {string} Formatted time string.
- */
-const formatTime = (secs: number): string => {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-};
+import { formatDuration } from "@/utils/format";
 
 /**
  * Renders a full-screen overlay for active voice calls.
@@ -50,7 +39,7 @@ export const InCallModal = (): React.JSX.Element | null => {
           {activeUsername}
         </h2>
         <p className="text-indigo-300 font-mono text-xl">
-          {formatTime(duration)}
+          {formatDuration(duration)}
         </p>
       </div>
 

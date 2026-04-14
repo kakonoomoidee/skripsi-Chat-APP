@@ -22,3 +22,16 @@ export const formatTime = (
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
+
+/**
+ * Formats a raw time duration in seconds into a standard MM:SS string representation.
+ * Useful for Voice Calls or Voice Notes.
+ *
+ * @param {number} time - Duration in seconds.
+ * @returns {string} Formatted MM:SS string (e.g., "03:45").
+ */
+export const formatDuration = (time: number): string => {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
