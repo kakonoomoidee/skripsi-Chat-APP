@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import { SeedPhraseModalInput } from "@/components/shared";
 
 export interface WithdrawalModalProps {
   isOpen: boolean;
@@ -38,12 +39,13 @@ export default function WithdrawalModal({
           Enter your 12-word internal wallet seed phrase to authorize sending{" "}
           <strong>{withdrawAmount} ETH</strong>.
         </p>
-        <textarea
+
+        <SeedPhraseModalInput
           value={withdrawSeedInput}
-          onChange={(e) => setWithdrawSeedInput(e.target.value)}
-          placeholder="Enter your 12-word seed phrase here..."
-          className="w-full h-24 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 outline-none transition-all resize-none mb-2 focus:border-indigo-500 focus:ring-1"
+          onChange={setWithdrawSeedInput}
+          disabled={isWithdrawing}
         />
+
         {withdrawError && (
           <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
             {withdrawError}

@@ -11,9 +11,16 @@ import {
   RelaySelector,
   PasswordInput,
   RelayStatusBadge,
+  SeedPhraseInput,
 } from "@/components/shared";
 
-export default function ImportIdentityClient() {
+/**
+ * Renders the import identity client interface for recovering an existing user identity.
+ * Validates seed phrases, passwords, and handles the cryptographic restoration process.
+ *
+ * @returns {React.JSX.Element} The Import Identity Client page component.
+ */
+export default function ImportIdentityClient(): React.JSX.Element {
   const navigate = useNavigate();
   const { address } = useWallet();
   const { isAuthenticated } = useAuth();
@@ -53,41 +60,15 @@ export default function ImportIdentityClient() {
       title="Recover Identity"
       subtitle="Import your 12-word seed phrase to restore your decentralized identity on this device."
     >
-      {/* Wallet Display is hidden if there's no address to save space */}
       {address && <WalletDisplay address={address} />}
 
       <form onSubmit={handleImport} className="space-y-4">
-        {/* Seed Phrase Textarea */}
-        <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-              12-Word Seed Phrase
-            </label>
-            <span
-              className={`text-[10px] font-mono ${
-                seedImport.trim().split(/\s+/).length === 12 &&
-                seedImport.length > 0
-                  ? "text-emerald-400"
-                  : "text-zinc-500"
-              }`}
-            >
-              {seedImport.length > 0
-                ? seedImport.trim().split(/\s+/).length
-                : 0}{" "}
-              / 12
-            </span>
-          </div>
-          <textarea
-            value={seedImport}
-            onChange={(e) => setSeedImport(e.target.value)}
-            placeholder="e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon"
-            rows={2}
-            className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-zinc-600 resize-none font-mono text-xs shadow-sm leading-relaxed custom-scrollbar"
-            disabled={isLoading}
-          />
-        </div>
+        <SeedPhraseInput
+          value={seedImport}
+          onChange={setSeedImport}
+          disabled={isLoading}
+        />
 
-        {/* Set New Local Password */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col">
             <PasswordInput
@@ -114,7 +95,6 @@ export default function ImportIdentityClient() {
           </div>
         </div>
 
-        {/* Relay Server Selector */}
         <div className="relative pt-1">
           <RelayStatusBadge isPinging={isPinging} isRelayAlive={isRelayAlive} />
           <RelaySelector
@@ -126,7 +106,6 @@ export default function ImportIdentityClient() {
           />
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={isButtonDisabled}
@@ -141,7 +120,6 @@ export default function ImportIdentityClient() {
                 : "Import & Connect"}
         </button>
 
-        {/* Links */}
         <div className="pt-3 mt-1 border-t border-zinc-800/50 flex flex-col gap-2 text-center text-sm text-zinc-500">
           <div>
             Don't have an identity yet?{" "}

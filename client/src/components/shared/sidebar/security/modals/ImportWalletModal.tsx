@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import { SeedPhraseModalInput } from "@/components/shared";
 
 export interface ImportWalletModalProps {
   isOpen: boolean;
@@ -32,12 +33,13 @@ export default function ImportWalletModal({
         <h3 className="text-lg font-bold text-zinc-100 mb-2">
           Import Internal Wallet
         </h3>
-        <textarea
+
+        <SeedPhraseModalInput
           value={importSeedInput}
-          onChange={(e) => setImportSeedInput(e.target.value)}
-          placeholder="e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon"
-          className="w-full h-24 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 outline-none transition-all resize-none mb-2 focus:border-indigo-500 focus:ring-1"
+          onChange={setImportSeedInput}
+          disabled={isConnecting}
         />
+
         {importError && (
           <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
             {importError}

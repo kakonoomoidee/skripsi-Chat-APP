@@ -69,13 +69,6 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   }, []);
 
-  /**
-   * Fetches the network and balance details for a given Ethereum address.
-   *
-   * @param {string} address - The wallet address to query.
-   * @param {boolean} isExternal - Indicates if the request should use the injected provider.
-   * @returns {Promise<void>} Resolves when state is updated.
-   */
   const fetchWalletDetails = async (
     address: string,
     isExternal: boolean,
@@ -108,11 +101,6 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   };
 
-  /**
-   * Generates a new random HD wallet and stores its encrypted credentials.
-   *
-   * @returns {void}
-   */
   const handleCreateInternalWallet = (): void => {
     setIsConnecting(true);
     try {
@@ -135,12 +123,6 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   };
 
-  /**
-   * Restores an internal transaction wallet using a provided mnemonic phrase.
-   *
-   * @param {string} phrase - The 12-word seed phrase.
-   * @returns {void}
-   */
   const handleImportInternalWallet = (phrase: string): void => {
     setIsConnecting(true);
     setImportError("");
@@ -163,11 +145,6 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   };
 
-  /**
-   * Requests connection to an injected Web3 provider to link an external wallet.
-   *
-   * @returns {Promise<void>}
-   */
   const handleConnectExternalWallet = async (): Promise<void> => {
     if (typeof window.ethereum === "undefined") {
       showToast("MetaMask is not installed.", "error");
@@ -192,17 +169,11 @@ export default function Web3Wallet(): React.JSX.Element {
         await fetchWalletDetails(linkedAddress, true);
       }
     } catch {
-      // Errors are likely user rejections; no need to alert.
     } finally {
       setIsConnecting(false);
     }
   };
 
-  /**
-   * Disconnects the currently active transaction wallet.
-   *
-   * @returns {void}
-   */
   const handleDisconnectWallet = (): void => {
     setTxWalletAddress(null);
     setTxWalletType(null);
@@ -213,11 +184,6 @@ export default function Web3Wallet(): React.JSX.Element {
     localStorage.removeItem("internal_tx_pk");
   };
 
-  /**
-   * Validates withdrawal inputs and triggers the confirmation modal.
-   *
-   * @returns {void}
-   */
   const handleInitiateWithdrawal = (): void => {
     if (!ethers.isAddress(withdrawAddress)) {
       showToast("Invalid destination address.", "error");
@@ -240,12 +206,6 @@ export default function Web3Wallet(): React.JSX.Element {
     setIsWithdrawModalOpen(true);
   };
 
-  /**
-   * Executes the external withdrawal after confirming the seed phrase.
-   *
-   * @param {string} withdrawSeedInput - The 12-word seed phrase.
-   * @returns {Promise<void>}
-   */
   const executeWithdrawal = async (
     withdrawSeedInput: string,
   ): Promise<void> => {
@@ -297,11 +257,6 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   };
 
-  /**
-   * Calculates the maximum safe withdrawal amount by reserving network gas fees.
-   *
-   * @returns {Promise<void>}
-   */
   const handleMaxAmount = async (): Promise<void> => {
     if (!txWalletAddress) return;
 

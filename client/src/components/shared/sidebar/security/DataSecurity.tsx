@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
 import GlassDropdown from "@/components/shared/GlassDropdown";
+import { SeedPhraseModalInput } from "@/components/shared";
 import {
   ImportIcon,
   ExportIcon,
@@ -190,18 +191,11 @@ export default function DataSecurity(): React.JSX.Element {
               <p className="text-xs text-zinc-400 mb-4">
                 Enter your 12-word identity seed phrase to authenticate.
               </p>
-              <textarea
-                value={seedInput}
-                onChange={(e) => setSeedInput(e.target.value)}
-                placeholder="e.g. apple banana cat..."
-                className={`w-full h-24 bg-zinc-950 border rounded-xl p-3 text-sm text-zinc-200 outline-none transition-all resize-none mb-2 ${
-                  seedModal.type === "wipe"
-                    ? "border-red-500/30 focus:border-red-500 focus:ring-1"
-                    : "border-zinc-800 focus:border-indigo-500 focus:ring-1"
-                }`}
-              />
+
+              <SeedPhraseModalInput value={seedInput} onChange={setSeedInput} />
+
               {modalError && (
-                <p className="text-[11px] font-medium text-red-400 mb-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                <p className="text-[11px] font-medium text-red-400 mt-4 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
                   {modalError}
                 </p>
               )}
