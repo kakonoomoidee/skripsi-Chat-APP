@@ -12,11 +12,12 @@ import {
   PasswordInput,
   RelayStatusBadge,
   SeedPhraseInput,
+  validatePasswordSecurity,
 } from "@/components/shared";
 
 /**
  * Renders the import identity client interface for recovering an existing user identity.
- * Validates seed phrases, passwords, and handles the cryptographic restoration process.
+ * Validates seed phrases, strict password requirements, and handles the cryptographic restoration process.
  *
  * @returns {React.JSX.Element} The Import Identity Client page component.
  */
@@ -41,6 +42,7 @@ export default function ImportIdentityClient(): React.JSX.Element {
     handleImport,
   } = useImportHandler(activeRelay);
 
+  const isPasswordStrong = validatePasswordSecurity(password);
   const showPasswordError =
     confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -51,7 +53,7 @@ export default function ImportIdentityClient(): React.JSX.Element {
   const isButtonDisabled =
     isLoading ||
     !seedImport.trim() ||
-    !password ||
+    !isPasswordStrong ||
     password !== confirmPassword ||
     !isRelayAlive;
 
@@ -75,8 +77,9 @@ export default function ImportIdentityClient(): React.JSX.Element {
               label="New Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 chars"
+              placeholder="Strong password required"
               disabled={isLoading}
+              showRules={true}
             />
           </div>
           <div className="flex flex-col">
@@ -85,13 +88,9 @@ export default function ImportIdentityClient(): React.JSX.Element {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm password"
-              disabled={isLoading}
+              disabled={isLoading || !isPasswordStrong}
+              error={showPasswordError ? "Passwords do not match" : undefined}
             />
-            {showPasswordError && (
-              <p className="text-[10px] text-red-400 mt-1.5 ml-1 font-medium animate-in slide-in-from-top-1">
-                Passwords do not match!
-              </p>
-            )}
           </div>
         </div>
 

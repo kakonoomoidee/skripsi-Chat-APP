@@ -12,14 +12,17 @@ import {
   PasswordInput,
   RelayStatusBadge,
   SeedPhraseGrid,
+  validatePasswordSecurity,
 } from "@/components/shared";
 import { WarningIcon } from "@/components/icons";
 
 /**
  * Registration page component handling identity creation and seed phrase backup.
+ * Enforces strong password requirements before allowing registration.
+ *
  * @returns {React.JSX.Element}
  */
-export default function RegisterPage() {
+export default function RegisterPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { address } = useWallet();
   const { isAuthenticated } = useAuth();
@@ -45,6 +48,7 @@ export default function RegisterPage() {
 
   const [isCopied, setIsCopied] = useState(false);
 
+  const isPasswordStrong = validatePasswordSecurity(password);
   const showPasswordError =
     confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -52,36 +56,36 @@ export default function RegisterPage() {
     if (isAuthenticated && !seedPhrase) navigate("/chat");
   }, [isAuthenticated, navigate, seedPhrase]);
 
-/**
- * Handles copying the seed phrase to the clipboard with a fallback for insecure HTTP contexts.
- * @returns {void}
- */
-const handleCopyAndProceed = () => {
-  if (!seedPhrase) return;
+  /**
+   * Handles copying the seed phrase to the clipboard with a fallback for insecure HTTP contexts.
+   *
+   * @returns {void}
+   */
+  const handleCopyAndProceed = (): void => {
+    if (!seedPhrase) return;
 
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(seedPhrase);
-    } else {
-      const textArea = document.createElement("textarea");
-      textArea.value = seedPhrase;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-999999px";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      document.execCommand("copy");
-      textArea.remove();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(seedPhrase);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = seedPhrase;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+      }
+
+      setIsCopied(true);
+      setTimeout(() => navigate("/chat"), 1500);
+    } catch (err) {
+      setIsCopied(true);
+      setTimeout(() => navigate("/chat"), 1500);
     }
-    
-    setIsCopied(true);
-    setTimeout(() => navigate("/chat"), 1500);
-  } catch (err) {
-    console.error("Failed to copy phrase", err);
-    setIsCopied(true);
-    setTimeout(() => navigate("/chat"), 1500);
-  }
-};
+  };
 
   if (seedPhrase) {
     return (
@@ -123,7 +127,7 @@ const handleCopyAndProceed = () => {
     isLoading ||
     isAvailable === false ||
     isChecking ||
-    !password ||
+    !isPasswordStrong ||
     password !== confirmPassword ||
     !isRelayAlive;
 
@@ -179,8 +183,9 @@ const handleCopyAndProceed = () => {
               label="Set Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 chars"
+              placeholder="Strong password required"
               disabled={isLoading}
+              showRules={true}
             />
           </div>
           <div className="flex flex-col">
@@ -189,13 +194,9 @@ const handleCopyAndProceed = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm password"
-              disabled={isLoading}
+              disabled={isLoading || !isPasswordStrong}
+              error={showPasswordError ? "Passwords do not match" : undefined}
             />
-            {showPasswordError && (
-              <p className="text-[10px] text-red-400 mt-1.5 ml-1 font-medium animate-in slide-in-from-top-1">
-                Passwords do not match!
-              </p>
-            )}
           </div>
         </div>
 
