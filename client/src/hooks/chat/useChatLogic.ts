@@ -106,7 +106,10 @@ export const useChatLogic = ({
     }
   }, [address, relayUrl]);
 
-  // Efek khusus buat trigger toast biar ga berantem sama render cycle
+  /**
+   * Deferred effect to trigger toast after render cycle settles,
+   * preventing state update conflicts during the same render pass.
+   */
   useEffect(() => {
     if (newRequestQueue && showToast) {
       showToast(`${newRequestQueue} sent a handshake request!`, "info");
@@ -151,7 +154,8 @@ export const useChatLogic = ({
       setPendingRequests((prev) => {
         if (prev.find((req) => req.from === data.from)) return prev;
 
-        setNewRequestQueue(incomingUser); // Lempar ke state terpisah buat Toast
+        /** Queue the incoming username so toast fires outside the setState callback. */
+        setNewRequestQueue(incomingUser);
 
         return [...prev, { ...data, username: incomingUser }];
       });

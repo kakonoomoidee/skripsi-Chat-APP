@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { createPortal } from "react-dom";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
-import { useUIStore } from "@/store";
+
 import RelaySelector from "./RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
@@ -51,7 +50,6 @@ export default function Sidebar(): React.JSX.Element {
     searchError,
   } = useChatContext();
 
-  const { toast } = useUIStore();
 
   const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
     "chats",
@@ -390,20 +388,6 @@ export default function Sidebar(): React.JSX.Element {
         </div>
       </div>
 
-      {toast.show &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className={`fixed top-4 right-4 z-9999 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
-              toast.type === "error"
-                ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-            }`}
-          >
-            <span className="text-sm font-medium">{toast.msg}</span>
-          </div>,
-          document.body,
-        )}
     </>
   );
 }

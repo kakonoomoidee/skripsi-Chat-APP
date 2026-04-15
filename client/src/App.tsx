@@ -57,7 +57,7 @@ function App() {
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className={`fixed top-16 right-4 z-9999 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
+            className={`fixed top-18 right-4 md:right-8 z-9999 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-200 ${
               toast.type === "error"
                 ? "bg-red-500/10 border border-red-500/20 text-red-400"
                 : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"

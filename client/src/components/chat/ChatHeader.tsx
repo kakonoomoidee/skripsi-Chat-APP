@@ -17,7 +17,8 @@ export const ChatHeader = (): React.JSX.Element => {
     isWebRTCConnected,
     isPeerTyping,
     initiateCall,
-    pendingRequests, // <-- Tarik ini dari context
+    /** Pulled from context so the badge indicator can reflect incoming request count. */
+    pendingRequests,
   } = useChatContext();
 
   const { setIsMobileSidebarOpen } = useUIStore();
@@ -33,7 +34,7 @@ export const ChatHeader = (): React.JSX.Element => {
           className="md:hidden relative p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           <MenuIcon className="w-6 h-6" />
-          {/* Titik orange kalo ada request masuk */}
+          {/** Badge shown when there are incoming handshake requests on mobile view. */}
           {pendingRequests.length > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-zinc-950"></span>
           )}
