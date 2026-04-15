@@ -6,6 +6,7 @@ import {
   TextBubble,
   DocumentBubble,
 } from "./bubbles/index";
+import { MessageStatus } from "@/utils/db";
 
 /**
  * Interface defining the structure of a chat message.
@@ -18,6 +19,7 @@ export interface ChatMessage {
   isMine: boolean;
   timestamp: number;
   isImage?: boolean;
+  status?: MessageStatus;
   replyTo?: {
     id: string | number;
     text: string;
@@ -25,6 +27,7 @@ export interface ChatMessage {
     timestamp: number;
   } | null;
 }
+
 
 /**
  * Interface defining the properties for the MessageBubble component.

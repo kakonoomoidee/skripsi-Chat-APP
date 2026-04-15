@@ -46,3 +46,4 @@ export { ShieldCheckIcon } from "./ShieldCheckIcon";
 export { MegaphoneIcon } from "./MegaphoneIcon";
 export { JournalistIcon } from "./JournalistIcon";
 export { FingerprintIcon } from "./FingerprintIcon";
+export { MessageStatusIcon } from "./MessageStatusIcon";

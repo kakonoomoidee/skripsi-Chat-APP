@@ -2,7 +2,7 @@ import { formatTime } from "@/utils/format";
 import { useSessionStore } from "@/store";
 import { useState, useRef, useEffect } from "react";
 import { ReplyBubbleContext } from "../context/ReplyBubbleContext";
-import { ChevronDownIcon, ReplyIcon } from "@/components/icons";
+import { ChevronDownIcon, ReplyIcon, MessageStatusIcon } from "@/components/icons";
 
 export const TextBubble = ({ msg }: { msg: any }) => {
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
@@ -82,13 +82,16 @@ export const TextBubble = ({ msg }: { msg: any }) => {
         </p>
 
         <span
-          className={`text-[9px] mt-1 font-medium select-none ${
+          className={`text-[9px] mt-1 font-medium select-none flex items-center gap-0.5 ${
             msg.isMine
-              ? "text-indigo-200 text-right"
-              : "text-zinc-400 text-left"
+              ? "text-indigo-200 justify-end"
+              : "text-zinc-400 justify-start"
           }`}
         >
           {formatTime(msg.timestamp)}
+          {msg.isMine && (
+            <MessageStatusIcon status={msg.status ?? "delivered"} />
+          )}
         </span>
       </div>
     </div>

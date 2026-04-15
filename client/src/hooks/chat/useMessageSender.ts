@@ -104,6 +104,7 @@ export const useMessageSender = ({
         text: encryptLocalDB(stringifiedPayload),
         isMine: true,
         timestamp: Date.now(),
+        status: isWebRTCConnected ? "delivered" : "pending",
       });
 
       setMessageInput("");
@@ -148,6 +149,7 @@ export const useMessageSender = ({
           isMine: true,
           timestamp: Date.now(),
           isImage: true,
+          status: isWebRTCConnected ? "delivered" : "pending",
         });
       } catch (err) {
         console.error("[Message Sender] Image send error:", err);
@@ -186,6 +188,7 @@ export const useMessageSender = ({
         text: encryptLocalDB(stringifiedPayload),
         isMine: true,
         timestamp: Date.now(),
+        status: isWebRTCConnected ? "delivered" : "pending",
       });
     } catch (err) {
       console.error("[Message Sender] Document send error:", err);
@@ -216,6 +219,7 @@ export const useMessageSender = ({
         isMine: true,
         timestamp: Date.now(),
         isImage: true,
+        status: isWebRTCConnected ? "delivered" : "pending",
       });
     } catch (err) {
       console.error("[Message Sender] Camera photo send error:", err);
@@ -248,6 +252,7 @@ export const useMessageSender = ({
           text: encryptLocalDB(base64Audio),
           isMine: true,
           timestamp: Date.now(),
+          status: isWebRTCConnected ? "delivered" : "pending",
         });
       } catch (err) {
         console.error("[Message Sender] Audio send error:", err);
@@ -353,6 +358,7 @@ export const useMessageSender = ({
         text: encryptLocalDB(`[SENT] ${amount} ETH\nTx Hash: ${txHash}`),
         isMine: true,
         timestamp: Date.now(),
+        status: "delivered",
       });
     } catch (err: any) {
       console.error("[Message Sender] Transaction failed:", err);

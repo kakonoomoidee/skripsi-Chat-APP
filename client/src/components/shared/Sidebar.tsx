@@ -48,6 +48,7 @@ export default function Sidebar(): React.JSX.Element {
     handleRejectRequest,
     logout,
     searchError,
+    unreadCount,
   } = useChatContext();
 
 
@@ -236,13 +237,22 @@ export default function Sidebar(): React.JSX.Element {
                         </p>
                       </div>
                     </div>
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        connectedPeers.includes(session.address.toLowerCase())
-                          ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
-                          : "bg-amber-500 animate-pulse"
-                      }`}
-                    ></div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          connectedPeers.includes(session.address.toLowerCase())
+                            ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
+                            : "bg-amber-500 animate-pulse"
+                        }`}
+                      ></div>
+                      {(unreadCount[session.address.toLowerCase()] ?? 0) > 0 && (
+                        <span className="min-w-[18px] h-[18px] bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md shadow-emerald-500/30">
+                          {(unreadCount[session.address.toLowerCase()] ?? 0) > 99
+                            ? "99+"
+                            : unreadCount[session.address.toLowerCase()]}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
 

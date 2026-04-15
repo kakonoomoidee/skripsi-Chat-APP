@@ -4,6 +4,14 @@ import Dexie, { Table } from "dexie";
  * Interface representing a single encrypted chat message entity.
  * Stored locally in the browser's IndexedDB.
  */
+/**
+ * Union type representing the delivery status of a sent message.
+ * - `pending`   — Created locally while the WebRTC DataChannel is closed.
+ * - `delivered` — Successfully transmitted over the DataChannel.
+ * - `read`      — The peer actively opened the chat UI and acknowledged it.
+ */
+export type MessageStatus = "pending" | "delivered" | "read";
+
 export interface Message {
   id?: number;
   ownerAddress: string;
@@ -12,6 +20,7 @@ export interface Message {
   isMine: boolean;
   timestamp: number;
   isImage?: boolean;
+  status?: MessageStatus;
 }
 
 /**
@@ -38,6 +47,11 @@ export class SecureP2PDatabase extends Dexie {
 
     this.version(2).stores({
       messages: "++id, [ownerAddress+chatId], timestamp",
+      relays: "++id, &url",
+    });
+
+    this.version(3).stores({
+      messages: "++id, [ownerAddress+chatId], timestamp, status",
       relays: "++id, &url",
     });
   }

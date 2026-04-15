@@ -67,6 +67,9 @@ export interface ChatContextValue {
   declineCall: () => void;
   endCall: () => void;
   toggleMute: () => void;
+  unreadCount: Record<string, number>;
+  totalUnread: number;
+  sendMarkAsRead: (peerAddress: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -143,6 +146,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isPeerTyping,
     setIsPeerTyping,
     removeActiveSession,
+    unreadCount,
+    incrementUnread,
+    resetUnread,
   } = useChatLogic({
     address,
     socket,
@@ -158,6 +164,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const {
     isWebRTCConnected,
     sendDataViaWebRTC,
+    sendMarkAsRead,
     initiateWebRTCConnection,
     connectedPeers,
     startVoiceCall,
@@ -170,10 +177,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     activeChat,
     decrypt,
     encryptLocalDB,
+    encrypt,
     generateHandshakeKeys,
     computeSecret,
     hasSecret,
     setIsPeerTyping,
+    incrementUnread,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
       setIsInCall(true);
@@ -277,6 +286,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [autoDeleteMode]);
+
+  useEffect(() => {
+    if (!activeChat || !isWebRTCConnected) return;
+    sendMarkAsRead(activeChat);
+    resetUnread(activeChat);
+  }, [activeChat, isWebRTCConnected, sendMarkAsRead, resetUnread]);
 
   useEffect(() => {
     const current = activeChat?.toLowerCase();
@@ -396,6 +411,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     searchError,
     isPeerTyping,
     resetWallet,
+    unreadCount,
+    totalUnread: Object.values(unreadCount).reduce((a, b) => a + b, 0),
+    sendMarkAsRead,
     ...messageSender,
     ...callActions,
     isIncomingCall,

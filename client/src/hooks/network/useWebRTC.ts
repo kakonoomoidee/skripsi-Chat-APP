@@ -24,6 +24,8 @@ export const useWebRTC = (props: any) => {
     computeSecret,
     generateHandshakeKeys,
     onPeerDisconnected,
+    encrypt,
+    incrementUnread,
   } = props;
 
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
@@ -36,9 +38,11 @@ export const useWebRTC = (props: any) => {
   const { startVoiceCall, stopVoiceCall, toggleMicMute } =
     useWebRTCMedia(peerConnections);
 
-  const { dataChannels, handleIncomingMessage, sendDataViaWebRTC } =
+  const { dataChannels, handleIncomingMessage, sendDataViaWebRTC, sendMarkAsRead } =
     useWebRTCDataChannel({
       ...props,
+      encrypt,
+      incrementUnread,
       startVoiceCall,
       stopVoiceCall,
     });
@@ -264,6 +268,7 @@ export const useWebRTC = (props: any) => {
   return {
     isWebRTCConnected,
     sendDataViaWebRTC,
+    sendMarkAsRead,
     initiateWebRTCConnection,
     connectedPeers,
     startVoiceCall,
