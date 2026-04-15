@@ -1,173 +1,17 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-
-// ============================================================================
-// SVG ICONS (KEPT HERE FOR EASY MAINTENANCE, CAN BE MOVED TO SEPARATE FILE IF NEEDED)
-// ============================================================================
-
-const IconChevronRight = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 5l7 7-7 7"
-    />
-  </svg>
-);
-
-const IconLogin = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-    />
-  </svg>
-);
-
-const IconServerCross = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-    />
-  </svg>
-);
-
-const IconGlobeNodes = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-    />
-  </svg>
-);
-
-const IconKey = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-    />
-  </svg>
-);
-
-const IconLock = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-    />
-  </svg>
-);
-
-const IconShieldCheck = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-
-const IconMegaphone = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
-    />
-  </svg>
-);
-
-const IconJournalist = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2.5 2.5 0 00-2.5-2.5H15"
-    />
-  </svg>
-);
-
-const IconFingerprint = () => (
-  <svg
-    className="w-full h-full"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1}
-      d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-    />
-  </svg>
-);
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+import {
+  ChevronRightIcon,
+  LoginIcon,
+  ServerCrossIcon,
+  GlobeNodesIcon,
+  KeyIcon,
+  LandingLockIcon,
+  ShieldCheckIcon,
+  MegaphoneIcon,
+  JournalistIcon,
+  FingerprintIcon,
+} from "@/components/icons";
 
 /**
  * Landing Page Component presenting the product overview, architecture, cryptography, and features
@@ -283,7 +127,7 @@ export default function LandingClient() {
               className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl text-base font-semibold transition-all duration-300 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_40px_rgba(79,70,229,0.6)] transform hover:-translate-y-1 flex items-center justify-center gap-2"
             >
               Create Web3 Identity
-              <IconChevronRight />
+              <ChevronRightIcon className="w-4 h-4" />
             </Link>
             <Link
               to="/login"
@@ -291,7 +135,7 @@ export default function LandingClient() {
             >
               Login to Existing
               <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors">
-                <IconLogin />
+                <LoginIcon className="w-4 h-4" />
               </div>
             </Link>
           </div>
@@ -328,11 +172,11 @@ export default function LandingClient() {
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-linear-to-b from-red-500/10 to-zinc-950 border border-red-500/20 p-10 rounded-4xl relative overflow-hidden group hover:border-red-500/40 transition-colors duration-500">
               <div className="absolute top-0 right-0 p-6 w-48 h-48 text-red-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 transform origin-top-right">
-                <IconServerCross />
+              <ServerCrossIcon className="w-full h-full" />
               </div>
               <h3 className="text-2xl font-bold mb-6 text-red-400 flex items-center gap-3">
                 <div className="w-6 h-6">
-                  <IconServerCross />
+                  <ServerCrossIcon className="w-full h-full" />
                 </div>
                 The Status Quo
               </h3>
@@ -362,11 +206,11 @@ export default function LandingClient() {
 
             <div className="bg-linear-to-b from-indigo-500/10 to-zinc-950 border border-indigo-500/30 p-10 rounded-4xl relative overflow-hidden group hover:border-indigo-500/50 transition-colors duration-500">
               <div className="absolute top-0 right-0 p-6 w-48 h-48 text-indigo-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 transform origin-top-right">
-                <IconGlobeNodes />
+                <GlobeNodesIcon className="w-full h-full" />
               </div>
               <h3 className="text-2xl font-bold mb-6 text-indigo-400 flex items-center gap-3">
                 <div className="w-6 h-6 text-emerald-500">
-                  <IconShieldCheck />
+                  <ShieldCheckIcon className="w-full h-full" />
                 </div>
                 SecureP2P Architecture
               </h3>
@@ -424,7 +268,7 @@ export default function LandingClient() {
               {/* Box 1 */}
               <div className="bg-linear-to-br from-zinc-900/90 to-zinc-950 backdrop-blur-sm p-10 rounded-4xl border border-indigo-500/30 hover:border-indigo-500 shadow-[0_0_30px_rgba(79,70,229,0.1)] hover:shadow-[0_0_40px_rgba(79,70,229,0.3)] transition-all duration-500 group overflow-hidden relative">
                 <div className="absolute -right-6 -bottom-6 w-40 h-40 text-indigo-500 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-500">
-                  <IconKey />
+                  <KeyIcon className="w-full h-full" />
                 </div>
                 <div className="w-16 h-16 bg-zinc-950 border border-indigo-500/50 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-inner relative z-10">
                   <span className="text-indigo-400 font-mono font-bold text-xl">
@@ -444,7 +288,7 @@ export default function LandingClient() {
               {/* Box 2 (Elevated) */}
               <div className="bg-linear-to-br from-zinc-900/90 to-zinc-950 backdrop-blur-sm p-10 rounded-4xl border border-cyan-500/30 hover:border-cyan-500 shadow-[0_0_30px_rgba(34,211,238,0.1)] hover:shadow-[0_0_40px_rgba(34,211,238,0.3)] transition-all duration-500 group md:-translate-y-12 overflow-hidden relative">
                 <div className="absolute -right-6 -bottom-6 w-40 h-40 text-cyan-500 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-500">
-                  <IconFingerprint />
+                  <FingerprintIcon className="w-full h-full" />
                 </div>
                 <div className="w-16 h-16 bg-zinc-950 border border-cyan-500/50 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-inner relative z-10">
                   <span className="text-cyan-400 font-mono font-bold text-xl">
@@ -464,7 +308,7 @@ export default function LandingClient() {
               {/* Box 3 */}
               <div className="bg-linear-to-br from-zinc-900/90 to-zinc-950 backdrop-blur-sm p-10 rounded-4xl border border-emerald-500/30 hover:border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] transition-all duration-500 group overflow-hidden relative">
                 <div className="absolute -right-6 -bottom-6 w-40 h-40 text-emerald-500 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-500">
-                  <IconLock />
+                  <LandingLockIcon className="w-full h-full" />
                 </div>
                 <div className="w-16 h-16 bg-zinc-950 border border-emerald-500/50 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-inner relative z-10">
                   <span className="text-emerald-400 font-mono font-bold text-xl">
@@ -552,7 +396,7 @@ export default function LandingClient() {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="p-8 bg-zinc-900/30 border border-zinc-800 rounded-3xl hover:border-zinc-600 transition-all duration-300 relative overflow-hidden group">
               <div className="absolute top-4 right-4 w-32 h-32 text-zinc-600 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 pointer-events-none">
-                <IconMegaphone />
+                <MegaphoneIcon className="w-full h-full" />
               </div>
               <h4 className="text-xl font-bold text-zinc-100 mb-4 relative z-10">
                 Whistleblowers
@@ -565,7 +409,7 @@ export default function LandingClient() {
 
             <div className="p-8 bg-zinc-900/30 border border-zinc-800 rounded-3xl hover:border-zinc-600 transition-all duration-300 relative overflow-hidden group">
               <div className="absolute top-4 right-4 w-32 h-32 text-zinc-600 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 pointer-events-none">
-                <IconJournalist />
+                <JournalistIcon className="w-full h-full" />
               </div>
               <h4 className="text-xl font-bold text-zinc-100 mb-4 relative z-10">
                 Journalists
@@ -578,7 +422,7 @@ export default function LandingClient() {
 
             <div className="p-8 bg-zinc-900/30 border border-zinc-800 rounded-3xl hover:border-zinc-600 transition-all duration-300 relative overflow-hidden group">
               <div className="absolute top-4 right-4 w-32 h-32 text-zinc-600 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 pointer-events-none">
-                <IconFingerprint />
+                <FingerprintIcon className="w-full h-full" />
               </div>
               <h4 className="text-xl font-bold text-zinc-100 mb-4 relative z-10">
                 Privacy Purists

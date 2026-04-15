@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { LockIcon, BoltIcon } from "@/components/icons";
 
 /**
  * Interface defining the layout props
@@ -83,19 +84,7 @@ export default function AuthLayout({
           <div className="grid grid-cols-2 gap-6">
             <div>
               <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
-                <svg
-                  className="w-5 h-5 text-indigo-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
+                <LockIcon className="w-5 h-5 text-indigo-400" />
               </div>
               <h4 className="font-semibold text-zinc-200 mb-1">
                 Local Identity
@@ -106,19 +95,7 @@ export default function AuthLayout({
             </div>
             <div>
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-3">
-                <svg
-                  className="w-5 h-5 text-purple-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
+                <BoltIcon className="w-5 h-5 text-purple-400" />
               </div>
               <h4 className="font-semibold text-zinc-200 mb-1">
                 P2P Tunneling
