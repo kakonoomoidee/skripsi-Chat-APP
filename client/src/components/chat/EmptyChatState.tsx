@@ -1,7 +1,7 @@
 import React from "react";
 import { useUIStore } from "@/store";
 import { useChatContext } from "@/context/ChatContext";
-import { MenuIcon, LockIcon, LockSessionIcon } from "@/components/icons";
+import { MenuIcon, LockIcon } from "@/components/icons";
 import { GlassBadge } from "@/components/shared";
 
 /**
@@ -34,20 +34,6 @@ export const EmptyChatState = (): React.JSX.Element => {
               className="absolute -bottom-1 -right-1"
             />
           </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-600/20 border border-indigo-500/30 rounded-lg flex items-center justify-center shadow-inner">
-            <LockSessionIcon className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="flex flex-col">
-            <h2 className="text-[15px] font-bold text-zinc-100 tracking-tight leading-tight">
-              Secure<span className="text-indigo-400">P2P</span>
-            </h2>
-            <span className="text-[10px] text-zinc-500 font-medium tracking-wide uppercase">
-              Decentralized Encrypted Chat
-            </span>
-          </div>
         </div>
       </div>
 

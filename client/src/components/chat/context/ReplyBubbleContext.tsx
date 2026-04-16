@@ -54,7 +54,7 @@ export const ReplyBubbleContext = ({
       targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
       targetEl.classList.add("bg-indigo-500/40", "scale-[1.02]", "z-10");
       setTimeout(() => {
-        targetEl.classList.remove("bg-indigo-500/40", "scale-[1.02]", "z-10");
+        targetEl?.classList.remove("bg-indigo-500/40", "scale-[1.02]", "z-10");
       }, 1000);
     }
   };
