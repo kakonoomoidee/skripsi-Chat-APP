@@ -31,4 +31,4 @@ coverage/
 #--- json ---
 blockchain/build/
 relay-server/abis/
-
+*.tsbuildinfo
