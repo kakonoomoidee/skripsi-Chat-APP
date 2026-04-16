@@ -165,6 +165,7 @@ export const useAuth = (): UseAuthReturn => {
       console.log("=========================================");
 
       localStorage.setItem("auth_token", newToken);
+      localStorage.setItem("securep2p_last_activity", Date.now().toString());
       setToken(newToken);
 
       return newToken;
@@ -191,9 +192,10 @@ export const useAuth = (): UseAuthReturn => {
    */
   const logout = useCallback((): void => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("securep2p_last_activity");
     setToken(null);
     console.log(
-      "[AUTH LOG] Session Terminated. Token removed from local storage.",
+      "[AUTH LOG] Session Terminated. Token and activity timestamp removed from local storage.",
     );
   }, []);
 
