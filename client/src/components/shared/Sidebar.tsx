@@ -12,6 +12,7 @@ import {
   GhostIcon,
   ArrowRightIcon,
 } from "@/components/icons";
+import { GlassBadge } from "./GlassBadge";
 
 /**
  * Interface for contact history.
@@ -138,11 +139,7 @@ export default function Sidebar(): React.JSX.Element {
             }`}
           >
             Requests
-            {pendingRequests.length > 0 && (
-              <span className="bg-amber-500 text-amber-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
-                {pendingRequests.length}
-              </span>
-            )}
+            <GlassBadge count={pendingRequests.length} variant="request" />
           </button>
           <button
             onClick={() => setActiveTab("settings")}
@@ -245,13 +242,10 @@ export default function Sidebar(): React.JSX.Element {
                             : "bg-amber-500 animate-pulse"
                         }`}
                       ></div>
-                      {(unreadCount[session.address.toLowerCase()] ?? 0) > 0 && (
-                        <span className="min-w-[18px] h-[18px] bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md shadow-emerald-500/30">
-                          {(unreadCount[session.address.toLowerCase()] ?? 0) > 99
-                            ? "99+"
-                            : unreadCount[session.address.toLowerCase()]}
-                        </span>
-                      )}
+                      <GlassBadge
+                        count={unreadCount[session.address.toLowerCase()] ?? 0}
+                        variant="chat"
+                      />
                     </div>
                   </div>
                 ))}

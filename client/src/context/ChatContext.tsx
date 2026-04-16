@@ -69,6 +69,7 @@ export interface ChatContextValue {
   toggleMute: () => void;
   unreadCount: Record<string, number>;
   unreadTotal: number;
+  pendingRequestsTotal: number;
   sendMarkAsRead: (peerAddress: string) => void;
 }
 
@@ -446,6 +447,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     resetWallet,
     unreadCount,
     unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),
+    pendingRequestsTotal: pendingRequests.length,
     sendMarkAsRead,
     ...messageSender,
     ...callActions,

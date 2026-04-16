@@ -9,3 +9,4 @@ export { default as SeedPhraseModal } from "./SeedPhraseModal";
 export { PasswordInput, validatePasswordSecurity } from "./PasswordInput";
 export { SeedPhraseInput } from "./SeedPhraseInput";
 export { SeedPhraseModalInput } from "./SeedPhraseModalInput";
+export { GlassBadge } from "./GlassBadge";

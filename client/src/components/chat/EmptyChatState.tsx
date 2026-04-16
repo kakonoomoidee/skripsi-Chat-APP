@@ -2,7 +2,7 @@ import React from "react";
 import { useUIStore } from "@/store";
 import { useChatContext } from "@/context/ChatContext";
 import { MenuIcon, LockIcon, LockSessionIcon } from "@/components/icons";
-import { HamburgerNotificationBadge } from "./HamburgerNotificationBadge";
+import { GlassBadge } from "@/components/shared";
 
 /**
  * Renders the placeholder view when no active chat session is selected.
@@ -12,7 +12,7 @@ import { HamburgerNotificationBadge } from "./HamburgerNotificationBadge";
  */
 export const EmptyChatState = (): React.JSX.Element => {
   const { setIsMobileSidebarOpen } = useUIStore();
-  const { unreadTotal, pendingRequests } = useChatContext();
+  const { unreadTotal, pendingRequestsTotal } = useChatContext();
 
   return (
     <div className="flex flex-col bg-zinc-950 w-full h-full overflow-hidden">
@@ -23,10 +23,16 @@ export const EmptyChatState = (): React.JSX.Element => {
             className="md:hidden relative p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <MenuIcon className="w-6 h-6" />
-            <HamburgerNotificationBadge unreadTotal={unreadTotal} />
-            {pendingRequests.length > 0 && unreadTotal === 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-zinc-950"></span>
-            )}
+            <GlassBadge
+              count={unreadTotal}
+              variant="chat"
+              className="absolute -top-1 -right-1"
+            />
+            <GlassBadge
+              count={pendingRequestsTotal}
+              variant="request"
+              className="absolute -bottom-1 -right-1"
+            />
           </button>
         </div>
 
