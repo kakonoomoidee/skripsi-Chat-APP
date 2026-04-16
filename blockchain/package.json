@@ -1,6 +1,6 @@
 {
   "name": "securep2p-blockchain",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Smart contracts and Truffle configuration for SecureP2P decentralized identity and relay management.",
   "main": "truffle-config.js",
   "scripts": {
