@@ -5,15 +5,15 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useImportHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
-import AuthLayout from "../../../components/auth/AuthLayout";
-import WalletDisplay from "../components/WalletDisplay";
+import AuthLayout from "../../../layouts/AuthLayout";
+import WalletDisplay from "../../../components/auth/WalletDisplay";
 import {
   RelaySelector,
   PasswordInput,
   RelayStatusBadge,
   SeedPhraseInput,
   validatePasswordSecurity,
-} from "@/components/shared";
+} from "@/components/ui";
 
 /**
  * Renders the import identity client interface for recovering an existing user identity.

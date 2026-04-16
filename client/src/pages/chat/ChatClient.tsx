@@ -1,5 +1,5 @@
 import React from "react";
-import { Sidebar } from "@/components/shared";
+import { Sidebar } from "@/components/ui";
 import { ChatArea } from "@/components/chat";
 import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";

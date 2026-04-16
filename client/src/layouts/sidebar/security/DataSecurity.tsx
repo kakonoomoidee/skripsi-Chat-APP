@@ -1,8 +1,8 @@
 import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
-import GlassDropdown from "@/components/shared/GlassDropdown";
-import { SeedPhraseModalInput } from "@/components/shared";
+import GlassDropdown from "@/components/ui/GlassDropdown";
+import { SeedPhraseModalInput } from "@/components/ui";
 import {
   ImportIcon,
   ExportIcon,

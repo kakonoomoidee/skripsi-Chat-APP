@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { InfoIcon } from "@/components/icons";
-import GlassDropdown from "@/components/shared/GlassDropdown";
+import GlassDropdown from "@/components/ui/GlassDropdown";
 
 /**
  * Interface defining the props for the RelaySelector component.

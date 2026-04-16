@@ -2,7 +2,7 @@ import { formatTime } from "@/utils/format";
 import { DocumentIcon, ChevronDownIcon, ReplyIcon } from "@/components/icons";
 import { useSessionStore } from "@/store";
 import { useState, useRef, useEffect } from "react";
-import { ReplyBubbleContext } from "../context/ReplyBubbleContext";
+import { ReplyBubbleContext } from "../../../context/ReplyBubbleContext";
 
 export const DocumentBubble = ({
   msg,

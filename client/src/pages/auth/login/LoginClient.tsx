@@ -5,13 +5,13 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useLoginHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
-import AuthLayout from "../../../components/auth/AuthLayout";
-import WalletDisplay from "../components/WalletDisplay";
+import AuthLayout from "../../../layouts/AuthLayout";
+import WalletDisplay from "../../../components/auth/WalletDisplay";
 import {
   RelaySelector,
   PasswordInput,
   RelayStatusBadge,
-} from "@/components/shared";
+} from "@/components/ui";
 
 export default function LoginPage() {
   const navigate = useNavigate();

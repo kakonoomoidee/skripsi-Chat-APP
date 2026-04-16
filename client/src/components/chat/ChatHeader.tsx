@@ -4,7 +4,7 @@ import { MenuIcon, PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
 import { InCallModal } from "./modals/InCallModal";
-import { GlassBadge } from "@/components/shared";
+import { GlassBadge } from "@/components/ui";
 
 /**
  * Renders the header section of the active chat interface.

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 
-import RelaySelector from "./RelaySelector";
+import RelaySelector from "../components/ui/RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
 import SecuritySection from "./sidebar/SecuritySection";
 import {
@@ -12,7 +12,7 @@ import {
   GhostIcon,
   ArrowRightIcon,
 } from "@/components/icons";
-import { GlassBadge } from "./GlassBadge";
+import { GlassBadge } from "../components/ui/GlassBadge";
 
 /**
  * Interface for contact history.

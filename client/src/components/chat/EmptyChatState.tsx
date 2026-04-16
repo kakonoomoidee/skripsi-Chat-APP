@@ -2,7 +2,7 @@ import React from "react";
 import { useUIStore } from "@/store";
 import { useChatContext } from "@/context/ChatContext";
 import { MenuIcon, LockIcon } from "@/components/icons";
-import { GlassBadge } from "@/components/shared";
+import { GlassBadge } from "@/components/ui";
 
 /**
  * Renders the placeholder view when no active chat session is selected.

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { SeedPhraseModalInput } from "@/components/shared";
+import { SeedPhraseModalInput } from "@/components/ui";
 
 export interface WithdrawalModalProps {
   isOpen: boolean;

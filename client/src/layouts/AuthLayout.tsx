@@ -29,7 +29,7 @@ export default function AuthLayout({
   subtitle,
 }: AuthLayoutProps): React.JSX.Element {
   return (
-    <div className="flex h-[100dvh] w-full bg-zinc-950 font-sans antialiased text-zinc-100 overflow-hidden">
+    <div className="flex h-100dvh w-full bg-zinc-950 font-sans antialiased text-zinc-100 overflow-hidden">
       <div className="w-full lg:w-[45%] xl:w-[40%] flex flex-col h-full px-8 sm:px-16 lg:px-24 bg-zinc-950 z-10 relative shadow-2xl shadow-black overflow-y-auto custom-scrollbar">
         <div className="w-full max-w-md mx-auto py-12 lg:py-24 my-auto">
           <div className="mb-10">

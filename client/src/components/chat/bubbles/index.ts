@@ -6,5 +6,5 @@ export { MediaBubble } from "./MediaBubble";
 export { AudioBubble } from "./AudioBubble";
 export { CryptoBubble } from "./CryptoBubble";
 export { DocumentBubble } from "./DocumentBubble";
-export { ReplyBubbleContext } from "../context/ReplyBubbleContext";
+export { ReplyBubbleContext } from "../../../context/ReplyBubbleContext";
 export { ReplyPreview } from "./ReplyPreview";

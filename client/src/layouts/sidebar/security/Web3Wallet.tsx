@@ -5,7 +5,7 @@ import { useUIStore } from "@/store";
 import { transferViaInternalWallet } from "@/utils/transaction";
 import { shortenAddress } from "@/utils/format";
 import { ImportIcon, InfoIcon, WalletIcon, SendIcon } from "@/components/icons";
-import SeedPhraseModal from "@/components/shared/SeedPhraseModal";
+import SeedPhraseModal from "@/components/ui/SeedPhraseModal";
 import ImportWalletModal from "./modals/ImportWalletModal";
 import WithdrawalModal from "./modals/WithdrawalModal";
 
