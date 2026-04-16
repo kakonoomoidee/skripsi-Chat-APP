@@ -68,7 +68,7 @@ export interface ChatContextValue {
   endCall: () => void;
   toggleMute: () => void;
   unreadCount: Record<string, number>;
-  totalUnread: number;
+  unreadTotal: number;
   sendMarkAsRead: (peerAddress: string) => void;
 }
 
@@ -146,9 +146,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isPeerTyping,
     setIsPeerTyping,
     removeActiveSession,
-    unreadCount,
-    incrementUnread,
-    resetUnread,
   } = useChatLogic({
     address,
     socket,
@@ -182,7 +179,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     computeSecret,
     hasSecret,
     setIsPeerTyping,
-    incrementUnread,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
       setIsInCall(true);
@@ -260,6 +256,32 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!isAuthenticated) navigate("/login");
   }, [isAuthenticated, navigate]);
 
+  const globalUnreadMessages = useLiveQuery(
+    () => {
+      if (!address) return [];
+      return db.messages
+        .filter(
+          (msg) =>
+            msg.ownerAddress === address.toLowerCase() &&
+            !msg.isMine &&
+            msg.status !== "read"
+        )
+        .toArray();
+    },
+    [address],
+    []
+  );
+
+  const unreadCount = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (globalUnreadMessages) {
+      globalUnreadMessages.forEach((msg) => {
+        counts[msg.chatId] = (counts[msg.chatId] || 0) + 1;
+      });
+    }
+    return counts;
+  }, [globalUnreadMessages]);
+
   useEffect(() => {
     const sweepOldMessages = async () => {
       if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
@@ -289,9 +311,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!activeChat || !isWebRTCConnected) return;
-    sendMarkAsRead(activeChat);
-    resetUnread(activeChat);
-  }, [activeChat, isWebRTCConnected, sendMarkAsRead, resetUnread]);
+
+    if (unreadCount[activeChat] && unreadCount[activeChat] > 0) {
+      sendMarkAsRead(activeChat);
+      db.messages
+        .filter(
+          (msg) =>
+            msg.ownerAddress === address?.toLowerCase() &&
+            msg.chatId === activeChat.toLowerCase() &&
+            !msg.isMine &&
+            msg.status !== "read"
+        )
+        .modify({ status: "read" });
+    }
+  }, [activeChat, isWebRTCConnected, sendMarkAsRead, unreadCount, address]);
 
   useEffect(() => {
     const current = activeChat?.toLowerCase();
@@ -412,7 +445,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isPeerTyping,
     resetWallet,
     unreadCount,
-    totalUnread: Object.values(unreadCount).reduce((a, b) => a + b, 0),
+    unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),
     sendMarkAsRead,
     ...messageSender,
     ...callActions,

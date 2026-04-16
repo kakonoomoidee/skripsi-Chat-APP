@@ -4,6 +4,7 @@ import { MenuIcon, PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
 import { InCallModal } from "./modals/InCallModal";
+import { HamburgerNotificationBadge } from "./HamburgerNotificationBadge";
 
 /**
  * Renders the header section of the active chat interface.
@@ -18,7 +19,7 @@ export const ChatHeader = (): React.JSX.Element => {
     isPeerTyping,
     initiateCall,
     pendingRequests,
-    totalUnread,
+    unreadTotal,
   } = useChatContext();
 
   const { setIsMobileSidebarOpen } = useUIStore();
@@ -34,12 +35,8 @@ export const ChatHeader = (): React.JSX.Element => {
           className="md:hidden relative p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           <MenuIcon className="w-6 h-6" />
-          {totalUnread > 0 && (
-            <span className="absolute top-1 right-0.5 min-w-[16px] h-4 bg-emerald-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border border-zinc-950 shadow-sm">
-              {totalUnread > 99 ? "99+" : totalUnread}
-            </span>
-          )}
-          {pendingRequests.length > 0 && totalUnread === 0 && (
+          <HamburgerNotificationBadge unreadTotal={unreadTotal} />
+          {pendingRequests.length > 0 && unreadTotal === 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-zinc-950"></span>
           )}
         </button>

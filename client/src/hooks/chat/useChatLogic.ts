@@ -68,11 +68,7 @@ export const useChatLogic = ({
   const [searchError, setSearchError] = useState<string>("");
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
-  /**
-   * A map of peer addresses to their respective unread message counts.
-   * Counts are incremented for background chats and reset when the user opens a chat.
-   */
-  const [unreadCount, setUnreadCount] = useState<Record<string, number>>({});
+
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
   const activeChatRef = useRef<string | null>(null);
@@ -91,33 +87,6 @@ export const useChatLogic = ({
     setActiveUsername("");
   }, []);
 
-  /**
-   * Increments the unread message counter for a specific peer.
-   * Should only be called when the incoming message is not from the currently active chat.
-   *
-   * @param {string} peerAddress - The address of the peer who sent the message.
-   * @returns {void}
-   */
-  const incrementUnread = useCallback((peerAddress: string): void => {
-    setUnreadCount((prev) => ({
-      ...prev,
-      [peerAddress.toLowerCase()]: (prev[peerAddress.toLowerCase()] ?? 0) + 1,
-    }));
-  }, []);
-
-  /**
-   * Resets the unread message counter for a specific peer to zero.
-   * Called automatically when the user switches to or opens that chat.
-   *
-   * @param {string} peerAddress - The address of the peer whose counter should be cleared.
-   * @returns {void}
-   */
-  const resetUnread = useCallback((peerAddress: string): void => {
-    setUnreadCount((prev) => ({
-      ...prev,
-      [peerAddress.toLowerCase()]: 0,
-    }));
-  }, []);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -350,8 +319,5 @@ export const useChatLogic = ({
     isPeerTyping,
     setIsPeerTyping,
     removeActiveSession,
-    unreadCount,
-    incrementUnread,
-    resetUnread,
   };
 };

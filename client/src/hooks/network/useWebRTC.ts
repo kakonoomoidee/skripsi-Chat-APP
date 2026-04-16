@@ -25,7 +25,6 @@ export const useWebRTC = (props: any) => {
     generateHandshakeKeys,
     onPeerDisconnected,
     encrypt,
-    incrementUnread,
   } = props;
 
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
@@ -42,7 +41,6 @@ export const useWebRTC = (props: any) => {
     useWebRTCDataChannel({
       ...props,
       encrypt,
-      incrementUnread,
       startVoiceCall,
       stopVoiceCall,
     });

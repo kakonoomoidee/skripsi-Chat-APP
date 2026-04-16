@@ -17,7 +17,6 @@ interface UseWebRTCDataChannelProps {
   onCallEnded: (() => void) | undefined;
   startVoiceCall: (peerAddress: string) => Promise<boolean>;
   stopVoiceCall: (peerAddress: string) => void;
-  incrementUnread: (peerAddress: string) => void;
 }
 
 /**
@@ -39,7 +38,6 @@ export const useWebRTCDataChannel = ({
   onCallEnded,
   startVoiceCall,
   stopVoiceCall,
-  incrementUnread,
 }: UseWebRTCDataChannelProps) => {
   const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,10 +172,6 @@ export const useWebRTCDataChannel = ({
           isImage: isReceivedImage,
         });
 
-        if (activeChat?.toLowerCase() !== peerAddress.toLowerCase()) {
-          incrementUnread(peerAddress);
-        }
-
         const deliveredSignal = JSON.stringify({
           type: "MSG_DELIVERED",
           timestamp: messageTimestamp,
@@ -200,7 +194,6 @@ export const useWebRTCDataChannel = ({
       activeChat,
       startVoiceCall,
       stopVoiceCall,
-      incrementUnread,
       encrypt,
       sendDataViaWebRTC,
     ],
