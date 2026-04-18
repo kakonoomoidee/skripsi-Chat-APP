@@ -23,6 +23,7 @@
   "license": "MIT",
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@types/ms": "^2.1.0",
     "axios": "^1.13.5",
     "crypto-js": "^4.2.0",
     "dexie": "^4.3.0",

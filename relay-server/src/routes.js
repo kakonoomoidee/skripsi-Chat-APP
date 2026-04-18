@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { ethers } = require("ethers");
 const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
+const ms = require("ms");
 const {
   identityContract,
   relayRegistryContract,
@@ -13,11 +14,11 @@ const {
 const { getKnownRelaysCount } = require("./relayService");
 const { getActiveUsersCount } = require("./socketManager");
 
-const NONCE_TTL_MS = 5 * 60 * 1000;
+const NONCE_TTL_MS = ms("5m");
 const activeNonces = {};
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: ms("15m"),
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,

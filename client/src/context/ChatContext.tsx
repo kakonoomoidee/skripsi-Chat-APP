@@ -22,6 +22,7 @@ import { useDuplicateTab } from "@/hooks/ui/useDuplicateTab";
 import { useCallActions } from "@/hooks/chat/useCallActions";
 import { useMessageSender } from "@/hooks/chat/useMessageSender";
 import { DuplicateTabWarning } from "@/components/chat/index";
+import ms from "ms";
 
 export interface ChatContextValue {
   isAuthenticated: boolean;
@@ -288,13 +289,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
       const now = Date.now();
       let thresholdTime = now;
-      if (autoDeleteMode === "1") thresholdTime = now - 24 * 60 * 60 * 1000;
+      if (autoDeleteMode === "1") thresholdTime = now - ms("1d");
       else if (autoDeleteMode === "3")
-        thresholdTime = now - 3 * 24 * 60 * 60 * 1000;
+        thresholdTime = now - ms("3d");
       else if (autoDeleteMode === "7")
-        thresholdTime = now - 7 * 24 * 60 * 60 * 1000;
+        thresholdTime = now - ms("7d");
       else if (autoDeleteMode === "30")
-        thresholdTime = now - 30 * 24 * 60 * 60 * 1000;
+        thresholdTime = now - ms("30d");
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
       } catch (error) {}
