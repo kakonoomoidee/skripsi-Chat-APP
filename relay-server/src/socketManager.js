@@ -6,7 +6,8 @@ const activeSessions = new Map();
 
 /**
  * Initializes Socket.IO logic, authentication middleware, and connection tracking.
- * Enforces a single-session policy across different devices to prevent split-brain routing.
+ * Enforces a single-session policy across different devices.
+ * Operates STRICTLY as a signaling server for WebRTC handshakes (Pure P2P architecture).
  *
  * @param {Object} io - The Socket.IO server instance.
  * @returns {void}
@@ -51,18 +52,6 @@ const initSocketManager = (io) => {
     console.log(
       `[Socket Manager] Client connected: ${user}. Total active sessions: ${activeSessions.size}`,
     );
-
-    socket.on("send_message", (data) => {
-      const to = data.to.toLowerCase();
-      const payload = {
-        from: user,
-        message: data.encryptedMessage,
-        timestamp: Date.now(),
-      };
-
-      io.to(to).emit("receive_message", payload);
-      gossipToOtherRelays("receive_message", to, payload);
-    });
 
     socket.on("handshake_init", (data) => {
       const to = data.to.toLowerCase();
