@@ -1,4 +1,7 @@
 const axios = require("axios");
+const https = require("https");
+
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 const {
   relayRegistryContract,
   MY_PUBLIC_URL,
@@ -65,9 +68,12 @@ const gossipToOtherRelays = (event, to, data) => {
       .post(
         `${relayUrl}/internal/gossip`,
         { event, to, data },
-        INTERNAL_SECRET
-          ? { headers: { "x-internal-secret": INTERNAL_SECRET } }
-          : {},
+        {
+          httpsAgent,
+          ...(INTERNAL_SECRET
+            ? { headers: { "x-internal-secret": INTERNAL_SECRET } }
+            : {}),
+        },
       )
       .catch((err) => {
         console.warn(`Gossip to ${relayUrl} failed: ${err.message}`);
