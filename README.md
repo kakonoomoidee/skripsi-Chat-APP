@@ -176,36 +176,21 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -addext "subjectAltName=IP:10.64.24.248"
 ```
 
-**Nginx config** (`/etc/nginx/sites-available/chat-app`):
+**Nginx config** is located at `chat-app/apps/config/nginx.conf`. The config covers:
 
-```nginx
-server {
-    listen 80;
-    server_name _;
-    return 301 https://10.64.24.248$request_uri;
-}
+- Port **80** → redirect to HTTPS
+- Port **443** → serve React/Vite client
+- Port **4431–4433** → SSL reverse proxy to each relay node (3001–3003)
 
-server {
-    listen 443 ssl;
-    server_name 10.64.24.248;
-
-    ssl_certificate /etc/ssl/certs/selfsigned.crt;
-    ssl_certificate_key /etc/ssl/private/selfsigned.key;
-
-    root /home/thesis/rizki/skripsi-Chat-APP/client/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-**Enable & reload:**
+**Apply config:**
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/chat-app /etc/nginx/sites-enabled/
-sudo nginx -t && sudo nginx -s reload
+# Backup & copy config from repo
+sudo cp /etc/nginx/sites-available/chat-app /etc/nginx/sites-available/chat-app.bak
+sudo cp /home/thesis/rizki/skripsi-Chat-APP/config/nginx.conf /etc/nginx/sites-available/chat-app
+
+# Symlink to sites-enabled already exists, test & reload directly
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 > **Note**: Your browser may display a "Not Secure" warning because a self-signed certificate is being used. Click **Advanced → Proceed** to continue. After that, microphone and camera access should work normally since the connection is already using HTTPS.
