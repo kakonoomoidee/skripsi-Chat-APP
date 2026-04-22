@@ -105,7 +105,7 @@ contract IdentityRegistry {
             abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
         );
 
-        /// @dev ecrecover returns the address that signed the message. We compare it to the expected signer.
+        // @dev ecrecover returns the address that signed the message. We compare it to the expected signer.
         address recoveredAddress = ecrecover(ethSignedMessageHash, _v, _r, _s);
 
         return (recoveredAddress == _signer);
