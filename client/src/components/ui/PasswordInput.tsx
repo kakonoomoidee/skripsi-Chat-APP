@@ -11,7 +11,7 @@ import { EyeIcon, EyeSlashIcon } from "@/components/icons";
  * @property {string} [placeholder] - Placeholder text.
  * @property {boolean} [disabled] - Disables the input when true.
  * @property {boolean} [showRules] - Determines whether to display password validation rules below the input.
- * @property {string} [error] - Optional error message to display below the input (e.g., "Passwords do not match").
+ * @property {string} [error] - Optional error message to display below the input.
  */
 export interface PasswordInputProps {
   label?: string;
@@ -40,6 +40,7 @@ export const validatePasswordSecurity = (password: string): boolean => {
 
 /**
  * Renders a secure password input field with visibility toggle and dynamic strength indicators.
+ * Restricts whitespace characters from being entered.
  *
  * @param {PasswordInputProps} props - Component properties.
  * @returns {React.JSX.Element} The rendered password input component.
@@ -63,6 +64,19 @@ export const PasswordInput = ({
     { id: 5, text: "Special character", met: /[^A-Za-z0-9]/.test(value) },
   ];
 
+  /**
+   * Intercepts the change event to strip out any whitespace before passing to parent.
+   *
+   * @param {React.ChangeEvent<HTMLInputElement>} e - The input change event.
+   * @returns {void}
+   */
+  const handleNoSpaceChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): void => {
+    e.target.value = e.target.value.replace(/\s/g, "");
+    onChange(e);
+  };
+
   return (
     <div className="flex flex-col w-full">
       {label && (
@@ -74,7 +88,7 @@ export const PasswordInput = ({
         <input
           type={showPassword ? "text" : "password"}
           value={value}
-          onChange={onChange}
+          onChange={handleNoSpaceChange}
           placeholder={placeholder}
           disabled={disabled}
           className={`w-full bg-zinc-950 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all pr-12 disabled:opacity-50 ${
@@ -115,7 +129,9 @@ export const PasswordInput = ({
                 }`}
               >
                 {rule.met && (
-                  <span className="text-[8px] text-emerald-400 font-bold">✓</span>
+                  <span className="text-[8px] text-emerald-400 font-bold">
+                    ✓
+                  </span>
                 )}
               </div>
               <span
