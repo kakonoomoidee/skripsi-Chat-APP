@@ -46,14 +46,21 @@ export default function RelaySelector({
   }, []);
 
   /**
-   * Processes the addition of a new custom relay URL.
+   * Processes the addition of a new custom relay URL and prevents duplicates.
    *
    * @returns {Promise<void>}
    */
   const handleAddRelaySubmit = async (): Promise<void> => {
-    if (customRelayInput.trim()) {
+    const input = customRelayInput.trim();
+
+    if (input) {
+      if (defaultRelays.includes(input)) {
+        setRelayError("This relay node is already in the list.");
+        return;
+      }
+
       try {
-        await addCustomRelay(customRelayInput.trim());
+        await addCustomRelay(input);
         setIsModalOpen(false);
         setCustomRelayInput("");
         setRelayError("");
@@ -68,9 +75,14 @@ export default function RelaySelector({
   const buttonPadding =
     size === "md" ? "px-4 py-3 text-sm" : "px-3.5 py-2.5 text-xs";
 
-  const dropdownOptions = defaultRelays.map((url) => ({
+  const uniqueRelays = Array.from(new Set(defaultRelays));
+
+  const dropdownOptions = uniqueRelays.map((url) => ({
     value: url,
-    label: url.replace("http://", "").replace("https://", ""),
+    label: url
+      .replace("http://", "")
+      .replace("https://", "")
+      .replace(/\/$/, ""),
   }));
 
   return (
