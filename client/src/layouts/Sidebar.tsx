@@ -1,12 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 import { db } from "@/utils/db";
 
-import RelaySelector from "../components/ui/RelaySelector";
-import ProfileSection from "./sidebar/ProfileSection";
-import SecuritySection from "./sidebar/SecuritySection";
 import {
   LockSessionIcon,
   SearchIcon,
@@ -26,20 +23,20 @@ interface ContactHistory {
 }
 
 /**
- * Main sidebar component for navigation, displaying active sessions,
- * a split Chats / Archived list, and application settings.
+ * Main sidebar component.
+ *
+ * Features:
+ * - Application logo header with a 3-dot overflow menu (Settings / Log out).
+ * - Search / "Start Chat" panel for peer discovery.
+ * - Active session list split into main and archived sub-lists.
+ * - Recent history of disconnected peers.
+ * - Three-dot context menu per session row for Archive / Unarchive.
  *
  * @returns {React.JSX.Element} The sidebar UI.
  */
 export default function Sidebar(): React.JSX.Element {
   const {
     myUsername,
-    address,
-    isConnected,
-    activeRelay,
-    defaultRelays,
-    changeRelay,
-    addCustomRelay,
     activeSessions,
     activeChat,
     switchChat,
@@ -53,20 +50,42 @@ export default function Sidebar(): React.JSX.Element {
     unreadCount,
     archiveContact,
     unarchiveContact,
+    setActiveAreaView,
   } = useChatContext();
 
-  const [activeTab, setActiveTab] = useState<"chats" | "settings">("chats");
+  /**
+   * Whether the 3-dot header overflow menu is visible.
+   */
+  const [headerMenuOpen, setHeaderMenuOpen] = useState<boolean>(false);
 
   /**
-   * Whether the "Archived" sub-section inside the Chats tab is expanded.
+   * Whether the "Archived" sub-section inside the chat list is expanded.
    */
   const [showArchived, setShowArchived] = useState<boolean>(false);
 
   /**
    * Address of the session row whose context menu is currently open.
-   * `null` means no menu is visible.
+   * `null` means no row menu is visible.
    */
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+
+  const headerMenuRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Closes the header overflow menu when the user clicks outside of it.
+   */
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        headerMenuRef.current &&
+        !headerMenuRef.current.contains(e.target as Node)
+      ) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
@@ -111,11 +130,7 @@ export default function Sidebar(): React.JSX.Element {
     setRecentContacts([]);
   };
 
-  const allContacts = useLiveQuery(
-    () => db.contacts.toArray(),
-    [],
-    [],
-  );
+  const allContacts = useLiveQuery(() => db.contacts.toArray(), [], []);
 
   const archivedAddresses = new Set(
     (allContacts ?? [])
@@ -139,7 +154,8 @@ export default function Sidebar(): React.JSX.Element {
     targetUsername.trim().toLowerCase() === myUsername?.toLowerCase();
 
   /**
-   * Renders a single session row with avatar, name, status dot, and unread badge.
+   * Renders a single session row with avatar, name, status dot, unread badge,
+   * and a hover-revealed 3-dot context menu for Archive / Unarchive.
    *
    * @param {object} session - The active session data.
    * @param {boolean} isArchived - Whether this row belongs to the archived list.
@@ -178,6 +194,7 @@ export default function Sidebar(): React.JSX.Element {
             </p>
           </div>
         </div>
+
         <div className="flex items-center gap-2">
           <div
             className={`w-2 h-2 rounded-full ${
@@ -186,10 +203,8 @@ export default function Sidebar(): React.JSX.Element {
                 : "bg-amber-500 animate-pulse"
             }`}
           />
-          <GlassBadge
-            count={unreadCount[addr] ?? 0}
-            variant="chat"
-          />
+          <GlassBadge count={unreadCount[addr] ?? 0} variant="chat" />
+
           <div className="relative">
             <button
               id={`session-menu-${addr}`}
@@ -249,9 +264,10 @@ export default function Sidebar(): React.JSX.Element {
   };
 
   return (
-    <>
-      <div className="w-full h-full flex flex-col bg-zinc-950/90 backdrop-blur-xl">
-        <div className="p-5 flex items-center gap-3 border-b border-zinc-800/50 shrink-0">
+    <div className="w-full h-full flex flex-col bg-zinc-950/90 backdrop-blur-xl">
+
+      <div className="p-5 flex items-center justify-between border-b border-zinc-800/50 shrink-0">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <LockSessionIcon className="w-5 h-5 text-white" />
           </div>
@@ -260,214 +276,220 @@ export default function Sidebar(): React.JSX.Element {
           </h2>
         </div>
 
-        <div className="flex px-4 pt-4 gap-1 border-b border-zinc-800/50 shrink-0">
+        <div className="relative" ref={headerMenuRef}>
           <button
-            onClick={() => setActiveTab("chats")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
-              activeTab === "chats"
-                ? "text-indigo-400 border-b-2 border-indigo-500"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
+            id="sidebar-overflow-menu-btn"
+            onClick={() => setHeaderMenuOpen((v) => !v)}
+            className="p-2 rounded-full text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            title="More options"
           >
-            Chats
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <circle cx="10" cy="3" r="1.5" />
+              <circle cx="10" cy="10" r="1.5" />
+              <circle cx="10" cy="17" r="1.5" />
+            </svg>
           </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
-              activeTab === "settings"
-                ? "text-zinc-100 border-b-2 border-zinc-300"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            Settings
-          </button>
-        </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-          {activeTab === "chats" && (
-            <div className="p-4 flex flex-col h-full">
-              <div className="relative mb-4 group shrink-0">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search or start new chat..."
-                  value={targetUsername}
-                  onChange={(e) => setTargetUsername(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-600"
-                />
-              </div>
-
-              {targetUsername && filteredSessions.length === 0 && (
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center shrink-0">
-                  <p className="text-xs text-zinc-400 mb-3">
-                    No active session with{" "}
-                    <span className="text-zinc-200 font-semibold">
-                      {targetUsername}
-                    </span>
-                  </p>
-
-                  {isSelfChat ? (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
-                      <WarningIcon className="w-4 h-4" />
-                      Cannot handshake yourself
-                    </div>
-                  ) : searchError ? (
-                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-lg flex flex-col items-center justify-center gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <WarningIcon className="w-3.5 h-3.5" />
-                        {searchError}
-                      </div>
-                      <span className="text-[10px] opacity-70">
-                        Check the username and try again
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleConnectPeer}
-                      disabled={isSearching}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center"
-                    >
-                      {isSearching ? (
-                        <>
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                          Searching Network...
-                        </>
-                      ) : (
-                        "Start Chat"
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-1.5 flex-1">
-                {mainSessions.map((session) =>
-                  renderSessionRow(session, false),
-                )}
-
-                {recentContacts.filter(
-                  (rc) =>
-                    !activeSessions.some((as) => as.username === rc.username),
-                ).length > 0 &&
-                  !targetUsername && (
-                    <div className="pt-4">
-                      <div className="px-2 flex justify-between items-center mb-2">
-                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                          Recent History
-                        </label>
-                        <button
-                          onClick={clearHistory}
-                          className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <div className="space-y-1">
-                        {recentContacts
-                          .filter(
-                            (rc) =>
-                              !activeSessions.some(
-                                (as) => as.username === rc.username,
-                              ),
-                          )
-                          .map((contact) => (
-                            <div
-                              key={contact.username}
-                              onClick={() =>
-                                setTargetUsername(contact.username)
-                              }
-                              className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
-                            >
-                              <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
-                                <div className="w-8 h-8 rounded-full bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-zinc-400 font-bold text-xs">
-                                  {contact.username.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
-                                    {contact.username}
-                                  </p>
-                                  <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
-                                    Disconnected
-                                  </p>
-                                </div>
-                              </div>
-                              <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                {activeSessions.length === 0 &&
-                  recentContacts.length === 0 &&
-                  !targetUsername && (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 mt-10">
-                      <GhostIcon className="w-8 h-8 opacity-20" />
-                      <p className="text-xs">No active sessions or history.</p>
-                    </div>
-                  )}
-              </div>
-
-              {archivedSessions.length > 0 && (
-                <div className="mt-4 shrink-0">
-                  <button
-                    onClick={() => setShowArchived((v) => !v)}
-                    className="w-full flex items-center justify-between px-2 py-2 rounded-xl hover:bg-zinc-900 transition-colors"
-                  >
-                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                      Archived ({archivedSessions.length})
-                    </span>
-                    <ArrowDownIcon
-                      className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${
-                        showArchived ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {showArchived && (
-                    <div className="space-y-1.5 mt-1">
-                      {archivedSessions.map((session) =>
-                        renderSessionRow(session, true),
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "settings" && (
-            <div className="p-4 space-y-5">
-              <ProfileSection
-                myUsername={myUsername}
-                address={address}
-                isConnected={isConnected}
-              />
-
-              <SecuritySection
-                nodeSelector={
-                  <RelaySelector
-                    activeRelay={activeRelay}
-                    defaultRelays={defaultRelays}
-                    changeRelay={changeRelay}
-                    addCustomRelay={addCustomRelay}
-                  />
-                }
-              />
-
-              <div className="pt-4 border-t border-zinc-800/50">
-                <button
-                  onClick={logout}
-                  className="w-full text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-2"
+          {headerMenuOpen && (
+            <div
+              id="sidebar-overflow-menu"
+              className="absolute right-0 top-full mt-2 w-44 bg-zinc-800/95 backdrop-blur-sm border border-zinc-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1"
+            >
+              <button
+                onClick={() => {
+                  setActiveAreaView("settings");
+                  setHeaderMenuOpen(false);
+                }}
+                className="w-full text-left text-sm text-zinc-200 px-4 py-3 hover:bg-zinc-700/70 transition-colors flex items-center gap-2.5"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4 text-zinc-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
                 >
-                  <LockSessionIcon className="w-3.5 h-3.5" />
-                  Lock Session
-                </button>
-              </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                  />
+                </svg>
+                Settings
+              </button>
+              <div className="border-t border-zinc-700/50" />
+              <button
+                onClick={() => {
+                  setHeaderMenuOpen(false);
+                  logout();
+                }}
+                className="w-full text-left text-sm text-red-400 px-4 py-3 hover:bg-zinc-700/70 transition-colors flex items-center gap-2.5"
+              >
+                <LockSessionIcon className="w-4 h-4" />
+                Log out
+              </button>
             </div>
           )}
         </div>
       </div>
-    </>
+
+      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+        <div className="p-4 flex flex-col h-full">
+          <div className="relative mb-4 group shrink-0">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
+            <input
+              type="text"
+              placeholder="Search or start new chat..."
+              value={targetUsername}
+              onChange={(e) => setTargetUsername(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-600"
+            />
+          </div>
+
+          {targetUsername && filteredSessions.length === 0 && (
+            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center shrink-0">
+              <p className="text-xs text-zinc-400 mb-3">
+                No active session with{" "}
+                <span className="text-zinc-200 font-semibold">
+                  {targetUsername}
+                </span>
+              </p>
+
+              {isSelfChat ? (
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
+                  <WarningIcon className="w-4 h-4" />
+                  Cannot handshake yourself
+                </div>
+              ) : searchError ? (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-lg flex flex-col items-center justify-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <WarningIcon className="w-3.5 h-3.5" />
+                    {searchError}
+                  </div>
+                  <span className="text-[10px] opacity-70">
+                    Check the username and try again
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleConnectPeer}
+                  disabled={isSearching}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center"
+                >
+                  {isSearching ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      Searching Network...
+                    </>
+                  ) : (
+                    "Start Chat"
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1.5 flex-1">
+            {mainSessions.map((session) => renderSessionRow(session, false))}
+
+            {recentContacts.filter(
+              (rc) => !activeSessions.some((as) => as.username === rc.username),
+            ).length > 0 &&
+              !targetUsername && (
+                <div className="pt-4">
+                  <div className="px-2 flex justify-between items-center mb-2">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                      Recent History
+                    </label>
+                    <button
+                      onClick={clearHistory}
+                      className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {recentContacts
+                      .filter(
+                        (rc) =>
+                          !activeSessions.some(
+                            (as) => as.username === rc.username,
+                          ),
+                      )
+                      .map((contact) => (
+                        <div
+                          key={contact.username}
+                          onClick={() => setTargetUsername(contact.username)}
+                          className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-zinc-400 font-bold text-xs">
+                              {contact.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
+                                {contact.username}
+                              </p>
+                              <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
+                                Disconnected
+                              </p>
+                            </div>
+                          </div>
+                          <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+            {activeSessions.length === 0 &&
+              recentContacts.length === 0 &&
+              !targetUsername && (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 mt-10">
+                  <GhostIcon className="w-8 h-8 opacity-20" />
+                  <p className="text-xs">No active sessions or history.</p>
+                </div>
+              )}
+          </div>
+
+          {archivedSessions.length > 0 && (
+            <div className="mt-4 shrink-0">
+              <button
+                onClick={() => setShowArchived((v) => !v)}
+                className="w-full flex items-center justify-between px-2 py-2 rounded-xl hover:bg-zinc-900 transition-colors"
+              >
+                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                  Archived ({archivedSessions.length})
+                </span>
+                <ArrowDownIcon
+                  className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${
+                    showArchived ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {showArchived && (
+                <div className="space-y-1.5 mt-1">
+                  {archivedSessions.map((session) =>
+                    renderSessionRow(session, true),
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

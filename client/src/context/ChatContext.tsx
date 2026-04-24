@@ -85,6 +85,8 @@ export interface ChatContextValue {
   archiveContact: (peerAddress: string) => Promise<void>;
   unarchiveContact: (peerAddress: string) => Promise<void>;
   forceDisconnectPeer: (peerAddress: string) => void;
+  activeAreaView: "chat" | "settings";
+  setActiveAreaView: (view: "chat" | "settings") => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -126,6 +128,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
+  /**
+   * Controls which primary panel is visible to the right of the Sidebar.
+   * - `'chat'`     — The active chat area (default).
+   * - `'settings'` — The full-panel Settings view.
+   */
+  const [activeAreaView, setActiveAreaView] = useState<"chat" | "settings">("chat");
 
   /**
    * Tracks the current state of the peer-to-peer connection lifecycle.
@@ -558,6 +567,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     switchChat(session);
     setPeerWalletAddress(null);
     setIsMobileSidebarOpen(false);
+    setActiveAreaView("chat");
   };
 
   const handleAcceptRequestWrapped = (req: any): void => {
@@ -603,6 +613,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     archiveContact,
     unarchiveContact,
     forceDisconnectPeer,
+    activeAreaView,
+    setActiveAreaView,
     ...messageSender,
     ...callActions,
     isIncomingCall,

@@ -4,18 +4,24 @@ import { ChatArea } from "@/components/chat";
 import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
 import { useSessionTimeout } from "@/hooks/ui/useSessionTimeout";
+import SettingsArea from "./SettingsArea";
 
 /**
- * Responsive Layout Wrapper
+ * Responsive Layout Wrapper.
+ *
  * Controls the sliding drawer sidebar and background overlay for mobile devices.
  * Automatically enforces session timeout due to inactivity.
+ *
+ * The right-hand panel is driven by `activeAreaView` from ChatContext:
+ * - `'chat'`     — Renders the active {@link ChatArea}.
+ * - `'settings'` — Renders the full-panel {@link SettingsArea}.
  *
  * @returns {React.JSX.Element} The chat interface layout.
  */
 const ChatLayout = (): React.JSX.Element => {
   const { isMobileSidebarOpen, setIsMobileSidebarOpen, showToast } =
     useUIStore();
-  const { logout } = useChatContext();
+  const { logout, activeAreaView } = useChatContext();
 
   useSessionTimeout(() => {
     logout();
@@ -43,14 +49,14 @@ const ChatLayout = (): React.JSX.Element => {
       </div>
 
       <div className="flex-1 flex flex-col relative min-w-0 w-full">
-        <ChatArea />
+        {activeAreaView === "settings" ? <SettingsArea /> : <ChatArea />}
       </div>
     </div>
   );
 };
 
 /**
- * Main Chat Client View
+ * Main Chat Client View.
  * Minimalist container injecting the global context provider.
  *
  * @returns {React.JSX.Element} The root chat application view.
