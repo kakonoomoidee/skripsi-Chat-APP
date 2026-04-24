@@ -54,7 +54,7 @@ export default function Web3Wallet(): React.JSX.Element {
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [importError, setImportError] = useState<string>("");
 
-  const [showWithdrawForm, setShowWithdrawForm] = useState<boolean>(false);
+  const [copiedWalletAddr, setCopiedWalletAddr] = useState<boolean>(false);
   const [withdrawAddress, setWithdrawAddress] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] =
@@ -186,7 +186,6 @@ export default function Web3Wallet(): React.JSX.Element {
     setTxWalletAddress(null);
     setTxWalletType(null);
     setWalletDetails(null);
-    setShowWithdrawForm(false);
     localStorage.removeItem("linked_metamask");
     localStorage.removeItem("internal_tx_wallet");
     localStorage.removeItem("internal_tx_pk");
@@ -263,7 +262,6 @@ export default function Web3Wallet(): React.JSX.Element {
       setWithdrawAddress("");
       setWithdrawAmount("");
       setIsWithdrawModalOpen(false);
-      setShowWithdrawForm(false);
 
       if (txWalletAddress) {
         fetchWalletDetails(txWalletAddress, false);
@@ -365,9 +363,29 @@ export default function Web3Wallet(): React.JSX.Element {
                   <span className="text-[9px] text-zinc-500 block mb-0.5">
                     ADDRESS
                   </span>
-                  <span className="text-xs text-zinc-200 font-mono break-all bg-zinc-950 p-1.5 rounded-md border border-zinc-800/50 block">
-                    {txWalletAddress}
-                  </span>
+                  <div className="flex items-center gap-2 bg-zinc-950 px-1.5 py-1.5 rounded-md border border-zinc-800/50">
+                    <span className="text-xs text-zinc-200 font-mono break-all flex-1">
+                      {txWalletAddress}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(txWalletAddress ?? "");
+                        setCopiedWalletAddr(true);
+                        setTimeout(() => setCopiedWalletAddr(false), 1800);
+                      }}
+                      className="shrink-0 text-zinc-600 hover:text-indigo-400 transition-colors p-0.5"
+                      title="Copy address"
+                    >
+                      {copiedWalletAddr ? (
+                        <span className="text-[9px] font-bold text-emerald-400">Copied!</span>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50">
@@ -394,16 +412,10 @@ export default function Web3Wallet(): React.JSX.Element {
 
             {txWalletType === "internal" && (
               <div className="pt-3 border-t border-zinc-800/50">
-                <button
-                  onClick={() => setShowWithdrawForm(!showWithdrawForm)}
-                  className="w-full flex items-center justify-between text-[10px] font-semibold text-zinc-500 uppercase tracking-widest hover:text-zinc-300 transition-colors focus:outline-none"
-                >
-                  <span>External Withdrawal</span>
-                  <span>{showWithdrawForm ? "Hide" : "Show"}</span>
-                </button>
-
-                {showWithdrawForm && (
-                  <div className="flex flex-col gap-4 mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-3">
+                  External Withdrawal
+                </p>
+                <div className="flex flex-col gap-4">
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
@@ -411,13 +423,15 @@ export default function Web3Wallet(): React.JSX.Element {
                         <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                           Destination Address
                         </label>
-                        <input
-                          type="text"
-                          placeholder="0x..."
-                          value={withdrawAddress}
-                          onChange={(e) => setWithdrawAddress(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 font-mono"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="0x..."
+                            value={withdrawAddress}
+                            onChange={(e) => setWithdrawAddress(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 font-mono"
+                          />
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
@@ -444,7 +458,6 @@ export default function Web3Wallet(): React.JSX.Element {
                           </button>
                         </div>
                         <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
-                          <span>⛽</span>
                           Est. network fee: ~{ESTIMATED_GAS} ETH
                         </p>
                       </div>
@@ -454,16 +467,14 @@ export default function Web3Wallet(): React.JSX.Element {
                     <button
                       onClick={handleInitiateWithdrawal}
                       disabled={!withdrawAddress || !withdrawAmount}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                       <SendIcon className="w-3.5 h-3.5" />
-                      Initiate Transfer
+                      Execute Transfer
                     </button>
 
                   </div>
-                )}
-
-              </div>
+                </div>
             )}
           </div>
         )}

@@ -61,7 +61,7 @@ export default function GlassDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute z-[200] top-full mt-1.5 w-full bg-zinc-900/95 backdrop-blur-xl border border-zinc-700 rounded-xl shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute z-[200] top-full mt-1.5 w-full bg-[#18181b] border border-zinc-700 rounded-xl shadow-2xl shadow-black/80 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
           <ul className="py-1 max-h-52 overflow-y-auto custom-scrollbar">
             {options.map((opt) => (
               <li key={opt.value}>
