@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
+import { db } from "@/utils/db";
 
 import RelaySelector from "../components/ui/RelaySelector";
 import ProfileSection from "./sidebar/ProfileSection";
@@ -11,11 +13,12 @@ import {
   WarningIcon,
   GhostIcon,
   ArrowRightIcon,
+  ArrowDownIcon,
 } from "@/components/icons";
 import { GlassBadge } from "../components/ui/GlassBadge";
 
 /**
- * Interface for contact history.
+ * Interface for contact history stored in localStorage.
  */
 interface ContactHistory {
   username: string;
@@ -23,7 +26,8 @@ interface ContactHistory {
 }
 
 /**
- * Main sidebar component for navigation, displaying active sessions, pending requests, and settings.
+ * Main sidebar component for navigation, displaying active sessions,
+ * a split Chats / Archived list, and application settings.
  *
  * @returns {React.JSX.Element} The sidebar UI.
  */
@@ -47,10 +51,22 @@ export default function Sidebar(): React.JSX.Element {
     logout,
     searchError,
     unreadCount,
+    archiveContact,
+    unarchiveContact,
   } = useChatContext();
 
-
   const [activeTab, setActiveTab] = useState<"chats" | "settings">("chats");
+
+  /**
+   * Whether the "Archived" sub-section inside the Chats tab is expanded.
+   */
+  const [showArchived, setShowArchived] = useState<boolean>(false);
+
+  /**
+   * Address of the session row whose context menu is currently open.
+   * `null` means no menu is visible.
+   */
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
 
   const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
@@ -95,12 +111,142 @@ export default function Sidebar(): React.JSX.Element {
     setRecentContacts([]);
   };
 
+  const allContacts = useLiveQuery(
+    () => db.contacts.toArray(),
+    [],
+    [],
+  );
+
+  const archivedAddresses = new Set(
+    (allContacts ?? [])
+      .filter((c) => c.isArchived)
+      .map((c) => c.address.toLowerCase()),
+  );
+
   const filteredSessions = activeSessions.filter((s) =>
     s.username.toLowerCase().includes(targetUsername.toLowerCase()),
   );
 
+  const mainSessions = filteredSessions.filter(
+    (s) => !archivedAddresses.has(s.address.toLowerCase()),
+  );
+
+  const archivedSessions = filteredSessions.filter((s) =>
+    archivedAddresses.has(s.address.toLowerCase()),
+  );
+
   const isSelfChat =
     targetUsername.trim().toLowerCase() === myUsername?.toLowerCase();
+
+  /**
+   * Renders a single session row with avatar, name, status dot, and unread badge.
+   *
+   * @param {object} session - The active session data.
+   * @param {boolean} isArchived - Whether this row belongs to the archived list.
+   * @returns {React.JSX.Element} The session row element.
+   */
+  const renderSessionRow = (
+    session: { address: string; username: string },
+    isArchived: boolean,
+  ): React.JSX.Element => {
+    const addr = session.address.toLowerCase();
+    const isActive = activeChat === session.address;
+    const menuOpen = openMenuFor === addr;
+
+    return (
+      <div
+        key={session.address}
+        className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between group relative ${
+          isActive
+            ? "bg-indigo-600/10 border border-indigo-500/30"
+            : "hover:bg-zinc-900 border border-transparent"
+        }`}
+      >
+        <div
+          className="flex items-center gap-3 flex-1 min-w-0"
+          onClick={() => switchChat(session)}
+        >
+          <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold group-hover:bg-zinc-700 transition-colors shrink-0">
+            {session.username.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-sm text-zinc-100 capitalize leading-tight truncate">
+              {session.username}
+            </p>
+            <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
+              {shortenAddress(session.address)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              connectedPeers.includes(addr)
+                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
+                : "bg-amber-500 animate-pulse"
+            }`}
+          />
+          <GlassBadge
+            count={unreadCount[addr] ?? 0}
+            variant="chat"
+          />
+          <div className="relative">
+            <button
+              id={`session-menu-${addr}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenuFor(menuOpen ? null : addr);
+              }}
+              className="p-1 rounded-full text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+              title="More options"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-3.5 h-3.5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <circle cx="10" cy="4" r="1.5" />
+                <circle cx="10" cy="10" r="1.5" />
+                <circle cx="10" cy="16" r="1.5" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 w-36 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1"
+                onMouseLeave={() => setOpenMenuFor(null)}
+              >
+                {isArchived ? (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await unarchiveContact(addr);
+                      setOpenMenuFor(null);
+                    }}
+                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors"
+                  >
+                    Unarchive
+                  </button>
+                ) : (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await archiveContact(addr);
+                      setOpenMenuFor(null);
+                    }}
+                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors"
+                  >
+                    Archive
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -183,7 +329,7 @@ export default function Sidebar(): React.JSX.Element {
                     >
                       {isSearching ? (
                         <>
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>
+                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                           Searching Network...
                         </>
                       ) : (
@@ -195,44 +341,9 @@ export default function Sidebar(): React.JSX.Element {
               )}
 
               <div className="space-y-1.5 flex-1">
-                {filteredSessions.map((session) => (
-                  <div
-                    key={session.address}
-                    onClick={() => switchChat(session)}
-                    className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between group ${
-                      activeChat === session.address
-                        ? "bg-indigo-600/10 border border-indigo-500/30"
-                        : "hover:bg-zinc-900 border border-transparent"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold group-hover:bg-zinc-700 transition-colors">
-                        {session.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm text-zinc-100 capitalize leading-tight">
-                          {session.username}
-                        </p>
-                        <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
-                          {shortenAddress(session.address)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          connectedPeers.includes(session.address.toLowerCase())
-                            ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
-                            : "bg-amber-500 animate-pulse"
-                        }`}
-                      ></div>
-                      <GlassBadge
-                        count={unreadCount[session.address.toLowerCase()] ?? 0}
-                        variant="chat"
-                      />
-                    </div>
-                  </div>
-                ))}
+                {mainSessions.map((session) =>
+                  renderSessionRow(session, false),
+                )}
 
                 {recentContacts.filter(
                   (rc) =>
@@ -296,6 +407,32 @@ export default function Sidebar(): React.JSX.Element {
                     </div>
                   )}
               </div>
+
+              {archivedSessions.length > 0 && (
+                <div className="mt-4 shrink-0">
+                  <button
+                    onClick={() => setShowArchived((v) => !v)}
+                    className="w-full flex items-center justify-between px-2 py-2 rounded-xl hover:bg-zinc-900 transition-colors"
+                  >
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                      Archived ({archivedSessions.length})
+                    </span>
+                    <ArrowDownIcon
+                      className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${
+                        showArchived ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {showArchived && (
+                    <div className="space-y-1.5 mt-1">
+                      {archivedSessions.map((session) =>
+                        renderSessionRow(session, true),
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -331,7 +468,6 @@ export default function Sidebar(): React.JSX.Element {
           )}
         </div>
       </div>
-
     </>
   );
 }

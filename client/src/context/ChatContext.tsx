@@ -80,6 +80,11 @@ export interface ChatContextValue {
   unreadTotal: number;
   pendingRequestsTotal: number;
   sendMarkAsRead: (peerAddress: string) => void;
+  acceptContact: (peerAddress: string) => Promise<void>;
+  blockContact: (peerAddress: string) => Promise<void>;
+  archiveContact: (peerAddress: string) => Promise<void>;
+  unarchiveContact: (peerAddress: string) => Promise<void>;
+  forceDisconnectPeer: (peerAddress: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -162,6 +167,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isPeerTyping,
     setIsPeerTyping,
     removeActiveSession,
+    acceptContact,
+    blockContact,
+    archiveContact,
+    unarchiveContact,
   } = useChatLogic({
     address,
     socket,
@@ -589,6 +598,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),
     pendingRequestsTotal: pendingRequests.length,
     sendMarkAsRead,
+    acceptContact,
+    blockContact,
+    archiveContact,
+    unarchiveContact,
+    forceDisconnectPeer,
     ...messageSender,
     ...callActions,
     isIncomingCall,

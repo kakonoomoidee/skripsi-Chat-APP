@@ -33,12 +33,32 @@ export interface RelayNode {
 }
 
 /**
+ * Union type representing the privacy status of a contact.
+ * - `pending`  — Offer received but not yet reviewed by the user.
+ * - `accepted` — User explicitly trusted this peer.
+ * - `blocked`  — All future offers from this peer are silently dropped.
+ */
+export type ContactStatus = "pending" | "accepted" | "blocked";
+
+/**
+ * Interface representing an application-layer contact record.
+ * Stored in the local IndexedDB alongside message history.
+ */
+export interface Contact {
+  address: string;
+  status: ContactStatus;
+  isArchived: boolean;
+  username?: string;
+}
+
+/**
  * Database class managing local data persistence using Dexie.js over IndexedDB.
  * Responsible for handling offline storage of encrypted messages and custom relay configurations.
  */
 export class SecureP2PDatabase extends Dexie {
   messages!: Table<Message, number>;
   relays!: Table<RelayNode, number>;
+  contacts!: Table<Contact, string>;
 
   constructor() {
     super("SecureP2PChatDB");
@@ -53,6 +73,16 @@ export class SecureP2PDatabase extends Dexie {
     this.version(3).stores({
       messages: "++id, [ownerAddress+chatId], timestamp, status",
       relays: "++id, &url",
+    });
+
+    /**
+     * Version 4 — Adds the `contacts` table for the application-layer
+     * privacy management system (Accept / Block / Archive).
+     */
+    this.version(4).stores({
+      messages: "++id, [ownerAddress+chatId], timestamp, status",
+      relays: "++id, &url",
+      contacts: "&address, status, isArchived",
     });
   }
 }

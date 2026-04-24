@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
+import { db } from "@/utils/db";
 
 /**
  * Interface defining the dependencies required by the useChatLogic hook.
@@ -111,11 +112,13 @@ export const useChatLogic = ({
     /**
      * Handles an incoming ECDH handshake offer from a remote peer.
      *
-     * The receiver silently accepts every offer without user intervention.
-     * If an active session already exists for the peer, the existing WebRTC
-     * connection is torn down before the new key material is processed.
-     * For brand-new peers, the username is resolved from the relay server,
-     * the session is registered, and the ECDH response is emitted immediately.
+     * Before processing the key material, the receiver queries the local
+     * `contacts` table. If the sender's status is `'blocked'`, the offer is
+     * silently dropped and no response is emitted.
+     *
+     * For all other statuses (including `'pending'` or unknown), the receiver
+     * auto-accepts the crypto handshake so the WebRTC connection can proceed.
+     * The UI layer (ChatArea banner) separately handles the 'pending' UX.
      *
      * @param {{ from: string, ephemeralPublicKey: string }} data - The offer payload.
      * @returns {Promise<void>}
@@ -125,6 +128,9 @@ export const useChatLogic = ({
       ephemeralPublicKey: string;
     }): Promise<void> => {
       const peerAddress = data.from.toLowerCase();
+
+      const contactRecord = await db.contacts.get(peerAddress);
+      if (contactRecord?.status === "blocked") return;
 
       const existingSession = activeSessionsRef.current.find(
         (s) => s.address === peerAddress,
@@ -167,6 +173,13 @@ export const useChatLogic = ({
       });
 
       setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
+
+      await db.contacts.put({
+        address: peerAddress,
+        status: contactRecord?.status ?? "pending",
+        isArchived: contactRecord?.isArchived ?? false,
+        username: incomingUser,
+      });
     };
 
     /**
@@ -312,6 +325,76 @@ export const useChatLogic = ({
     [closeChat, removeSecret],
   );
 
+  /**
+   * Marks a contact as 'accepted' in the local database.
+   *
+   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @returns {Promise<void>}
+   */
+  const acceptContact = useCallback(async (peerAddress: string): Promise<void> => {
+    const addr = peerAddress.toLowerCase();
+    const existing = await db.contacts.get(addr);
+    await db.contacts.put({
+      address: addr,
+      status: "accepted",
+      isArchived: existing?.isArchived ?? false,
+      username: existing?.username,
+    });
+  }, []);
+
+  /**
+   * Marks a contact as 'blocked' in the local database.
+   * Callers are responsible for invoking `forceDisconnectPeer` and
+   * navigating away from the active chat.
+   *
+   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @returns {Promise<void>}
+   */
+  const blockContact = useCallback(async (peerAddress: string): Promise<void> => {
+    const addr = peerAddress.toLowerCase();
+    const existing = await db.contacts.get(addr);
+    await db.contacts.put({
+      address: addr,
+      status: "blocked",
+      isArchived: existing?.isArchived ?? false,
+      username: existing?.username,
+    });
+  }, []);
+
+  /**
+   * Moves a contact to the archived list by setting `isArchived` to true.
+   *
+   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @returns {Promise<void>}
+   */
+  const archiveContact = useCallback(async (peerAddress: string): Promise<void> => {
+    const addr = peerAddress.toLowerCase();
+    const existing = await db.contacts.get(addr);
+    await db.contacts.put({
+      address: addr,
+      status: existing?.status ?? "accepted",
+      isArchived: true,
+      username: existing?.username,
+    });
+  }, []);
+
+  /**
+   * Moves a contact back to the main list by setting `isArchived` to false.
+   *
+   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @returns {Promise<void>}
+   */
+  const unarchiveContact = useCallback(async (peerAddress: string): Promise<void> => {
+    const addr = peerAddress.toLowerCase();
+    const existing = await db.contacts.get(addr);
+    await db.contacts.put({
+      address: addr,
+      status: existing?.status ?? "accepted",
+      isArchived: false,
+      username: existing?.username,
+    });
+  }, []);
+
   return {
     targetUsername,
     setTargetUsername,
@@ -331,5 +414,9 @@ export const useChatLogic = ({
     isPeerTyping,
     setIsPeerTyping,
     removeActiveSession,
+    acceptContact,
+    blockContact,
+    archiveContact,
+    unarchiveContact,
   };
 };
