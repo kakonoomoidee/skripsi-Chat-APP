@@ -22,7 +22,9 @@ export default function GlassDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Logic buat nutup dropdown otomatis kalau user ngeklik area luar
+  /**
+   * Closes the dropdown automatically when the user clicks outside the component.
+   */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -59,8 +61,8 @@ export default function GlassDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute z-100 bottom-full mb-2 w-full bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-xl shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <ul className="py-1 max-h-48 overflow-y-auto custom-scrollbar">
+        <div className="absolute z-[200] top-full mt-1.5 w-full bg-zinc-900/95 backdrop-blur-xl border border-zinc-700 rounded-xl shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+          <ul className="py-1 max-h-52 overflow-y-auto custom-scrollbar">
             {options.map((opt) => (
               <li key={opt.value}>
                 <button

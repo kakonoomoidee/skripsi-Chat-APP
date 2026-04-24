@@ -22,6 +22,14 @@ interface WalletDetails {
 }
 
 /**
+ * Flat ETH amount reserved for standard transfer gas costs.
+ * Used to compute the safe-maximum withdrawal amount and validate inputs.
+ *
+ * @constant {number}
+ */
+const ESTIMATED_GAS = 0.001;
+
+/**
  * Renders the Web3 wallet management interface.
  * Handles internal wallet generation, importation, withdrawals with toggleable UI, and external provider linking.
  *
@@ -184,6 +192,12 @@ export default function Web3Wallet(): React.JSX.Element {
     localStorage.removeItem("internal_tx_pk");
   };
 
+  /**
+   * Validates the withdrawal inputs against the safe maximum (balance minus gas)
+   * before opening the seed-phrase confirmation modal.
+   *
+   * @returns {void}
+   */
   const handleInitiateWithdrawal = (): void => {
     if (!ethers.isAddress(withdrawAddress)) {
       showToast("Invalid destination address.", "error");
@@ -192,14 +206,18 @@ export default function Web3Wallet(): React.JSX.Element {
 
     const numericAmount = Number(withdrawAmount);
     const currentBalance = Number(walletDetails?.balance || "0");
+    const safeMax = Math.max(0, currentBalance - ESTIMATED_GAS);
 
     if (isNaN(numericAmount) || numericAmount <= 0) {
       showToast("Invalid withdrawal amount.", "error");
       return;
     }
 
-    if (numericAmount > currentBalance) {
-      showToast("Insufficient funds.", "error");
+    if (numericAmount > safeMax) {
+      showToast(
+        `Amount exceeds safe maximum. Max: ${safeMax.toFixed(4)} ETH (after ~${ESTIMATED_GAS} ETH gas fee).`,
+        "error",
+      );
       return;
     }
 
@@ -257,33 +275,17 @@ export default function Web3Wallet(): React.JSX.Element {
     }
   };
 
-  const handleMaxAmount = async (): Promise<void> => {
-    if (!txWalletAddress) return;
-
-    try {
-      const rpcUrl = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545";
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-
-      const rawBalance = await provider.getBalance(txWalletAddress);
-      const feeData = await provider.getFeeData();
-      const gasPrice = feeData.gasPrice || ethers.parseUnits("2", "gwei");
-
-      const gasCost = 21000n * gasPrice;
-
-      if (rawBalance > gasCost) {
-        const maxAmountWei = rawBalance - gasCost;
-        const maxAmountEth = ethers.formatEther(maxAmountWei);
-
-        const safeMax = Math.floor(parseFloat(maxAmountEth) * 10000) / 10000;
-        setWithdrawAmount(safeMax.toString());
-      } else {
-        showToast("Balance too low to cover gas fees.", "error");
-      }
-    } catch {
-      const currentBal = parseFloat(walletDetails?.balance || "0");
-      const fallbackMax = Math.max(0, currentBal - 0.001);
-      setWithdrawAmount(fallbackMax.toFixed(4));
-    }
+  /**
+   * Sets the withdrawal amount to the maximum safe value: balance minus the
+   * estimated gas fee. If the balance is insufficient to cover even the fee,
+   * the amount is set to zero to prevent invalid submissions.
+   *
+   * @returns {void}
+   */
+  const handleMaxAmount = (): void => {
+    const currentBalance = parseFloat(walletDetails?.balance || "0");
+    const safeMax = Math.max(0, currentBalance - ESTIMATED_GAS);
+    setWithdrawAmount(safeMax > 0 ? safeMax.toFixed(4) : "0");
   };
 
   return (
@@ -401,43 +403,66 @@ export default function Web3Wallet(): React.JSX.Element {
                 </button>
 
                 {showWithdrawForm && (
-                  <div className="flex flex-col gap-2 mt-3 animate-in slide-in-from-top-2 fade-in duration-200">
-                    <input
-                      type="text"
-                      placeholder="Destination Address (0x...)"
-                      value={withdrawAddress}
-                      onChange={(e) => setWithdrawAddress(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600"
-                    />
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
+                  <div className="flex flex-col gap-4 mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                          Destination Address
+                        </label>
                         <input
-                          type="number"
-                          step="0.0001"
-                          min="0"
-                          placeholder="Amount ETH"
-                          value={withdrawAmount}
-                          onChange={(e) => setWithdrawAmount(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2 pr-12 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          type="text"
+                          placeholder="0x..."
+                          value={withdrawAddress}
+                          onChange={(e) => setWithdrawAddress(e.target.value)}
+                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 font-mono"
                         />
-                        <button
-                          type="button"
-                          onClick={handleMaxAmount}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 hover:bg-zinc-700 text-[9px] font-bold text-zinc-300 px-1.5 py-0.5 rounded transition-colors"
-                        >
-                          MAX
-                        </button>
                       </div>
-                      <button
-                        onClick={handleInitiateWithdrawal}
-                        disabled={!withdrawAddress || !withdrawAmount}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center"
-                      >
-                        <SendIcon className="w-3.5 h-3.5" />
-                      </button>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                          Amount (ETH)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            placeholder="0.0000"
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 pr-14 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleMaxAmount}
+                            disabled={!walletDetails || parseFloat(walletDetails.balance) <= ESTIMATED_GAS}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
+                          >
+                            MAX
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
+                          <span>⛽</span>
+                          Est. network fee: ~{ESTIMATED_GAS} ETH
+                        </p>
+                      </div>
+
                     </div>
+
+                    <button
+                      onClick={handleInitiateWithdrawal}
+                      disabled={!withdrawAddress || !withdrawAmount}
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <SendIcon className="w-3.5 h-3.5" />
+                      Initiate Transfer
+                    </button>
+
                   </div>
                 )}
+
               </div>
             )}
           </div>
