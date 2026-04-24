@@ -81,6 +81,7 @@ export const ChatInput = ({
 }: ChatInputProps): React.JSX.Element => {
   const {
     isWebRTCConnected,
+    connectionState,
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
@@ -416,7 +417,7 @@ export const ChatInput = ({
                     <button
                       type="button"
                       onClick={onOpenTransferModal}
-                      disabled={!isWebRTCConnected}
+                      disabled={connectionState !== "connected"}
                       title="Send Crypto via MetaMask"
                       className="p-2 mb-0.5 text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0"
                     >
@@ -428,7 +429,7 @@ export const ChatInput = ({
                     <button
                       type="button"
                       onClick={() => setShowAttachMenu(!showAttachMenu)}
-                      disabled={!isWebRTCConnected}
+                      disabled={connectionState !== "connected"}
                       className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
                     >
                       <AttachmentIcon className="w-5 h-5" />
@@ -515,16 +516,20 @@ export const ChatInput = ({
                     handleTyping();
                   }}
                   onKeyDown={handleKeyDown}
-                  disabled={!isWebRTCConnected}
+                  disabled={connectionState !== "connected"}
                   placeholder={
-                    isWebRTCConnected ? "Type a message..." : "Connecting..."
+                    connectionState === "connected"
+                      ? "Type a message..."
+                      : connectionState === "offline"
+                        ? "User is offline"
+                        : "Connecting..."
                   }
                   className="flex-1 bg-transparent px-2 py-2.5 mb-0.5 text-sm text-zinc-100 outline-none disabled:opacity-50 transition-all placeholder-zinc-600 resize-none custom-scrollbar min-h-10 max-h-25"
                 />
               )}
             </div>
 
-            {!messageInput.trim() && isWebRTCConnected && !isRecording ? (
+            {!messageInput.trim() && connectionState === "connected" && !isRecording ? (
               <button
                 type="button"
                 onClick={startRecording}
@@ -539,7 +544,8 @@ export const ChatInput = ({
                   isRecording ? sendRecording : (e) => handleSendMessage(e)
                 }
                 disabled={
-                  (!isRecording && !messageInput.trim()) || !isWebRTCConnected
+                  (!isRecording && !messageInput.trim()) ||
+                  connectionState !== "connected"
                 }
                 className={`w-12 h-12 rounded-full transition-all shrink-0 mb-0.5 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:scale-95 disabled:shadow-none ${
                   isRecording

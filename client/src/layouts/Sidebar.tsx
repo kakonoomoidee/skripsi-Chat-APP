@@ -44,18 +44,13 @@ export default function Sidebar(): React.JSX.Element {
     setTargetUsername,
     isSearching,
     handleConnectPeer,
-    pendingRequests,
-    handleAcceptRequest,
-    handleRejectRequest,
     logout,
     searchError,
     unreadCount,
   } = useChatContext();
 
 
-  const [activeTab, setActiveTab] = useState<"chats" | "requests" | "settings">(
-    "chats",
-  );
+  const [activeTab, setActiveTab] = useState<"chats" | "settings">("chats");
 
   const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
@@ -131,17 +126,6 @@ export default function Sidebar(): React.JSX.Element {
             Chats
           </button>
           <button
-            onClick={() => setActiveTab("requests")}
-            className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors flex justify-center items-center gap-1.5 ${
-              activeTab === "requests"
-                ? "text-amber-400 border-b-2 border-amber-500"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            Requests
-            <GlassBadge count={pendingRequests.length} variant="request" />
-          </button>
-          <button
             onClick={() => setActiveTab("settings")}
             className={`flex-1 pb-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
               activeTab === "settings"
@@ -203,7 +187,7 @@ export default function Sidebar(): React.JSX.Element {
                           Searching Network...
                         </>
                       ) : (
-                        "Start Handshake"
+                        "Start Chat"
                       )}
                     </button>
                   )}
@@ -312,50 +296,6 @@ export default function Sidebar(): React.JSX.Element {
                     </div>
                   )}
               </div>
-            </div>
-          )}
-
-          {activeTab === "requests" && (
-            <div className="p-4">
-              {pendingRequests.length > 0 ? (
-                <div className="space-y-3">
-                  {pendingRequests.map((req, index) => (
-                    <div
-                      key={index}
-                      className="bg-zinc-900 p-4 rounded-xl border border-amber-500/20 shadow-sm relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
-                      <p className="font-semibold text-sm text-zinc-100 capitalize">
-                        {req.username}
-                      </p>
-                      <p className="font-mono text-[10px] text-zinc-500 mb-4 mt-0.5">
-                        {shortenAddress(req.from)}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            handleAcceptRequest(req);
-                            setActiveTab("chats");
-                          }}
-                          className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium py-2 rounded-lg transition-colors border border-emerald-500/20"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleRejectRequest(req.from)}
-                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-medium py-2 rounded-lg transition-colors"
-                        >
-                          Ignore
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-zinc-600 mt-10">
-                  <p className="text-xs">No pending requests.</p>
-                </div>
-              )}
             </div>
           )}
 

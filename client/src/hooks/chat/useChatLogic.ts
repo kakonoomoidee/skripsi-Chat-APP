@@ -14,7 +14,6 @@ export interface UseChatLogicProps {
   relayUrl: string;
   removeSecret: (addr: string) => void;
   forceDisconnectPeer?: (addr: string) => void;
-  showToast?: (msg: string, type: "success" | "error" | "info") => void;
 }
 
 /**
@@ -50,7 +49,6 @@ export const useChatLogic = ({
   relayUrl,
   removeSecret,
   forceDisconnectPeer,
-  showToast,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
 
@@ -69,10 +67,8 @@ export const useChatLogic = ({
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
 
-
   const activeSessionsRef = useRef<ActiveSession[]>([]);
   const activeChatRef = useRef<string | null>(null);
-  const [newRequestQueue, setNewRequestQueue] = useState<string | null>(null);
 
   useEffect(() => {
     activeSessionsRef.current = activeSessions;
@@ -109,24 +105,25 @@ export const useChatLogic = ({
     }
   }, [address, relayUrl]);
 
-  /**
-   * Deferred effect to trigger toast after render cycle settles,
-   * preventing state update conflicts during the same render pass.
-   */
-  useEffect(() => {
-    if (newRequestQueue && showToast) {
-      showToast(`${newRequestQueue} sent a handshake request!`, "info");
-      setNewRequestQueue(null);
-    }
-  }, [newRequestQueue, showToast]);
-
   useEffect(() => {
     if (!socket) return;
 
+    /**
+     * Handles an incoming ECDH handshake offer from a remote peer.
+     *
+     * The receiver silently accepts every offer without user intervention.
+     * If an active session already exists for the peer, the existing WebRTC
+     * connection is torn down before the new key material is processed.
+     * For brand-new peers, the username is resolved from the relay server,
+     * the session is registered, and the ECDH response is emitted immediately.
+     *
+     * @param {{ from: string, ephemeralPublicKey: string }} data - The offer payload.
+     * @returns {Promise<void>}
+     */
     const onHandshakeOffer = async (data: {
       from: string;
       ephemeralPublicKey: string;
-    }) => {
+    }): Promise<void> => {
       const peerAddress = data.from.toLowerCase();
 
       const existingSession = activeSessionsRef.current.find(
@@ -152,22 +149,37 @@ export const useChatLogic = ({
       try {
         const res = await axios.get(`${relayUrl}/auth/user/${data.from}`);
         incomingUser = res.data.username;
-      } catch (err) {}
+      } catch {
+        incomingUser = "Unknown";
+      }
 
-      setPendingRequests((prev) => {
-        if (prev.find((req) => req.from === data.from)) return prev;
+      const myNewPubKey = generateHandshakeKeys(peerAddress);
+      computeSecret(peerAddress, data.ephemeralPublicKey);
 
-        /** Queue the incoming username so toast fires outside the setState callback. */
-        setNewRequestQueue(incomingUser);
-
-        return [...prev, { ...data, username: incomingUser }];
+      socket.emit("handshake_response", {
+        to: peerAddress,
+        ephemeralPublicKey: myNewPubKey,
       });
+
+      setActiveSessions((prev) => {
+        if (prev.find((s) => s.address === peerAddress)) return prev;
+        return [...prev, { address: peerAddress, username: incomingUser }];
+      });
+
+      setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
     };
 
+    /**
+     * Handles the ECDH handshake answer from a peer, completing the shared-secret
+     * derivation on the initiator side.
+     *
+     * @param {{ from: string, ephemeralPublicKey: string }} data - The answer payload.
+     * @returns {void}
+     */
     const onHandshakeAnswer = (data: {
       from: string;
       ephemeralPublicKey: string;
-    }) => {
+    }): void => {
       computeSecret(data.from, data.ephemeralPublicKey);
     };
 

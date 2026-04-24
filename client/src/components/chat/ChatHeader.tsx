@@ -1,5 +1,6 @@
 import React from "react";
 import { useChatContext } from "@/context/ChatContext";
+import type { ConnectionState } from "@/context/ChatContext";
 import { MenuIcon, PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
@@ -7,8 +8,51 @@ import { InCallModal } from "./modals/InCallModal";
 import { GlassBadge } from "@/components/ui";
 
 /**
+ * Returns the status label element for the sub-header, driven by the connection state machine.
+ * Priority order: peer typing indicator > connection state.
+ *
+ * @param {boolean} isTyping - Whether the remote peer is currently typing.
+ * @param {ConnectionState} state - The current connection lifecycle state.
+ * @returns {React.JSX.Element} The appropriate status indicator element.
+ */
+const renderStatus = (
+  isTyping: boolean,
+  state: ConnectionState,
+): React.JSX.Element => {
+  if (isTyping) {
+    return (
+      <span className="text-[10px] text-indigo-400 font-medium italic">
+        typing...
+      </span>
+    );
+  }
+  if (state === "connected") {
+    return (
+      <span className="text-[10px] text-emerald-500 font-medium">
+        Secured Tunnel Active
+      </span>
+    );
+  }
+  if (state === "offline") {
+    return (
+      <span className="text-[10px] text-red-500 font-medium">
+        User is offline
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+      <span className="w-2 h-2 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+      Connecting...
+    </span>
+  );
+};
+
+/**
  * Renders the header section of the active chat interface.
  * Displays peer information, connection status, typing indicators, and call controls.
+ * The status sub-label is driven entirely by the {@link ConnectionState} machine exposed
+ * via ChatContext, removing any direct dependency on the raw `isWebRTCConnected` flag.
  *
  * @returns {React.JSX.Element} The chat header UI component.
  */
@@ -16,6 +60,7 @@ export const ChatHeader = (): React.JSX.Element => {
   const {
     activeUsername,
     isWebRTCConnected,
+    connectionState,
     isPeerTyping,
     initiateCall,
     pendingRequestsTotal,
@@ -47,7 +92,6 @@ export const ChatHeader = (): React.JSX.Element => {
           />
         </button>
 
-
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold shadow-inner">
             {activeUsername?.charAt(0).toUpperCase()}
@@ -57,19 +101,7 @@ export const ChatHeader = (): React.JSX.Element => {
               {activeUsername}
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {isPeerTyping ? (
-                <span className="text-[10px] text-indigo-400 font-medium italic">
-                  typing...
-                </span>
-              ) : isWebRTCConnected ? (
-                <span className="text-[10px] text-emerald-500 font-medium">
-                  Secured Tunnel Active
-                </span>
-              ) : (
-                <span className="text-[10px] text-amber-500 font-medium">
-                  Negotiating Keys...
-                </span>
-              )}
+              {renderStatus(isPeerTyping, connectionState)}
             </div>
           </div>
         </div>

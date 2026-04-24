@@ -24,6 +24,13 @@ import { useMessageSender } from "@/hooks/chat/useMessageSender";
 import { DuplicateTabWarning } from "@/components/chat/index";
 import ms from "ms";
 
+/**
+ * Represents the possible states of the peer-to-peer connection lifecycle.
+ *
+ * @typedef {'idle' | 'connecting' | 'connected' | 'offline'} ConnectionState
+ */
+export type ConnectionState = "idle" | "connecting" | "connected" | "offline";
+
 export interface ChatContextValue {
   isAuthenticated: boolean;
   logout: () => void;
@@ -48,6 +55,7 @@ export interface ChatContextValue {
   handleRejectRequest: (addr: string) => void;
   connectedPeers: string[];
   isWebRTCConnected: boolean;
+  connectionState: ConnectionState;
   messages: any[];
   handleSendMessage: (e: React.SyntheticEvent) => Promise<void>;
   handleSendImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -114,6 +122,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
+  /**
+   * Tracks the current state of the peer-to-peer connection lifecycle.
+   * Drives UI gating across the ChatHeader and ChatInput components.
+   */
+  const [connectionState, setConnectionState] = useState<ConnectionState>("idle");
+
   const isDuplicateTab = useDuplicateTab();
 
   const forceDisconnectPeerRef = useRef<((addr: string) => void) | null>(null);
@@ -157,7 +171,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     relayUrl: activeRelay,
     removeSecret,
     forceDisconnectPeer: handleForceDisconnect,
-    showToast,
   });
 
   const {
@@ -231,6 +244,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
+
+  /**
+   * Ref that stores the handle of the active 8-second connection timeout
+   * so it can be cleared when the data channel opens successfully.
+   */
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Ref that stores the handle of the 10-second auto-reconnect interval
+   * so it can be cleared when the state leaves 'offline'.
+   */
+  const reconnectIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const rawMessages = useLiveQuery(
     () => {
@@ -328,6 +353,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [activeChat, isWebRTCConnected, sendMarkAsRead, unreadCount, address]);
 
+  /**
+   * Resets the idempotency guard whenever the active chat or initiators map changes,
+   * allowing a fresh connection attempt for the newly selected peer.
+   */
   useEffect(() => {
     const current = activeChat?.toLowerCase();
     if (current) {
@@ -335,8 +364,33 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [activeChat, initiators]);
 
+  /**
+   * Auto-Start State Machine.
+   *
+   * Fires whenever the active chat, secret availability, or initiator role changes.
+   * If this client is the initiator and a shared secret exists but the data channel
+   * is not yet open, it transitions to 'connecting', calls `initiateWebRTCConnection`,
+   * and arms an 8-second timeout stored in `connectionTimeoutRef`.
+   *
+   * The timeout is intentionally NOT cleared in this effect's cleanup because
+   * React will re-run this effect whenever `connectedPeers` updates (which
+   * occurs during ICE negotiation), and an early cleanup would cancel the timer
+   * before it has had a chance to fire. The timeout is exclusively cleared by
+   * the Connected Transition Effect when the data channel opens.
+   */
   useEffect(() => {
     const current = activeChat?.toLowerCase();
+
+    if (!current) {
+      setConnectionState("idle");
+      return;
+    }
+
+    if (connectedPeers.includes(current)) {
+      setConnectionState("connected");
+      return;
+    }
+
     if (
       current &&
       hasSecret(current) &&
@@ -345,7 +399,21 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     ) {
       if (!webrtcInitiated.current[current]) {
         webrtcInitiated.current[current] = true;
+        setConnectionState("connecting");
+
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+
         setTimeout(() => initiateWebRTCConnection(current), 1000);
+
+        connectionTimeoutRef.current = setTimeout(() => {
+          setConnectionState((prev) => {
+            if (prev === "connecting") {
+              forceDisconnectPeer(current);
+              return "offline";
+            }
+            return prev;
+          });
+        }, 8000);
       }
     }
   }, [
@@ -354,7 +422,77 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     hasSecret,
     connectedPeers,
     initiators,
+    forceDisconnectPeer,
   ]);
+
+  /**
+   * Global timer cleanup effect.
+   *
+   * Runs only on component unmount and clears both the connection timeout
+   * and the reconnect interval to prevent memory leaks and stale state updates
+   * after the provider has been torn down.
+   */
+  useEffect(() => {
+    return () => {
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+    };
+  }, []);
+
+  /**
+   * Connected Transition Effect.
+   *
+   * Watches `isWebRTCConnected` and immediately cancels the pending timeout
+   * and transitions the state machine to 'connected' when the data channel opens.
+   */
+  useEffect(() => {
+    if (isWebRTCConnected) {
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+      setConnectionState("connected");
+    }
+  }, [isWebRTCConnected]);
+
+  /**
+   * Auto-Reconnect Effect.
+   *
+   * When the state is 'offline', sets up a 10-second polling interval that
+   * silently re-initiates the WebRTC handshake in the background.
+   * The interval is cleared when the state transitions away from 'offline'.
+   */
+  useEffect(() => {
+    const current = activeChat?.toLowerCase();
+
+    if (connectionState === "offline" && current) {
+      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+
+      reconnectIntervalRef.current = setInterval(() => {
+        webrtcInitiated.current[current] = true;
+        setConnectionState("connecting");
+        initiateWebRTCConnection(current);
+
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = setTimeout(() => {
+          setConnectionState((prev) => {
+            if (prev === "connecting") {
+              forceDisconnectPeer(current);
+              return "offline";
+            }
+            return prev;
+          });
+        }, 8000);
+      }, 10000);
+    } else {
+      if (reconnectIntervalRef.current) {
+        clearInterval(reconnectIntervalRef.current);
+        reconnectIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+    };
+  }, [connectionState, activeChat, initiateWebRTCConnection, forceDisconnectPeer]);
 
   useEffect(() => {
     const handleProtocolMessages = async () => {
@@ -442,6 +580,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleRejectRequest,
     connectedPeers,
     isWebRTCConnected,
+    connectionState,
     messages: messages || [],
     searchError,
     isPeerTyping,
