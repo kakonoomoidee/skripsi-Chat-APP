@@ -62,12 +62,14 @@ export const ChatHeader = (): React.JSX.Element => {
     activeChat,
     activeUsername,
     isWebRTCConnected,
-    connectionState,
+    connectionStates,
     isPeerTyping,
     initiateCall,
     pendingRequestsTotal,
     unreadTotal,
   } = useChatContext();
+
+  const currentStatus = activeChat ? (connectionStates[activeChat.toLowerCase()] || "idle") : "idle";
 
   const { setIsMobileSidebarOpen } = useUIStore();
 
@@ -108,7 +110,7 @@ export const ChatHeader = (): React.JSX.Element => {
               {activeUsername}
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {renderStatus(isPeerTyping, connectionState)}
+              {renderStatus(isPeerTyping, currentStatus)}
             </div>
           </div>
         </div>

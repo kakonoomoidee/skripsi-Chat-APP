@@ -57,7 +57,7 @@ export interface ChatContextValue {
   handleRejectRequest: (addr: string) => void;
   connectedPeers: string[];
   isWebRTCConnected: boolean;
-  connectionState: ConnectionState;
+  connectionStates: Record<string, ConnectionState>;
   messages: any[];
   handleSendMessage: (e: React.SyntheticEvent) => Promise<void>;
   handleSendImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -126,7 +126,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [activeAreaView, setActiveAreaView] = useState<"chat" | "settings">("chat");
-  const [connectionState, setConnectionState] = useState<ConnectionState>("idle");
+  const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>({});
 
   const isDuplicateTab = useDuplicateTab();
 
@@ -138,8 +138,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
   const connectedPeersRef = useRef<string[]>([]);
   const avatarSyncedPeers = useRef<{ [addr: string]: boolean }>({});
-  const pingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pingTimeoutRef = useRef<{ [addr: string]: any }>({});
+  const reconnectIntervalRef = useRef<{ [addr: string]: any }>({});
 
   /**
    * Tracks peers for whom a pong was received but the ECDH handshake has not
@@ -247,24 +247,22 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const addr = peerAddress.toLowerCase();
       webrtcInitiated.current[addr] = false;
       showToast("Peer disconnected.", "error");
-      setConnectionState("offline");
+      setConnectionStates((prev) => ({ ...prev, [addr]: "offline" }));
     },
     onPongReceived: (peerAddress: string) => {
-      if (pingTimeoutRef.current) {
-        clearTimeout(pingTimeoutRef.current);
-        pingTimeoutRef.current = null;
+      const addr = peerAddress.toLowerCase();
+      if (pingTimeoutRef.current[addr]) {
+        clearTimeout(pingTimeoutRef.current[addr]);
+        delete pingTimeoutRef.current[addr];
       }
 
-      const current = activeChatRef.current?.toLowerCase();
-      if (!current || peerAddress.toLowerCase() !== current) return;
+      setConnectionStates((prev) => ({ ...prev, [addr]: "connecting" }));
 
-      setConnectionState("connecting");
-
-      if (hasSecret(current)) {
-        initiateWebRTCConnectionRef.current?.(current);
+      if (hasSecret(addr)) {
+        initiateWebRTCConnectionRef.current?.(addr);
       } else {
-        pendingWebRTCAfterHandshake.current.add(current);
-        initiateHandshakeRef.current?.(current);
+        pendingWebRTCAfterHandshake.current.add(addr);
+        initiateHandshakeRef.current?.(addr);
       }
     },
   });
@@ -407,28 +405,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       .modify({ status: "read" });
   }, [activeChat, isWebRTCConnected, sendMarkAsRead, unreadCount, address]);
 
-  /**
-   * Guard Reset Effect.
-   *
-   * Resets the idempotency guard, cancels any in-flight ping timeout, clears
-   * the pending-handshake set for the previous peer, and transitions to 'idle'
-   * whenever activeChat changes. This ensures every new peer selection starts
-   * with a clean pre-flight ping regardless of previous state.
-   */
-  useEffect(() => {
-    const current = activeChat?.toLowerCase();
 
-    if (pingTimeoutRef.current) {
-      clearTimeout(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
-    }
-
-    if (current) {
-      webrtcInitiated.current[current] = false;
-      pendingWebRTCAfterHandshake.current.delete(current);
-      setConnectionState("idle");
-    }
-  }, [activeChat]);
 
   /**
    * Auto-Start Effect.
@@ -452,12 +429,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const current = activeChat?.toLowerCase();
 
     if (!current) {
-      setConnectionState("idle");
       return;
     }
 
     if (connectedPeersRef.current.includes(current)) {
-      setConnectionState("connected");
+      setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
       return;
     }
 
@@ -466,14 +442,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (webrtcInitiated.current[current]) return;
 
     webrtcInitiated.current[current] = true;
-    setConnectionState("connecting");
+    setConnectionStates((prev) => ({ ...prev, [current]: "connecting" }));
 
     checkPeerStatus(current);
 
-    pingTimeoutRef.current = setTimeout(() => {
-      pingTimeoutRef.current = null;
+    pingTimeoutRef.current[current] = setTimeout(() => {
+      delete pingTimeoutRef.current[current];
       pendingWebRTCAfterHandshake.current.delete(current);
-      setConnectionState("idle");
+      setConnectionStates((prev) => ({ ...prev, [current]: "idle" }));
       showToast("Peer is offline or unreachable.", "error");
       removeActiveSession(current);
     }, 5000);
@@ -488,8 +464,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
    */
   useEffect(() => {
     return () => {
-      if (pingTimeoutRef.current) clearTimeout(pingTimeoutRef.current);
-      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+      Object.values(pingTimeoutRef.current).forEach((t) => clearTimeout(t as any));
+      Object.values(reconnectIntervalRef.current).forEach((t) => clearInterval(t as any));
     };
   }, []);
 
@@ -500,19 +476,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
    * WebRTC data channel opens successfully.
    */
   useEffect(() => {
-    if (!isWebRTCConnected) return;
-    if (pingTimeoutRef.current) {
-      clearTimeout(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
+    if (!isWebRTCConnected || !activeChat) return;
+    const current = activeChat.toLowerCase();
+
+    if (pingTimeoutRef.current[current]) {
+      clearTimeout(pingTimeoutRef.current[current]);
+      delete pingTimeoutRef.current[current];
     }
-    if (reconnectIntervalRef.current) {
-      clearInterval(reconnectIntervalRef.current);
-      reconnectIntervalRef.current = null;
+    if (reconnectIntervalRef.current[current]) {
+      clearInterval(reconnectIntervalRef.current[current]);
+      delete reconnectIntervalRef.current[current];
     }
-    if (activeChat) {
-      webrtcInitiated.current[activeChat.toLowerCase()] = false;
-    }
-    setConnectionState("connected");
+    
+    webrtcInitiated.current[current] = false;
+    setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
   }, [isWebRTCConnected, activeChat]);
 
   /**
@@ -558,35 +535,30 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const current = activeChat?.toLowerCase();
 
-    if (connectionState === "offline" && current) {
-      if (reconnectIntervalRef.current) clearInterval(reconnectIntervalRef.current);
+    if (current && connectionStates[current] === "offline") {
+      if (reconnectIntervalRef.current[current]) {
+        clearInterval(reconnectIntervalRef.current[current]);
+      }
 
-      reconnectIntervalRef.current = setInterval(() => {
+      reconnectIntervalRef.current[current] = setInterval(() => {
         if (connectedPeersRef.current.includes(current)) {
-          if (reconnectIntervalRef.current) {
-            clearInterval(reconnectIntervalRef.current);
-            reconnectIntervalRef.current = null;
+          if (reconnectIntervalRef.current[current]) {
+            clearInterval(reconnectIntervalRef.current[current]);
+            delete reconnectIntervalRef.current[current];
           }
-          setConnectionState("connected");
+          setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
           return;
         }
         webrtcInitiated.current[current] = false;
         checkPeerStatus(current);
       }, 10000);
-    } else {
-      if (reconnectIntervalRef.current) {
-        clearInterval(reconnectIntervalRef.current);
-        reconnectIntervalRef.current = null;
+    } else if (current) {
+      if (reconnectIntervalRef.current[current]) {
+        clearInterval(reconnectIntervalRef.current[current]);
+        delete reconnectIntervalRef.current[current];
       }
     }
-
-    return () => {
-      if (reconnectIntervalRef.current) {
-        clearInterval(reconnectIntervalRef.current);
-        reconnectIntervalRef.current = null;
-      }
-    };
-  }, [connectionState, activeChat, checkPeerStatus]);
+  }, [connectionStates, activeChat, checkPeerStatus]);
 
   /**
    * Protocol Message Handler Effect.
@@ -693,7 +665,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleRejectRequest,
     connectedPeers,
     isWebRTCConnected,
-    connectionState,
+    connectionStates,
     messages: messages || [],
     searchError,
     isPeerTyping,

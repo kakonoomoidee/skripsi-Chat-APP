@@ -42,8 +42,7 @@ export default function Sidebar(): React.JSX.Element {
     activeSessions,
     activeChat,
     switchChat,
-    connectedPeers,
-    connectionState,
+    connectionStates,
     targetUsername,
     setTargetUsername,
     isSearching,
@@ -136,39 +135,22 @@ export default function Sidebar(): React.JSX.Element {
     targetUsername.trim().toLowerCase() === myUsername?.toLowerCase();
 
   /**
-   * Derives the Tailwind classes for the status indicator dot of a session row.
+   * Derives the Tailwind classes for the status indicator dot of a session row based on the connection status.
    *
-   * For the currently active chat the full ConnectionState is used so the UI
-   * accurately reflects each phase of the pre-flight ping → ECDH → WebRTC flow:
-   * - connected  → solid green glow
-   * - connecting → amber pulse (ping sent or handshake in progress)
-   * - offline    → red pulse (reconnect polling active)
-   * - idle       → muted gray (no attempt in progress)
-   *
-   * For all other rows a simple online/offline check against connectedPeers
-   * is sufficient.
-   *
-   * @param {string}  addr     - Lowercase wallet address of the session.
-   * @param {boolean} isActive - Whether this row is the currently open chat.
+   * @param {string} status - The connection status string.
    * @returns {string} Tailwind class string for the dot element.
    */
-  const getStatusDotClass = (addr: string, isActive: boolean): string => {
-    if (isActive) {
-      if (connectionState === "connected") {
-        return "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]";
-      }
-      if (connectionState === "connecting") {
-        return "bg-amber-400 animate-pulse";
-      }
-      if (connectionState === "offline") {
-        return "bg-red-500 animate-pulse";
-      }
-      return "bg-zinc-600";
+  const getStatusDotClass = (status: string): string => {
+    if (status === "connected") {
+      return "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]";
     }
-
-    return connectedPeers.includes(addr)
-      ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
-      : "bg-amber-500 animate-pulse";
+    if (status === "connecting") {
+      return "bg-amber-400 animate-pulse";
+    }
+    if (status === "offline") {
+      return "bg-red-500 animate-pulse";
+    }
+    return "bg-zinc-600";
   };
 
   /**
@@ -186,6 +168,7 @@ export default function Sidebar(): React.JSX.Element {
     const addr = session.address.toLowerCase();
     const isActive = activeChat?.toLowerCase() === addr;
     const menuOpen = openMenuFor === addr;
+    const status = connectionStates[addr] || "idle";
 
     return (
       <div
@@ -217,7 +200,7 @@ export default function Sidebar(): React.JSX.Element {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${getStatusDotClass(addr, isActive)}`} />
+          <div className={`w-2 h-2 rounded-full ${getStatusDotClass(status)}`} />
           <GlassBadge count={unreadCount[addr] ?? 0} variant="chat" />
 
           <div className="relative">
