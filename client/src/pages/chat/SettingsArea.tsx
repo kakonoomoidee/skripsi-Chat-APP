@@ -166,9 +166,9 @@ export default function SettingsArea(): React.JSX.Element {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0d0d10] w-full overflow-hidden">
+    <div className="flex flex-col h-full bg-zinc-950 w-full overflow-hidden">
 
-      <div className="h-14 shrink-0 border-b border-zinc-800/60 flex items-center px-5 bg-[#0d0d10]/95 backdrop-blur-sm justify-between z-10">
+      <div className="h-14 shrink-0 border-b border-zinc-800/60 flex items-center px-5 bg-zinc-950/95 backdrop-blur-sm justify-between z-10">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveAreaView("chat")}

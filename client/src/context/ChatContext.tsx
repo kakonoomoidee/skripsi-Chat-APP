@@ -228,6 +228,21 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       showToast("Peer disconnected.", "error");
       removeActiveSession(peerAddress);
     },
+    onSignalingTimeout: (peerAddress: string) => {
+      console.warn("[ChatContext] Signaling timeout handler firing for:", peerAddress);
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      if (reconnectIntervalRef.current) {
+        clearInterval(reconnectIntervalRef.current);
+        reconnectIntervalRef.current = null;
+      }
+      webrtcInitiated.current[peerAddress] = false;
+      setConnectionState("idle");
+      showToast("Handshake timed out. Peer did not respond.", "error");
+      removeActiveSession(peerAddress);
+    },
   });
 
   useEffect(() => {
@@ -431,13 +446,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(() => initiateWebRTCConnection(current), 1000);
 
         connectionTimeoutRef.current = setTimeout(() => {
-          setConnectionState((prev) => {
-            if (prev === "connecting") {
-              forceDisconnectPeer(current);
-              return "offline";
-            }
-            return prev;
-          });
+          if (connectionTimeoutRef.current) connectionTimeoutRef.current = null;
+          if (reconnectIntervalRef.current) {
+            clearInterval(reconnectIntervalRef.current);
+            reconnectIntervalRef.current = null;
+          }
+          webrtcInitiated.current[current] = false;
+          forceDisconnectPeer(current);
+          setConnectionState((prev) =>
+            prev === "connecting" ? "offline" : prev
+          );
         }, 8000);
       }
     }
@@ -539,13 +557,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
         if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = setTimeout(() => {
-          setConnectionState((prev) => {
-            if (prev === "connecting") {
-              forceDisconnectPeer(current);
-              return "offline";
-            }
-            return prev;
-          });
+          webrtcInitiated.current[current] = false;
+          forceDisconnectPeer(current);
+          setConnectionState((prev) =>
+            prev === "connecting" ? "offline" : prev
+          );
         }, 8000);
       }, 10000);
     } else {
