@@ -6,9 +6,9 @@ import React, {
   useCallback,
 } from "react";
 import { formatTime } from "@/utils/format";
-import { PlayIcon, PauseIcon, ChevronDownIcon, ReplyIcon } from "../../icons";
+import { PlayIcon, PauseIcon, ChevronDownIcon, ReplyIcon } from "@/components/icons";
 import { useSessionStore } from "@/store";
-import { ReplyBubbleContext } from "../../../context/ReplyBubbleContext";
+import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
 
 const formatDuration = (time: number) => {
   if (!time || isNaN(time) || time === Infinity) return "0:00";

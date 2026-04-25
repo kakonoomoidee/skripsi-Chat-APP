@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { useChatContext } from "@/context/ChatContext";
 import { useWalletStore } from "@/store";
 import { XIcon } from "@/components/icons";
+import ms from "ms";
 
 /**
  * Interface defining the properties for the TransferModal component.
@@ -72,7 +73,7 @@ export const TransferModal = ({
       setRequestTimeout(false);
       timer = setTimeout(() => {
         setRequestTimeout(true);
-      }, 8000);
+      }, ms("8s"));
     }
     return () => {
       if (timer) clearTimeout(timer);

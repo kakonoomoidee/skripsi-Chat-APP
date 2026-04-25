@@ -452,7 +452,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setConnectionStates((prev) => ({ ...prev, [current]: "idle" }));
       showToast("Peer is offline or unreachable.", "error");
       removeActiveSession(current);
-    }, 5000);
+    }, ms("5s"));
   }, [activeChat, checkPeerStatus, initiators, showToast, removeActiveSession]);
 
   /**
@@ -551,7 +551,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         }
         webrtcInitiated.current[current] = false;
         checkPeerStatus(current);
-      }, 10000);
+      }, ms("10s"));
     } else if (current) {
       if (reconnectIntervalRef.current[current]) {
         clearInterval(reconnectIntervalRef.current[current]);

@@ -1,4 +1,5 @@
 import { useChatContext } from "@/context/ChatContext";
+import ms from "ms";
 
 interface ReplyBubbleContextProps {
   replyTo: {
@@ -55,7 +56,7 @@ export const ReplyBubbleContext = ({
       targetEl.classList.add("bg-indigo-500/40", "scale-[1.02]", "z-10");
       setTimeout(() => {
         targetEl?.classList.remove("bg-indigo-500/40", "scale-[1.02]", "z-10");
-      }, 1000);
+      }, ms("1s"));
     }
   };
 

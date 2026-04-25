@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import ms from "ms";
 import {
   ChevronRightIcon,
   LoginIcon,
@@ -30,9 +31,9 @@ export default function LandingClient() {
 
     const timer = setTimeout(() => {
       if (!isDeleting && typedText === fullText) {
-        setTimeout(() => setIsDeleting(true), 2000);
+        setTimeout(() => setIsDeleting(true), ms("2s"));
       } else if (isDeleting && typedText === "") {
-        setTimeout(() => setIsDeleting(false), 500);
+        setTimeout(() => setIsDeleting(false), ms("500ms"));
       } else {
         setTypedText(
           fullText.substring(0, typedText.length + (isDeleting ? -1 : 1)),

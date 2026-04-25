@@ -1,7 +1,7 @@
 import { formatTime } from "@/utils/format";
 import { useSessionStore } from "@/store";
 import { useState, useRef, useEffect } from "react";
-import { ReplyBubbleContext } from "../../../context/ReplyBubbleContext";
+import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
 import { ChevronDownIcon, ReplyIcon } from "@/components/icons";
 
 export const MediaBubble = ({ msg }: { msg: any }) => {

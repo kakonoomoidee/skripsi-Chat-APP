@@ -81,7 +81,8 @@ export const ChatInput = ({
 }: ChatInputProps): React.JSX.Element => {
   const {
     isWebRTCConnected,
-    connectionState,
+    connectionStates,
+    activeChat,
     handleSendMessage,
     handleSendImage,
     handleSendAudio,
@@ -93,6 +94,10 @@ export const ChatInput = ({
 
   const { messageInput, setMessageInput, replyingTo, setReplyingTo } =
     useSessionStore();
+
+  const connectionState = activeChat
+    ? connectionStates[activeChat.toLowerCase()] || "idle"
+    : "idle";
   const { showToast } = useUIStore();
 
   const imageInputRef = useRef<HTMLInputElement>(null);

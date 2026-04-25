@@ -4,7 +4,7 @@ import { ChatArea } from "@/components/chat";
 import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
 import { useSessionTimeout } from "@/hooks/ui/useSessionTimeout";
-import SettingsArea from "./SettingsArea";
+import SettingsArea from "@/components/settings/SettingsArea";
 
 /**
  * Responsive Layout Wrapper.

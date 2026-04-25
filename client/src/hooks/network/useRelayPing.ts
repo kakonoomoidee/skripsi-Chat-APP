@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ms from "ms";
 
 /**
  * Interface defining the return values for the relay ping status.
@@ -31,7 +32,7 @@ export const useRelayPing = (activeRelay: string): UseRelayPingReturn => {
         const httpUrl = `${baseUrl}/ping`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), ms("3s"));
 
         await fetch(httpUrl, { mode: "no-cors", signal: controller.signal });
         clearTimeout(timeoutId);
@@ -49,7 +50,7 @@ export const useRelayPing = (activeRelay: string): UseRelayPingReturn => {
     };
 
     pingRelay();
-    const intervalId = setInterval(pingRelay, 5000);
+    const intervalId = setInterval(pingRelay, ms("5s"));
 
     return () => {
       isMounted = false;
