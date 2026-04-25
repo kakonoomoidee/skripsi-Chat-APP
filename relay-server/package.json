@@ -1,6 +1,6 @@
 {
   "name": "securep2p-relay-server",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Node.js signaling and relay server for SecureP2P WebRTC handshakes and gasless meta-transactions.",
   "main": "server.js",
   "scripts": {
