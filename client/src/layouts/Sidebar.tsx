@@ -3,7 +3,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 import { db } from "@/utils/db";
-
 import {
   LockSessionIcon,
   SearchIcon,
@@ -30,6 +29,8 @@ interface ContactHistory {
  * - Application logo header with a 3-dot overflow menu (Settings / Log out).
  * - Search / "Start Chat" panel for peer discovery.
  * - Active session list split into main and archived sub-lists.
+ * - Status dot per session row that reflects the full ConnectionState for the
+ *   active chat and simple online/offline for all other rows.
  * - Recent history of disconnected peers.
  * - Three-dot context menu per session row for Archive / Unarchive.
  *
@@ -42,6 +43,7 @@ export default function Sidebar(): React.JSX.Element {
     activeChat,
     switchChat,
     connectedPeers,
+    connectionState,
     targetUsername,
     setTargetUsername,
     isSearching,
@@ -54,27 +56,12 @@ export default function Sidebar(): React.JSX.Element {
     setActiveAreaView,
   } = useChatContext();
 
-  /**
-   * Whether the 3-dot header overflow menu is visible.
-   */
   const [headerMenuOpen, setHeaderMenuOpen] = useState<boolean>(false);
-
-  /**
-   * Whether the "Archived" sub-section inside the chat list is expanded.
-   */
   const [showArchived, setShowArchived] = useState<boolean>(false);
-
-  /**
-   * Address of the session row whose context menu is currently open.
-   * `null` means no row menu is visible.
-   */
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
 
   const headerMenuRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Closes the header overflow menu when the user clicks outside of it.
-   */
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -108,19 +95,13 @@ export default function Sidebar(): React.JSX.Element {
 
       activeSessions.forEach((session) => {
         if (!updated.find((c) => c.username === session.username)) {
-          updated.push({
-            username: session.username,
-            address: session.address,
-          });
+          updated.push({ username: session.username, address: session.address });
           isChanged = true;
         }
       });
 
       if (isChanged) {
-        localStorage.setItem(
-          "securep2p_recent_contacts",
-          JSON.stringify(updated),
-        );
+        localStorage.setItem("securep2p_recent_contacts", JSON.stringify(updated));
         setRecentContacts(updated);
       }
     }
@@ -155,10 +136,46 @@ export default function Sidebar(): React.JSX.Element {
     targetUsername.trim().toLowerCase() === myUsername?.toLowerCase();
 
   /**
-   * Renders a single session row with avatar, name, status dot, unread badge,
-   * and a hover-revealed 3-dot context menu for Archive / Unarchive.
+   * Derives the Tailwind classes for the status indicator dot of a session row.
    *
-   * @param {object} session - The active session data.
+   * For the currently active chat the full ConnectionState is used so the UI
+   * accurately reflects each phase of the pre-flight ping → ECDH → WebRTC flow:
+   * - connected  → solid green glow
+   * - connecting → amber pulse (ping sent or handshake in progress)
+   * - offline    → red pulse (reconnect polling active)
+   * - idle       → muted gray (no attempt in progress)
+   *
+   * For all other rows a simple online/offline check against connectedPeers
+   * is sufficient.
+   *
+   * @param {string}  addr     - Lowercase wallet address of the session.
+   * @param {boolean} isActive - Whether this row is the currently open chat.
+   * @returns {string} Tailwind class string for the dot element.
+   */
+  const getStatusDotClass = (addr: string, isActive: boolean): string => {
+    if (isActive) {
+      if (connectionState === "connected") {
+        return "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]";
+      }
+      if (connectionState === "connecting") {
+        return "bg-amber-400 animate-pulse";
+      }
+      if (connectionState === "offline") {
+        return "bg-red-500 animate-pulse";
+      }
+      return "bg-zinc-600";
+    }
+
+    return connectedPeers.includes(addr)
+      ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
+      : "bg-amber-500 animate-pulse";
+  };
+
+  /**
+   * Renders a single session row with avatar, username, address, status dot,
+   * unread badge, and a hover-revealed 3-dot context menu for Archive / Unarchive.
+   *
+   * @param {object}  session    - The active session data.
    * @param {boolean} isArchived - Whether this row belongs to the archived list.
    * @returns {React.JSX.Element} The session row element.
    */
@@ -167,7 +184,7 @@ export default function Sidebar(): React.JSX.Element {
     isArchived: boolean,
   ): React.JSX.Element => {
     const addr = session.address.toLowerCase();
-    const isActive = activeChat === session.address;
+    const isActive = activeChat?.toLowerCase() === addr;
     const menuOpen = openMenuFor === addr;
 
     return (
@@ -200,13 +217,7 @@ export default function Sidebar(): React.JSX.Element {
         </div>
 
         <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              connectedPeers.includes(addr)
-                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]"
-                : "bg-amber-500 animate-pulse"
-            }`}
-          />
+          <div className={`w-2 h-2 rounded-full ${getStatusDotClass(addr, isActive)}`} />
           <GlassBadge count={unreadCount[addr] ?? 0} variant="chat" />
 
           <div className="relative">
@@ -269,7 +280,6 @@ export default function Sidebar(): React.JSX.Element {
 
   return (
     <div className="w-full h-full flex flex-col bg-zinc-950/90 backdrop-blur-xl">
-
       <div className="p-5 flex items-center justify-between border-b border-zinc-800/50 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -365,9 +375,7 @@ export default function Sidebar(): React.JSX.Element {
             <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center shrink-0">
               <p className="text-xs text-zinc-400 mb-3">
                 No active session with{" "}
-                <span className="text-zinc-200 font-semibold">
-                  {targetUsername}
-                </span>
+                <span className="text-zinc-200 font-semibold">{targetUsername}</span>
               </p>
 
               {isSelfChat ? (
@@ -409,56 +417,53 @@ export default function Sidebar(): React.JSX.Element {
 
             {recentContacts.filter(
               (rc) => !activeSessions.some((as) => as.username === rc.username),
-            ).length > 0 &&
-              !targetUsername && (
-                <div className="pt-4">
-                  <div className="px-2 flex justify-between items-center mb-2">
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                      Recent History
-                    </label>
-                    <button
-                      onClick={clearHistory}
-                      className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {recentContacts
-                      .filter(
-                        (rc) =>
-                          !activeSessions.some(
-                            (as) => as.username === rc.username,
-                          ),
-                      )
-                      .map((contact) => (
-                        <div
-                          key={contact.username}
-                          onClick={() => setTargetUsername(contact.username)}
-                          className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
+            ).length > 0 && !targetUsername && (
+              <div className="pt-4">
+                <div className="px-2 flex justify-between items-center mb-2">
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                    Recent History
+                  </label>
+                  <button
+                    onClick={clearHistory}
+                    className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {recentContacts
+                    .filter(
+                      (rc) =>
+                        !activeSessions.some((as) => as.username === rc.username),
+                    )
+                    .map((contact) => (
+                      <div
+                        key={contact.username}
+                        onClick={() => setTargetUsername(contact.username)}
+                        className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
                           <PeerAvatar
                             peerAddress={contact.address}
                             displayName={contact.username}
                             sizeClassName="w-8 h-8"
                             className="border border-zinc-700/50"
                           />
-                            <div>
-                              <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
-                                {contact.username}
-                              </p>
-                              <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
-                                Disconnected
-                              </p>
-                            </div>
+                          <div>
+                            <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
+                              {contact.username}
+                            </p>
+                            <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
+                              Disconnected
+                            </p>
                           </div>
-                          <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
                         </div>
-                      ))}
-                  </div>
+                        <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
+                      </div>
+                    ))}
                 </div>
-              )}
+              </div>
+            )}
 
             {activeSessions.length === 0 &&
               recentContacts.length === 0 &&

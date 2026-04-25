@@ -10,21 +10,11 @@ const ICE_SERVERS = {
 };
 
 /**
- * Duration in milliseconds before an unresolved WebRTC handshake
- * (data channel not yet open) is forcibly killed.
- */
-const HANDSHAKE_TIMEOUT_MS = 8000;
-
-/**
- * Duration in milliseconds before an offer with zero relay-level response
- * is treated as an unreachable peer and the connection is torn down.
- */
-const SIGNALING_TIMEOUT_MS = 10000;
-
-/**
  * Main facade hook orchestrating WebRTC connections, signaling, and media streams.
+ * Implements a ping-first reachability check: before any SDP negotiation begins,
+ * the target peer is verified online via a lightweight relay ping/pong probe.
  *
- * @param {any} props - Dependencies injected from the ChatContext.
+ * @param {any} props - Dependencies injected from ChatContext.
  * @returns {Object} WebRTC state and control methods.
  */
 export const useWebRTC = (props: any) => {
@@ -36,32 +26,12 @@ export const useWebRTC = (props: any) => {
     computeSecret,
     generateHandshakeKeys,
     onPeerDisconnected,
-    onSignalingTimeout,
+    onPongReceived,
     encrypt,
   } = props;
 
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
   const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
-
-  /**
-   * Per-peer handshake timeout handles. Armed after offer/answer emit;
-   * cancelled on data-channel open or successful ICE transition.
-   */
-  const handshakeTimers = useRef<{ [address: string]: ReturnType<typeof setTimeout> }>({});
-
-  /**
-   * Per-peer relay-signaling timeout handles. Armed when an offer is emitted;
-   * cancelled the moment any relay response arrives from the peer.
-   */
-  const signalingTimers = useRef<{ [address: string]: ReturnType<typeof setTimeout> }>({});
-
-  /**
-   * "Graveyard" set of peer addresses whose signaling timer already expired.
-   * Any late-arriving socket packet for a dead peer is silently dropped,
-   * preventing zombie resurrections that would re-enter the connecting state.
-   */
-  const deadPeersRef = useRef(new Set<string>());
-
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
 
   const isWebRTCConnected = activeChat
@@ -80,9 +50,10 @@ export const useWebRTC = (props: any) => {
     });
 
   /**
-   * Attaches the remote media stream to the hidden audio element.
+   * Attaches the remote media stream to the hidden audio element in the DOM.
+   * Creates the element lazily on first track event if it does not yet exist.
    *
-   * @param {RTCPeerConnection} pc - The active peer connection.
+   * @param {RTCPeerConnection} pc - The active peer connection emitting the track.
    * @returns {void}
    */
   const setupAudioTrack = (pc: RTCPeerConnection): void => {
@@ -106,53 +77,23 @@ export const useWebRTC = (props: any) => {
   };
 
   /**
-   * Cancels the pending handshake timer for a peer if one is active.
-   *
-   * @param {string} addr - Lowercase peer wallet address.
-   * @returns {void}
-   */
-  const cancelHandshakeTimer = (addr: string): void => {
-    if (handshakeTimers.current[addr]) {
-      clearTimeout(handshakeTimers.current[addr]);
-      delete handshakeTimers.current[addr];
-    }
-  };
-
-  /**
-   * Cancels the pending signaling timer for a peer if one is active.
-   *
-   * @param {string} addr - Lowercase peer wallet address.
-   * @returns {void}
-   */
-  const cancelSignalingTimer = (addr: string): void => {
-    if (signalingTimers.current[addr]) {
-      clearTimeout(signalingTimers.current[addr]);
-      delete signalingTimers.current[addr];
-    }
-  };
-
-  /**
    * Performs a complete hard-kill of all resources tied to a peer connection.
    *
    * Sequence:
-   * 1. Cancels both pending timers (handshake and signaling).
-   * 2. Nulls all event handler slots on the RTCPeerConnection to prevent
-   *    stale callbacks from firing against the already-removed map entry.
-   * 3. Calls `pc.close()` and removes the entry from `peerConnections`.
-   * 4. Nulls and closes the associated RTCDataChannel.
-   * 5. Uses the functional updater form of `setConnectedPeers` to guarantee
-   *    the filter operates on the latest state regardless of closure age.
-   * 6. Invokes `onPeerDisconnected` to notify the parent context.
+   * 1. Nulls all event handler slots on the RTCPeerConnection to prevent stale
+   *    callbacks from firing after the map entry is removed.
+   * 2. Calls pc.close() and deletes the entry from peerConnections.
+   * 3. Closes the associated RTCDataChannel and removes it from dataChannels.
+   * 4. Uses the functional updater of setConnectedPeers to guarantee the filter
+   *    operates on the latest state regardless of closure age.
+   * 5. Invokes onPeerDisconnected to notify the parent context.
    *
-   * @param {string} peerAddress - The wallet address of the peer to kill.
+   * @param {string} peerAddress - The wallet address of the peer to clean up.
    * @returns {void}
    */
   const cleanupPeerConnection = useCallback(
     (peerAddress: string): void => {
       const addr = peerAddress.toLowerCase();
-
-      cancelHandshakeTimer(addr);
-      cancelSignalingTimer(addr);
 
       const pc = peerConnections.current[addr];
       if (pc) {
@@ -181,76 +122,21 @@ export const useWebRTC = (props: any) => {
     [onPeerDisconnected, dataChannels],
   );
 
-  /**
-   * Alias exposed on the return object so external callers retain the
-   * original `forceDisconnectPeer` API without change.
-   */
   const forceDisconnectPeer = cleanupPeerConnection;
 
   /**
-   * Arms the 8-second data-channel handshake timer for a peer.
-   * If it fires before `dc.onopen`, `cleanupPeerConnection` is called.
-   * Cancels any previously active timer for the same peer first.
+   * Attaches onconnectionstatechange and oniceconnectionstatechange listeners
+   * to a peer connection. On any terminal failure state cleanupPeerConnection
+   * is invoked to release all associated resources.
    *
-   * @param {string} peerAddress - Lowercase peer wallet address.
-   * @returns {void}
-   */
-  const armHandshakeTimer = useCallback(
-    (peerAddress: string): void => {
-      const addr = peerAddress.toLowerCase();
-      cancelHandshakeTimer(addr);
-      handshakeTimers.current[addr] = setTimeout(() => {
-        delete handshakeTimers.current[addr];
-        if (peerConnections.current[addr]) {
-          cleanupPeerConnection(addr);
-        }
-      }, HANDSHAKE_TIMEOUT_MS);
-    },
-    [cleanupPeerConnection],
-  );
-
-  /**
-   * Arms the 10-second relay-signaling watchdog immediately after an offer is
-   * emitted. If it fires it means the relay received zero response from the peer.
-   *
-   * @param {string} peerAddress - Lowercase peer wallet address.
-   * @returns {void}
-   */
-  const armSignalingTimer = useCallback(
-    (peerAddress: string): void => {
-      const addr = peerAddress.toLowerCase();
-      cancelSignalingTimer(addr);
-      console.warn("[WebRTC] Signaling timer armed for:", addr);
-      signalingTimers.current[addr] = setTimeout(() => {
-        delete signalingTimers.current[addr];
-        console.warn("[WebRTC] Timeout Enforced & State Locked for:", addr);
-        deadPeersRef.current.add(addr);
-        cleanupPeerConnection(addr);
-        if (onSignalingTimeout) onSignalingTimeout(addr);
-      }, SIGNALING_TIMEOUT_MS);
-    },
-    [cleanupPeerConnection, onSignalingTimeout],
-  );
-
-  /**
-   * Constructs and attaches `onconnectionstatechange` and
-   * `oniceconnectionstatechange` listeners to a peer connection.
-   *
-   * On a successful transition both pending timers are cancelled.
-   * On any terminal failure state `cleanupPeerConnection` is invoked.
-   *
-   * @param {RTCPeerConnection} pc - The peer connection to instrument.
-   * @param {string} addr - Lowercase peer wallet address.
+   * @param {RTCPeerConnection} pc   - The peer connection to instrument.
+   * @param {string}            addr - Lowercase peer wallet address.
    * @returns {void}
    */
   const attachStateListeners = useCallback(
     (pc: RTCPeerConnection, addr: string): void => {
       pc.onconnectionstatechange = () => {
         const s = pc.connectionState;
-        if (s === "connected") {
-          cancelHandshakeTimer(addr);
-          cancelSignalingTimer(addr);
-        }
         if (s === "failed" || s === "disconnected" || s === "closed") {
           cleanupPeerConnection(addr);
         }
@@ -258,10 +144,6 @@ export const useWebRTC = (props: any) => {
 
       pc.oniceconnectionstatechange = () => {
         const s = pc.iceConnectionState;
-        if (s === "connected" || s === "completed") {
-          cancelHandshakeTimer(addr);
-          cancelSignalingTimer(addr);
-        }
         if (s === "failed" || s === "disconnected" || s === "closed") {
           cleanupPeerConnection(addr);
         }
@@ -271,20 +153,36 @@ export const useWebRTC = (props: any) => {
   );
 
   /**
-   * Initiates the P2P connection as the offerer.
-   * Removes the peer from the graveyard before attempting a fresh connection
-   * so that a deliberate retry (after a previous timeout) is not blocked.
-   * Arms both the signaling and handshake timers after emitting the offer.
+   * Emits a lightweight ping signal through the relay server to check whether
+   * the target peer is currently online before initiating a full WebRTC handshake.
    *
-   * @param {string} targetPeer - The address of the target peer.
+   * @param {string} targetPeer - The wallet address of the peer to probe.
+   * @returns {void}
+   */
+  const checkPeerStatus = useCallback(
+    (targetPeer: string): void => {
+      if (!socket || !targetPeer) return;
+      socket.emit("webrtc_signal", {
+        to: targetPeer.toLowerCase(),
+        signal: { type: "ping" },
+      });
+    },
+    [socket],
+  );
+
+  /**
+   * Initiates the P2P connection as the offerer. Tears down any pre-existing
+   * RTCPeerConnection for the target before creating a fresh one, attaches
+   * the data channel and audio transceiver, then emits an SDP offer via the relay.
+   * Should only be called after a successful pong is received for the target peer.
+   *
+   * @param {string} targetPeer - The wallet address of the peer to connect to.
    * @returns {Promise<void>}
    */
   const initiateWebRTCConnection = useCallback(
     async (targetPeer: string): Promise<void> => {
       if (!socket || !targetPeer || !myAddress) return;
       const addr = targetPeer.toLowerCase();
-
-      deadPeersRef.current.delete(addr);
 
       if (peerConnections.current[addr]) {
         peerConnections.current[addr].onconnectionstatechange = null;
@@ -304,11 +202,7 @@ export const useWebRTC = (props: any) => {
       const dc = pc.createDataChannel("secure_p2p_channel", { ordered: true });
       dataChannels.current[addr] = dc;
 
-      dc.onopen = () => {
-        cancelHandshakeTimer(addr);
-        cancelSignalingTimer(addr);
-        setConnectedPeers((prev) => [...new Set([...prev, addr])]);
-      };
+      dc.onopen = () => setConnectedPeers((prev) => [...new Set([...prev, addr])]);
       dc.onclose = () => cleanupPeerConnection(addr);
       dc.onmessage = (e) => handleIncomingMessage(addr, e.data);
 
@@ -335,9 +229,6 @@ export const useWebRTC = (props: any) => {
             : undefined,
         },
       });
-
-      armSignalingTimer(addr);
-      armHandshakeTimer(addr);
     },
     [
       socket,
@@ -348,8 +239,6 @@ export const useWebRTC = (props: any) => {
       dataChannels,
       cleanupPeerConnection,
       attachStateListeners,
-      armHandshakeTimer,
-      armSignalingTimer,
     ],
   );
 
@@ -359,21 +248,37 @@ export const useWebRTC = (props: any) => {
     /**
      * Processes incoming WebRTC signaling messages from the relay server.
      *
-     * Guard clause: if the sender's address is in `deadPeersRef`, the packet
-     * is silently dropped. This prevents late-arriving relay packets from
-     * resurrecting a connection whose signaling timer already expired.
+     * Handles:
+     * - ping  — responds immediately with a pong so the sender knows this peer is online.
+     * - pong  — forwards the event to onPongReceived so the parent can initiate the handshake.
+     * - offer — creates an answerer-side RTCPeerConnection, sets the remote description,
+     *           derives the shared secret if needed, and emits an SDP answer.
+     * - answer       — sets the remote description on the existing offerer connection.
+     * - ice-candidate — queues the candidate on the existing connection once remote
+     *                   description is available.
      *
-     * For `answer` and `ice-candidate`: cancels the signaling timer immediately
-     * since any relay response proves the peer is reachable.
-     *
-     * @param {{ from: string; signal: any }} data - Signaling payload.
+     * @param {{ from: string; signal: any }} data - Signaling payload from the relay.
      * @returns {Promise<void>}
      */
-    const handleWebRTCSignal = async (data: { from: string; signal: any }): Promise<void> => {
+    const handleWebRTCSignal = async (data: {
+      from: string;
+      signal: any;
+    }): Promise<void> => {
       const addr = data.from.toLowerCase();
       const { signal } = data;
 
-      if (deadPeersRef.current.has(addr)) return;
+      if (signal.type === "ping") {
+        socket.emit("webrtc_signal", {
+          to: addr,
+          signal: { type: "pong" },
+        });
+        return;
+      }
+
+      if (signal.type === "pong") {
+        if (onPongReceived) onPongReceived(addr);
+        return;
+      }
 
       if (signal.type === "offer") {
         if (peerConnections.current[addr]) {
@@ -394,11 +299,8 @@ export const useWebRTC = (props: any) => {
         pc.ondatachannel = (event) => {
           const dc = event.channel;
           dataChannels.current[addr] = dc;
-          dc.onopen = () => {
-            cancelHandshakeTimer(addr);
-            cancelSignalingTimer(addr);
+          dc.onopen = () =>
             setConnectedPeers((prev) => [...new Set([...prev, addr])]);
-          };
           dc.onclose = () => cleanupPeerConnection(addr);
           dc.onmessage = (e) => handleIncomingMessage(addr, e.data);
         };
@@ -433,15 +335,11 @@ export const useWebRTC = (props: any) => {
               : undefined,
           },
         });
-
-        armHandshakeTimer(addr);
       } else if (signal.type === "answer") {
-        cancelSignalingTimer(addr);
         const pc = peerConnections.current[addr];
         if (pc)
           await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
       } else if (signal.type === "ice-candidate" && signal.candidate) {
-        cancelSignalingTimer(addr);
         const pc = peerConnections.current[addr];
         if (pc && pc.remoteDescription)
           await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
@@ -462,7 +360,7 @@ export const useWebRTC = (props: any) => {
     dataChannels,
     cleanupPeerConnection,
     attachStateListeners,
-    armHandshakeTimer,
+    onPongReceived,
   ]);
 
   return {
@@ -475,5 +373,6 @@ export const useWebRTC = (props: any) => {
     stopVoiceCall,
     toggleMicMute,
     forceDisconnectPeer,
+    checkPeerStatus,
   };
 };

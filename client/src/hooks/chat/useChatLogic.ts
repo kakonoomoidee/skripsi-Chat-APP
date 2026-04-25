@@ -15,6 +15,7 @@ export interface UseChatLogicProps {
   relayUrl: string;
   removeSecret: (addr: string) => void;
   forceDisconnectPeer?: (addr: string) => void;
+  onHandshakeComplete?: (peerAddress: string) => void;
 }
 
 /**
@@ -38,6 +39,11 @@ export interface ActiveSession {
  * Custom hook to manage chat sessions, handle peer discovery, and coordinate
  * cryptographic handshakes via Socket.IO.
  *
+ * The ECDH handshake is intentionally decoupled from peer discovery. Callers
+ * are responsible for invoking initiateHandshake only after confirming the
+ * peer is reachable (e.g. after a successful ping/pong exchange). This prevents
+ * key material from being generated for peers that are offline.
+ *
  * @param {UseChatLogicProps} props - Dependencies including socket instance and crypto functions.
  * @returns {object} Chat session states and handler functions.
  */
@@ -46,30 +52,30 @@ export const useChatLogic = ({
   socket,
   generateHandshakeKeys,
   computeSecret,
-  hasSecret,
   relayUrl,
   removeSecret,
   forceDisconnectPeer,
+  onHandshakeComplete,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
-
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [activeUsername, setActiveUsername] = useState<string>("");
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-
   const [myUsername, setMyUsername] = useState<string>("Loading...");
-  const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>(
-    [],
-  );
+  const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
-
   const [initiators, setInitiators] = useState<Record<string, boolean>>({});
   const [searchError, setSearchError] = useState<string>("");
   const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
 
-
   const activeSessionsRef = useRef<ActiveSession[]>([]);
   const activeChatRef = useRef<string | null>(null);
+
+  const onHandshakeCompleteRef = useRef<((addr: string) => void) | undefined>(undefined);
+
+  useEffect(() => {
+    onHandshakeCompleteRef.current = onHandshakeComplete;
+  }, [onHandshakeComplete]);
 
   useEffect(() => {
     activeSessionsRef.current = activeSessions;
@@ -83,7 +89,6 @@ export const useChatLogic = ({
     setActiveChat(null);
     setActiveUsername("");
   }, []);
-
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -112,15 +117,12 @@ export const useChatLogic = ({
     /**
      * Handles an incoming ECDH handshake offer from a remote peer.
      *
-     * Before processing the key material, the receiver queries the local
-     * `contacts` table. If the sender's status is `'blocked'`, the offer is
-     * silently dropped and no response is emitted.
+     * If the sender is blocked the offer is silently dropped. For existing
+     * sessions the current WebRTC connection is torn down before re-keying
+     * so the new data channel can be established cleanly. The receiver always
+     * responds immediately with its own ephemeral key.
      *
-     * For all other statuses (including `'pending'` or unknown), the receiver
-     * auto-accepts the crypto handshake so the WebRTC connection can proceed.
-     * The UI layer (ChatArea banner) separately handles the 'pending' UX.
-     *
-     * @param {{ from: string, ephemeralPublicKey: string }} data - The offer payload.
+     * @param {{ from: string; ephemeralPublicKey: string }} data - Offer payload.
      * @returns {Promise<void>}
      */
     const onHandshakeOffer = async (data: {
@@ -184,16 +186,21 @@ export const useChatLogic = ({
 
     /**
      * Handles the ECDH handshake answer from a peer, completing the shared-secret
-     * derivation on the initiator side.
+     * derivation on the initiator side. Invokes onHandshakeComplete so the caller
+     * can proceed to initiate the WebRTC data channel.
      *
-     * @param {{ from: string, ephemeralPublicKey: string }} data - The answer payload.
+     * @param {{ from: string; ephemeralPublicKey: string }} data - Answer payload.
      * @returns {void}
      */
     const onHandshakeAnswer = (data: {
       from: string;
       ephemeralPublicKey: string;
     }): void => {
-      computeSecret(data.from, data.ephemeralPublicKey);
+      const peerAddress = data.from.toLowerCase();
+      computeSecret(peerAddress, data.ephemeralPublicKey);
+      if (onHandshakeCompleteRef.current) {
+        onHandshakeCompleteRef.current(peerAddress);
+      }
     };
 
     socket.on("handshake_offer", onHandshakeOffer);
@@ -211,6 +218,35 @@ export const useChatLogic = ({
     forceDisconnectPeer,
   ]);
 
+  /**
+   * Sends an ECDH handshake initiation to a peer via the relay. This must only
+   * be called after the peer has been confirmed reachable via a ping/pong probe.
+   * It does not start WebRTC negotiation — that happens in onHandshakeComplete.
+   *
+   * @param {string} peerAddress - Lowercase wallet address of the target peer.
+   * @returns {void}
+   */
+  const initiateHandshake = useCallback(
+    (peerAddress: string): void => {
+      if (!socket) return;
+      const addr = peerAddress.toLowerCase();
+      const myNewPubKey = generateHandshakeKeys(addr);
+      socket.emit("handshake_init", {
+        to: addr,
+        ephemeralPublicKey: myNewPubKey,
+      });
+    },
+    [socket, generateHandshakeKeys],
+  );
+
+  /**
+   * Resolves a username to a wallet address, adds the peer to the active session
+   * list, opens the chat panel, and marks this client as the initiator. It does
+   * NOT perform the ECDH handshake — that is deferred until after a successful
+   * ping/pong confirms the peer is online.
+   *
+   * @returns {Promise<void>}
+   */
   const handleConnectPeer = async (): Promise<void> => {
     if (!targetUsername.trim()) return;
 
@@ -241,29 +277,26 @@ export const useChatLogic = ({
       setActiveUsername(targetUsername.trim());
       setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
 
-      if (!hasSecret(peerAddress) && socket) {
-        const myNewPubKey = generateHandshakeKeys(peerAddress);
-        socket.emit("handshake_init", {
-          to: peerAddress,
-          ephemeralPublicKey: myNewPubKey,
-        });
-      }
       setTargetUsername("");
-    } catch (err) {
+    } catch {
       setSearchError("Username not found on the network.");
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleAcceptRequest = async (
-    request: HandshakeRequest,
-  ): Promise<void> => {
+  /**
+   * Completes a pending connection request by finalising the ECDH key exchange,
+   * responding to the peer, and opening the chat panel for the requester.
+   *
+   * @param {HandshakeRequest} request - The pending handshake offer to accept.
+   * @returns {Promise<void>}
+   */
+  const handleAcceptRequest = async (request: HandshakeRequest): Promise<void> => {
     const peerAddress = request.from.toLowerCase();
     const myNewPubKey = generateHandshakeKeys(peerAddress);
 
     computeSecret(peerAddress, request.ephemeralPublicKey);
-
     setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
@@ -291,17 +324,36 @@ export const useChatLogic = ({
     setActiveUsername(finalUsername);
   };
 
+  /**
+   * Removes a pending connection request without accepting it.
+   *
+   * @param {string} requestAddress - The wallet address of the peer to reject.
+   * @returns {void}
+   */
   const handleRejectRequest = (requestAddress: string): void => {
     setPendingRequests((prev) =>
       prev.filter((req) => req.from !== requestAddress),
     );
   };
 
+  /**
+   * Sets the given session as the active chat.
+   *
+   * @param {ActiveSession} session - The session to switch to.
+   * @returns {void}
+   */
   const switchChat = (session: ActiveSession): void => {
     setActiveChat(session.address);
     setActiveUsername(session.username);
   };
 
+  /**
+   * Removes a peer from the active session list, clears their initiator flag
+   * and shared secret, and closes the chat panel if it was currently open.
+   *
+   * @param {string} peerAddress - Wallet address of the peer to remove.
+   * @returns {void}
+   */
   const removeActiveSession = useCallback(
     (peerAddress: string): void => {
       const addr = peerAddress.toLowerCase();
@@ -328,7 +380,7 @@ export const useChatLogic = ({
   /**
    * Marks a contact as 'accepted' in the local database.
    *
-   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @param {string} peerAddress - Lowercase wallet address of the peer.
    * @returns {Promise<void>}
    */
   const acceptContact = useCallback(async (peerAddress: string): Promise<void> => {
@@ -344,10 +396,8 @@ export const useChatLogic = ({
 
   /**
    * Marks a contact as 'blocked' in the local database.
-   * Callers are responsible for invoking `forceDisconnectPeer` and
-   * navigating away from the active chat.
    *
-   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @param {string} peerAddress - Lowercase wallet address of the peer.
    * @returns {Promise<void>}
    */
   const blockContact = useCallback(async (peerAddress: string): Promise<void> => {
@@ -362,9 +412,9 @@ export const useChatLogic = ({
   }, []);
 
   /**
-   * Moves a contact to the archived list by setting `isArchived` to true.
+   * Moves a contact to the archived list by setting isArchived to true.
    *
-   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @param {string} peerAddress - Lowercase wallet address of the peer.
    * @returns {Promise<void>}
    */
   const archiveContact = useCallback(async (peerAddress: string): Promise<void> => {
@@ -379,9 +429,9 @@ export const useChatLogic = ({
   }, []);
 
   /**
-   * Moves a contact back to the main list by setting `isArchived` to false.
+   * Moves a contact back to the main list by setting isArchived to false.
    *
-   * @param {string} peerAddress - The lowercase wallet address of the peer.
+   * @param {string} peerAddress - Lowercase wallet address of the peer.
    * @returns {Promise<void>}
    */
   const unarchiveContact = useCallback(async (peerAddress: string): Promise<void> => {
@@ -410,6 +460,7 @@ export const useChatLogic = ({
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
+    initiateHandshake,
     searchError,
     isPeerTyping,
     setIsPeerTyping,
