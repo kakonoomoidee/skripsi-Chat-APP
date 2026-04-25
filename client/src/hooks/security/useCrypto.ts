@@ -27,9 +27,10 @@ export interface UseCryptoReturn {
  */
 export const useCrypto = (): UseCryptoReturn => {
   const pendingPrivateKeys = useRef<Record<string, any>>({});
-  const [sharedSecrets, setSharedSecrets] = useState<Record<string, string>>(
+  const [, setSharedSecrets] = useState<Record<string, string>>(
     {},
   );
+  const sharedSecretsRef = useRef<Record<string, string>>({});
 
   const [localDbKey] = useState(() => {
     let key = localStorage.getItem("securep2p_local_db_key");
@@ -82,6 +83,7 @@ export const useCrypto = (): UseCryptoReturn => {
       const secret = deriveSharedSecret(mySigningKey, peerPublicKey);
 
       if (secret) {
+        sharedSecretsRef.current[peerAddress] = secret;
         setSharedSecrets((prev) => ({ ...prev, [peerAddress]: secret }));
         delete pendingPrivateKeys.current[peerAddress];
         console.log(
@@ -105,7 +107,7 @@ export const useCrypto = (): UseCryptoReturn => {
    */
   const encrypt = useCallback(
     (peerAddress: string, plainText: string): string | null => {
-      const secret = sharedSecrets[peerAddress];
+      const secret = sharedSecretsRef.current[peerAddress];
       if (!secret) {
         console.error(
           `[Crypto Error] Attempted to encrypt without an established handshake for peer: ${peerAddress}`,
@@ -143,7 +145,7 @@ export const useCrypto = (): UseCryptoReturn => {
 
       return cipherText;
     },
-    [sharedSecrets],
+    [],
   );
 
   /**
@@ -154,7 +156,7 @@ export const useCrypto = (): UseCryptoReturn => {
    */
   const decrypt = useCallback(
     (peerAddress: string, cipherText: string): string => {
-      const secret = sharedSecrets[peerAddress];
+      const secret = sharedSecretsRef.current[peerAddress];
       if (!secret) return "Encrypted (Waiting Handshake...)";
 
       const decrypted = decryptAES(cipherText, secret);
@@ -197,7 +199,7 @@ export const useCrypto = (): UseCryptoReturn => {
 
       return decrypted;
     },
-    [sharedSecrets],
+    [],
   );
 
   /**
@@ -244,6 +246,7 @@ export const useCrypto = (): UseCryptoReturn => {
    * @returns {void}
    */
   const removeSecret = useCallback((peerAddress: string): void => {
+    delete sharedSecretsRef.current[peerAddress.toLowerCase()];
     setSharedSecrets((prev) => {
       const next = { ...prev };
       delete next[peerAddress.toLowerCase()];
@@ -262,6 +265,6 @@ export const useCrypto = (): UseCryptoReturn => {
     encryptLocalDB,
     decryptLocalDB,
     removeSecret,
-    hasSecret: (addr: string) => !!sharedSecrets[addr],
+    hasSecret: (addr: string) => !!sharedSecretsRef.current[addr],
   };
 };

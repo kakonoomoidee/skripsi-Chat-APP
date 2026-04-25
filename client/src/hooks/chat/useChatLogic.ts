@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { Socket } from "socket.io-client";
 import { db } from "@/utils/db";
+import { useChatStore, HandshakeRequest, ActiveSession } from "@/store/useChatStore";
 
 /**
  * Interface defining the dependencies required by the useChatLogic hook.
@@ -18,22 +19,6 @@ export interface UseChatLogicProps {
   onHandshakeComplete?: (peerAddress: string) => void;
 }
 
-/**
- * Interface representing an incoming handshake connection request.
- */
-export interface HandshakeRequest {
-  from: string;
-  ephemeralPublicKey: string;
-  username?: string;
-}
-
-/**
- * Interface representing an active chat session.
- */
-export interface ActiveSession {
-  address: string;
-  username: string;
-}
 
 /**
  * Custom hook to manage chat sessions, handle peer discovery, and coordinate
@@ -58,15 +43,19 @@ export const useChatLogic = ({
   onHandshakeComplete,
 }: UseChatLogicProps) => {
   const [targetUsername, setTargetUsername] = useState<string>("");
-  const [activeChat, setActiveChat] = useState<string | null>(null);
-  const [activeUsername, setActiveUsername] = useState<string>("");
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [myUsername, setMyUsername] = useState<string>("Loading...");
-  const [pendingRequests, setPendingRequests] = useState<HandshakeRequest[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [initiators, setInitiators] = useState<Record<string, boolean>>({});
-  const [searchError, setSearchError] = useState<string>("");
-  const [isPeerTyping, setIsPeerTyping] = useState<boolean>(false);
+
+  const {
+    activeChat,
+    setActiveChat,
+    setActiveUsername,
+    activeSessions,
+    setActiveSessions,
+    setPendingRequests,
+    setIsSearching,
+    setInitiators,
+    setSearchError,
+  } = useChatStore();
 
   const activeSessionsRef = useRef<ActiveSession[]>([]);
   const activeChatRef = useRef<string | null>(null);
@@ -275,7 +264,7 @@ export const useChatLogic = ({
 
       setActiveChat(peerAddress);
       setActiveUsername(targetUsername.trim());
-      setInitiators((prev) => ({ ...prev, [peerAddress]: true }));
+      setInitiators((prev: Record<string, boolean>) => ({ ...prev, [peerAddress]: true }));
 
       setTargetUsername("");
     } catch {
@@ -297,7 +286,7 @@ export const useChatLogic = ({
     const myNewPubKey = generateHandshakeKeys(peerAddress);
 
     computeSecret(peerAddress, request.ephemeralPublicKey);
-    setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
+    setInitiators((prev: Record<string, boolean>) => ({ ...prev, [peerAddress]: false }));
 
     if (socket) {
       socket.emit("handshake_response", {
@@ -306,8 +295,8 @@ export const useChatLogic = ({
       });
     }
 
-    setPendingRequests((prev) =>
-      prev.filter((req) => req.from !== request.from),
+    setPendingRequests((prev: HandshakeRequest[]) =>
+      prev.filter((req: HandshakeRequest) => req.from !== request.from),
     );
 
     const finalUsername =
@@ -331,8 +320,8 @@ export const useChatLogic = ({
    * @returns {void}
    */
   const handleRejectRequest = (requestAddress: string): void => {
-    setPendingRequests((prev) =>
-      prev.filter((req) => req.from !== requestAddress),
+    setPendingRequests((prev: HandshakeRequest[]) =>
+      prev.filter((req: HandshakeRequest) => req.from !== requestAddress),
     );
   };
 
@@ -362,7 +351,7 @@ export const useChatLogic = ({
         prev.filter((s) => s.address.toLowerCase() !== addr),
       );
 
-      setInitiators((prev) => {
+      setInitiators((prev: Record<string, boolean>) => {
         const next = { ...prev };
         delete next[addr];
         return next;
@@ -448,22 +437,13 @@ export const useChatLogic = ({
   return {
     targetUsername,
     setTargetUsername,
-    activeChat,
-    activeUsername,
     myUsername,
-    pendingRequests,
-    activeSessions,
     switchChat,
     closeChat,
-    isSearching,
-    initiators,
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
     initiateHandshake,
-    searchError,
-    isPeerTyping,
-    setIsPeerTyping,
     removeActiveSession,
     acceptContact,
     blockContact,

@@ -1,15 +1,5 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  ReactNode,
-  useState,
-  useCallback,
-} from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/utils/db";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useCrypto } from "@/hooks/security/useCrypto";
@@ -22,13 +12,12 @@ import { useDuplicateTab } from "@/hooks/ui/useDuplicateTab";
 import { useCallActions } from "@/hooks/chat/useCallActions";
 import { useMessageSender } from "@/hooks/chat/useMessageSender";
 import { DuplicateTabWarning } from "@/components/chat/index";
-import ms from "ms";
+import { useChatStore, ConnectionState } from "@/store/useChatStore";
+import { useMessageData } from "@/hooks/chat/useMessageData";
 
-/**
- * Represents the possible states of the peer-to-peer connection lifecycle.
- * @typedef {'idle' | 'connecting' | 'connected' | 'offline'} ConnectionState
- */
-export type ConnectionState = "idle" | "connecting" | "connected" | "offline";
+export type { ConnectionState };
+import { useConnectionManager } from "@/hooks/chat/useConnectionManager";
+import { useProtocolHandler } from "@/hooks/chat/useProtocolHandler";
 
 /**
  * Shape of the value exposed by {@link ChatContext}.
@@ -120,41 +109,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { autoDeleteMode } = useSessionStore();
-  const { setPeerWalletAddress } = useWalletStore();
+  const { setPeerWalletAddress, peerWalletAddress } = useWalletStore();
+  
+  const chatStore = useChatStore();
 
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [activeAreaView, setActiveAreaView] = useState<"chat" | "settings">("chat");
-  const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>({});
 
   const isDuplicateTab = useDuplicateTab();
 
   const forceDisconnectPeerRef = useRef<((addr: string) => void) | null>(null);
-  const initiateWebRTCConnectionRef = useRef<((addr: string) => Promise<void>) | null>(null);
-  const initiateHandshakeRef = useRef<((addr: string) => void) | null>(null);
-  const activeChatRef = useRef<string | null>(null);
+  const connectionManagerRefs = useRef<any>({});
 
-  const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
-  const connectedPeersRef = useRef<string[]>([]);
-  const avatarSyncedPeers = useRef<{ [addr: string]: boolean }>({});
-  const pingTimeoutRef = useRef<{ [addr: string]: any }>({});
-  const reconnectIntervalRef = useRef<{ [addr: string]: any }>({});
-
-  /**
-   * Tracks peers for whom a pong was received but the ECDH handshake has not
-   * yet completed. When onHandshakeComplete fires for one of these addresses,
-   * initiateWebRTCConnection is called immediately.
-   */
-  const pendingWebRTCAfterHandshake = useRef<Set<string>>(new Set());
-
-  /**
-   * Stable forwarder that delegates to forceDisconnectPeer via a ref so that
-   * useChatLogic can call it without capturing a stale closure.
-   *
-   * @param {string} addr - Lowercase peer wallet address to disconnect.
-   * @returns {void}
-   */
   const handleForceDisconnect = useCallback((addr: string) => {
     if (forceDisconnectPeerRef.current) forceDisconnectPeerRef.current(addr);
   }, []);
@@ -170,27 +137,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const {
     targetUsername,
     setTargetUsername,
-    activeChat,
-    activeUsername,
     myUsername,
-    pendingRequests,
-    activeSessions,
     switchChat,
     closeChat,
-    isSearching,
-    initiators,
     handleConnectPeer,
     handleAcceptRequest,
     handleRejectRequest,
     initiateHandshake,
-    searchError,
-    isPeerTyping,
-    setIsPeerTyping,
+    removeActiveSession,
     acceptContact,
     blockContact,
     archiveContact,
     unarchiveContact,
-    removeActiveSession,
   } = useChatLogic({
     address,
     socket,
@@ -200,13 +158,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     relayUrl: activeRelay,
     removeSecret,
     forceDisconnectPeer: handleForceDisconnect,
-    onHandshakeComplete: (peerAddress: string) => {
-      const addr = peerAddress.toLowerCase();
-      if (pendingWebRTCAfterHandshake.current.has(addr)) {
-        pendingWebRTCAfterHandshake.current.delete(addr);
-        initiateWebRTCConnectionRef.current?.(addr);
-      }
-    },
+    onHandshakeComplete: (addr: string) => connectionManagerRefs.current.handleHandshakeComplete?.(addr),
   });
 
   const {
@@ -223,14 +175,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   } = useWebRTC({
     socket,
     myAddress: address,
-    activeChat,
+    activeChat: chatStore.activeChat,
     decrypt,
     encryptLocalDB,
     encrypt,
     generateHandshakeKeys,
     computeSecret,
     hasSecret,
-    setIsPeerTyping,
+    setIsPeerTyping: chatStore.setIsPeerTyping,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
       setIsInCall(true);
@@ -243,52 +195,49 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setIsMuted(false);
       showToast("Call ended.", "error");
     },
-    onPeerDisconnected: (peerAddress: string) => {
-      const addr = peerAddress.toLowerCase();
-      webrtcInitiated.current[addr] = false;
-      showToast("Peer disconnected.", "error");
-      setConnectionStates((prev) => ({ ...prev, [addr]: "offline" }));
-    },
-    onPongReceived: (peerAddress: string) => {
-      const addr = peerAddress.toLowerCase();
-      if (pingTimeoutRef.current[addr]) {
-        clearTimeout(pingTimeoutRef.current[addr]);
-        delete pingTimeoutRef.current[addr];
-      }
-
-      setConnectionStates((prev) => ({ ...prev, [addr]: "connecting" }));
-
-      if (hasSecret(addr)) {
-        initiateWebRTCConnectionRef.current?.(addr);
-      } else {
-        pendingWebRTCAfterHandshake.current.add(addr);
-        initiateHandshakeRef.current?.(addr);
-      }
-    },
+    onPeerDisconnected: (addr: string) => connectionManagerRefs.current.handlePeerDisconnected?.(addr),
+    onPongReceived: (addr: string) => connectionManagerRefs.current.handlePongReceived?.(addr),
   });
 
   useEffect(() => {
     forceDisconnectPeerRef.current = forceDisconnectPeer;
   }, [forceDisconnectPeer]);
 
-  useEffect(() => {
-    initiateWebRTCConnectionRef.current = initiateWebRTCConnection;
-  }, [initiateWebRTCConnection]);
+  const connectionManager = useConnectionManager({
+    checkPeerStatus,
+    showToast,
+    removeActiveSession,
+    isWebRTCConnected,
+    encrypt,
+    sendDataViaWebRTC,
+    connectedPeers,
+    hasSecret,
+    initiateWebRTCConnection,
+    initiateHandshake,
+  });
 
   useEffect(() => {
-    initiateHandshakeRef.current = initiateHandshake;
-  }, [initiateHandshake]);
+    connectionManagerRefs.current = connectionManager;
+  }, [connectionManager]);
 
-  useEffect(() => {
-    activeChatRef.current = activeChat;
-  }, [activeChat]);
+  const { messages, unreadCount, unreadTotal } = useMessageData({
+    address,
+    activeChat: chatStore.activeChat,
+    isWebRTCConnected,
+    sendMarkAsRead,
+    decryptLocalDB,
+    autoDeleteMode,
+  });
 
-  useEffect(() => {
-    connectedPeersRef.current = connectedPeers;
-  }, [connectedPeers]);
+  useProtocolHandler({
+    messages,
+    address,
+    encrypt,
+    sendDataViaWebRTC,
+  });
 
   const callActions = useCallActions({
-    activeChat,
+    activeChat: chatStore.activeChat,
     isWebRTCConnected,
     encrypt,
     sendDataViaWebRTC,
@@ -303,7 +252,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const messageSender = useMessageSender({
     address,
-    activeChat,
+    activeChat: chatStore.activeChat,
     isWebRTCConnected,
     hasSecret,
     encrypt,
@@ -311,331 +260,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     decryptLocalDB,
     sendDataViaWebRTC,
     showToast,
-    peerWalletAddress: useWalletStore.getState().peerWalletAddress,
+    peerWalletAddress,
   });
-
-  const rawMessages = useLiveQuery(
-    () => {
-      if (!activeChat || !address) return [];
-      return db.messages
-        .where({
-          ownerAddress: address.toLowerCase(),
-          chatId: activeChat.toLowerCase(),
-        })
-        .sortBy("timestamp");
-    },
-    [activeChat, address],
-    [],
-  );
-
-  const messages = React.useMemo(() => {
-    if (!rawMessages) return [];
-    return rawMessages.map((msg) => ({
-      ...msg,
-      text: decryptLocalDB(msg.text),
-    }));
-  }, [rawMessages, decryptLocalDB]);
 
   useEffect(() => {
     if (!isAuthenticated) navigate("/login");
   }, [isAuthenticated, navigate]);
 
-  const globalUnreadMessages = useLiveQuery(
-    () => {
-      if (!address) return [];
-      return db.messages
-        .filter(
-          (msg) =>
-            msg.ownerAddress === address.toLowerCase() &&
-            !msg.isMine &&
-            msg.status !== "read",
-        )
-        .toArray();
-    },
-    [address],
-    [],
-  );
-
-  const unreadCount = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    if (globalUnreadMessages) {
-      globalUnreadMessages.forEach((msg) => {
-        counts[msg.chatId] = (counts[msg.chatId] || 0) + 1;
-      });
-    }
-    return counts;
-  }, [globalUnreadMessages]);
-
-  useEffect(() => {
-    const sweepOldMessages = async () => {
-      if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
-      const now = Date.now();
-      let thresholdTime = now;
-      if (autoDeleteMode === "1")       thresholdTime = now - ms("1d");
-      else if (autoDeleteMode === "3")  thresholdTime = now - ms("3d");
-      else if (autoDeleteMode === "7")  thresholdTime = now - ms("7d");
-      else if (autoDeleteMode === "30") thresholdTime = now - ms("30d");
-      try {
-        await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch (_) {}
-    };
-    sweepOldMessages();
-  }, [autoDeleteMode]);
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (autoDeleteMode === "close") db.messages.clear();
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [autoDeleteMode]);
-
-  useEffect(() => {
-    if (!activeChat || !isWebRTCConnected) return;
-    if (!unreadCount[activeChat] || unreadCount[activeChat] === 0) return;
-    sendMarkAsRead(activeChat);
-    db.messages
-      .filter(
-        (msg) =>
-          msg.ownerAddress === address?.toLowerCase() &&
-          msg.chatId === activeChat.toLowerCase() &&
-          !msg.isMine &&
-          msg.status !== "read",
-      )
-      .modify({ status: "read" });
-  }, [activeChat, isWebRTCConnected, sendMarkAsRead, unreadCount, address]);
-
-
-
-  /**
-   * Auto-Start Effect.
-   *
-   * Fires when activeChat or the initiators map changes. If this client is the
-   * designated initiator for the current peer, a ping is sent to verify the
-   * peer is online before any key material is exchanged or any WebRTC offer
-   * is emitted.
-   *
-   * The webrtcInitiated ref prevents duplicate pings when initiators updates
-   * multiple times in quick succession (e.g. during socket reconnection).
-   *
-   * If the peer is already in connectedPeers (e.g. switching back to an open
-   * chat) the state transitions directly to 'connected' without a redundant ping.
-   *
-   * Ping timeout behaviour:
-   * - On pong received within 5 s → onPongReceived handles ECDH + WebRTC.
-   * - On timeout → guard reset, state back to 'idle', error toast shown.
-   */
-  useEffect(() => {
-    const current = activeChat?.toLowerCase();
-
-    if (!current) {
-      return;
-    }
-
-    if (connectedPeersRef.current.includes(current)) {
-      setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
-      return;
-    }
-
-    if (initiators[current] !== true) return;
-
-    if (webrtcInitiated.current[current]) return;
-
-    webrtcInitiated.current[current] = true;
-    setConnectionStates((prev) => ({ ...prev, [current]: "connecting" }));
-
-    checkPeerStatus(current);
-
-    pingTimeoutRef.current[current] = setTimeout(() => {
-      delete pingTimeoutRef.current[current];
-      pendingWebRTCAfterHandshake.current.delete(current);
-      setConnectionStates((prev) => ({ ...prev, [current]: "idle" }));
-      showToast("Peer is offline or unreachable.", "error");
-      removeActiveSession(current);
-    }, ms("5s"));
-  }, [activeChat, checkPeerStatus, initiators, showToast, removeActiveSession]);
-
-  /**
-   * Global Timer Cleanup Effect.
-   *
-   * Runs only on component unmount. Clears the ping timeout and reconnect
-   * interval to prevent memory leaks and stale callbacks after the provider
-   * is torn down.
-   */
-  useEffect(() => {
-    return () => {
-      Object.values(pingTimeoutRef.current).forEach((t) => clearTimeout(t as any));
-      Object.values(reconnectIntervalRef.current).forEach((t) => clearInterval(t as any));
-    };
-  }, []);
-
-  /**
-   * Connected Transition Effect.
-   *
-   * Cancels all pending timers and transitions to 'connected' the moment the
-   * WebRTC data channel opens successfully.
-   */
-  useEffect(() => {
-    if (!isWebRTCConnected || !activeChat) return;
-    const current = activeChat.toLowerCase();
-
-    if (pingTimeoutRef.current[current]) {
-      clearTimeout(pingTimeoutRef.current[current]);
-      delete pingTimeoutRef.current[current];
-    }
-    if (reconnectIntervalRef.current[current]) {
-      clearInterval(reconnectIntervalRef.current[current]);
-      delete reconnectIntervalRef.current[current];
-    }
-    
-    webrtcInitiated.current[current] = false;
-    setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
-  }, [isWebRTCConnected, activeChat]);
-
-  /**
-   * Avatar Auto-Sync Effect.
-   *
-   * Transmits a PROFILE_SYNC message the moment the data channel opens. An
-   * idempotency guard ensures the sync happens exactly once per peer per session.
-   */
-  useEffect(() => {
-    if (!isWebRTCConnected || !activeChat) return;
-    const peer = activeChat.toLowerCase();
-    if (avatarSyncedPeers.current[peer]) return;
-    const myAvatar = localStorage.getItem("my_avatar");
-    if (!myAvatar) return;
-    avatarSyncedPeers.current[peer] = true;
-    const payload = JSON.stringify({ type: "PROFILE_SYNC", avatar: myAvatar });
-    const encrypted = encrypt(peer, payload);
-    if (encrypted) sendDataViaWebRTC(peer, encrypted);
-  }, [isWebRTCConnected, activeChat, encrypt, sendDataViaWebRTC]);
-
-  /**
-   * Avatar Guard Reset Effect.
-   *
-   * Clears the idempotency flag for the previously active peer whenever
-   * activeChat changes so the next connection delivers a fresh avatar sync.
-   */
-  useEffect(() => {
-    if (!activeChat) return;
-    const peer = activeChat.toLowerCase();
-    return () => {
-      delete avatarSyncedPeers.current[peer];
-    };
-  }, [activeChat]);
-
-  /**
-   * Auto-Reconnect Effect.
-   *
-   * When the state is 'offline', pings the peer every 10 seconds. If a pong
-   * is received, onPongReceived handles the transition back to 'connecting'
-   * and re-initiates the WebRTC handshake. The interval stops automatically
-   * when the state leaves 'offline'.
-   */
-  useEffect(() => {
-    const current = activeChat?.toLowerCase();
-
-    if (current && connectionStates[current] === "offline") {
-      if (reconnectIntervalRef.current[current]) {
-        clearInterval(reconnectIntervalRef.current[current]);
-      }
-
-      reconnectIntervalRef.current[current] = setInterval(() => {
-        if (connectedPeersRef.current.includes(current)) {
-          if (reconnectIntervalRef.current[current]) {
-            clearInterval(reconnectIntervalRef.current[current]);
-            delete reconnectIntervalRef.current[current];
-          }
-          setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
-          return;
-        }
-        webrtcInitiated.current[current] = false;
-        checkPeerStatus(current);
-      }, ms("10s"));
-    } else if (current) {
-      if (reconnectIntervalRef.current[current]) {
-        clearInterval(reconnectIntervalRef.current[current]);
-        delete reconnectIntervalRef.current[current];
-      }
-    }
-  }, [connectionStates, activeChat, checkPeerStatus]);
-
-  /**
-   * Protocol Message Handler Effect.
-   *
-   * Intercepts the latest message on every render and handles system-level
-   * protocol payloads that should not appear in the chat UI:
-   *
-   * - WALLET_RESPONSE — Stores the peer's wallet address in global state and
-   *   deletes the sentinel message from IndexedDB.
-   * - WALLET_REQUEST  — Responds with the local user's wallet address and
-   *   deletes the sentinel message from IndexedDB.
-   * - PROFILE_SYNC    — Persists the peer's avatar to the contacts table and
-   *   deletes the sentinel message from IndexedDB.
-   */
-  useEffect(() => {
-    const handleProtocolMessages = async () => {
-      if (!messages || messages.length === 0) return;
-      const latestMessage = messages[messages.length - 1];
-      if (!latestMessage?.text) return;
-      const { peerWalletAddress, setPeerWalletAddress } = useWalletStore.getState();
-      try {
-        const parsedData = JSON.parse(latestMessage.text);
-
-        if (parsedData.type === "WALLET_RESPONSE" && parsedData.address) {
-          if (peerWalletAddress !== parsedData.address) {
-            setPeerWalletAddress(parsedData.address);
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
-        }
-
-        if (parsedData.type === "WALLET_REQUEST") {
-          const txAddress =
-            localStorage.getItem("internal_tx_wallet") ||
-            localStorage.getItem("linked_metamask") ||
-            address;
-          if (txAddress && activeChat) {
-            const responsePayload = JSON.stringify({
-              type: "WALLET_RESPONSE",
-              address: txAddress,
-            });
-            const encryptedResponse = encrypt(activeChat, responsePayload);
-            if (encryptedResponse) sendDataViaWebRTC(activeChat, encryptedResponse);
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
-        }
-
-        if (parsedData.type === "PROFILE_SYNC" && parsedData.avatar && activeChat) {
-          const existing = await db.contacts.get(activeChat.toLowerCase());
-          if (existing) {
-            await db.contacts.put({ ...existing, avatar: parsedData.avatar });
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
-        }
-      } catch (_) {}
-    };
-    handleProtocolMessages();
-  }, [messages, activeChat, address, sendDataViaWebRTC]);
-
-  /**
-   * Wraps switchChat with sidebar and area-view side effects.
-   *
-   * @param {any} session - The session object to switch to.
-   * @returns {void}
-   */
   const handleSwitchChatWrapped = (session: any): void => {
     switchChat(session);
     setPeerWalletAddress(null);
     setIsMobileSidebarOpen(false);
-    setActiveAreaView("chat");
+    chatStore.setActiveAreaView("chat");
   };
 
-  /**
-   * Wraps handleAcceptRequest with a mobile sidebar close.
-   *
-   * @param {any} req - The pending connection request to accept.
-   * @returns {void}
-   */
   const handleAcceptRequestWrapped = (req: any): void => {
     handleAcceptRequest(req);
     setIsMobileSidebarOpen(false);
@@ -653,34 +291,34 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     isConnected,
     targetUsername,
     setTargetUsername,
-    activeChat,
-    activeUsername,
-    pendingRequests,
-    activeSessions,
+    activeChat: chatStore.activeChat,
+    activeUsername: chatStore.activeUsername,
+    pendingRequests: chatStore.pendingRequests,
+    activeSessions: chatStore.activeSessions,
     switchChat: handleSwitchChatWrapped,
     closeChat,
-    isSearching,
+    isSearching: chatStore.isSearching,
     handleConnectPeer,
     handleAcceptRequest: handleAcceptRequestWrapped,
     handleRejectRequest,
     connectedPeers,
     isWebRTCConnected,
-    connectionStates,
-    messages: messages || [],
-    searchError,
-    isPeerTyping,
+    connectionStates: chatStore.connectionStates,
+    messages,
+    searchError: chatStore.searchError,
+    isPeerTyping: chatStore.isPeerTyping,
     resetWallet,
     unreadCount,
-    unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),
-    pendingRequestsTotal: pendingRequests.length,
+    unreadTotal,
+    pendingRequestsTotal: chatStore.pendingRequests.length,
     sendMarkAsRead,
     acceptContact,
     blockContact,
     archiveContact,
     unarchiveContact,
     forceDisconnectPeer,
-    activeAreaView,
-    setActiveAreaView,
+    activeAreaView: chatStore.activeAreaView,
+    setActiveAreaView: chatStore.setActiveAreaView,
     ...messageSender,
     ...callActions,
     isIncomingCall,
