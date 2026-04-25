@@ -49,6 +49,7 @@ export interface Contact {
   status: ContactStatus;
   isArchived: boolean;
   username?: string;
+  avatar?: string;
 }
 
 /**
@@ -80,6 +81,17 @@ export class SecureP2PDatabase extends Dexie {
      * privacy management system (Accept / Block / Archive).
      */
     this.version(4).stores({
+      messages: "++id, [ownerAddress+chatId], timestamp, status",
+      relays: "++id, &url",
+      contacts: "&address, status, isArchived",
+    });
+
+    /**
+     * Version 5 — Extends the `contacts` table with an optional `avatar`
+     * field for P2P profile picture synchronisation. Non-indexed because
+     * it holds large Base64 payloads; queried by primary key only.
+     */
+    this.version(5).stores({
       messages: "++id, [ownerAddress+chatId], timestamp, status",
       relays: "++id, &url",
       contacts: "&address, status, isArchived",

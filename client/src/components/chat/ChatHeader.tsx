@@ -6,6 +6,7 @@ import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
 import { InCallModal } from "./modals/InCallModal";
 import { GlassBadge } from "@/components/ui";
+import { PeerAvatar } from "@/components/ui/PeerAvatar";
 
 /**
  * Returns the status label element for the sub-header, driven by the connection state machine.
@@ -58,6 +59,7 @@ const renderStatus = (
  */
 export const ChatHeader = (): React.JSX.Element => {
   const {
+    activeChat,
     activeUsername,
     isWebRTCConnected,
     connectionState,
@@ -93,9 +95,14 @@ export const ChatHeader = (): React.JSX.Element => {
         </button>
 
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold shadow-inner">
-            {activeUsername?.charAt(0).toUpperCase()}
-          </div>
+          {activeChat && (
+            <PeerAvatar
+              peerAddress={activeChat}
+              displayName={activeUsername ?? "?"}
+              sizeClassName="h-10 w-10"
+              className="bg-indigo-600 text-white font-bold shadow-inner"
+            />
+          )}
           <div>
             <h3 className="font-semibold text-zinc-100 capitalize">
               {activeUsername}

@@ -13,6 +13,7 @@ import {
   ArrowDownIcon,
 } from "@/components/icons";
 import { GlassBadge } from "../components/ui/GlassBadge";
+import { PeerAvatar } from "../components/ui/PeerAvatar";
 
 /**
  * Interface for contact history stored in localStorage.
@@ -182,9 +183,12 @@ export default function Sidebar(): React.JSX.Element {
           className="flex items-center gap-3 flex-1 min-w-0"
           onClick={() => switchChat(session)}
         >
-          <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold group-hover:bg-zinc-700 transition-colors shrink-0">
-            {session.username.charAt(0).toUpperCase()}
-          </div>
+          <PeerAvatar
+            peerAddress={addr}
+            displayName={session.username}
+            sizeClassName="w-9 h-9"
+            className="group-hover:ring-1 group-hover:ring-zinc-600 transition-all"
+          />
           <div className="min-w-0">
             <p className="font-semibold text-sm text-zinc-100 capitalize leading-tight truncate">
               {session.username}
@@ -434,9 +438,12 @@ export default function Sidebar(): React.JSX.Element {
                           className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
                         >
                           <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-zinc-400 font-bold text-xs">
-                              {contact.username.charAt(0).toUpperCase()}
-                            </div>
+                          <PeerAvatar
+                            peerAddress={contact.address}
+                            displayName={contact.username}
+                            sizeClassName="w-8 h-8"
+                            className="border border-zinc-700/50"
+                          />
                             <div>
                               <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
                                 {contact.username}

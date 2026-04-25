@@ -264,6 +264,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
 
   /**
+   * Tracks which peers have already received the local user's avatar during
+   * the current session. Keyed by lowercase peer address. Prevents redundant
+   * PROFILE_SYNC transmissions during ICE restarts or effect re-evaluations.
+   */
+  const avatarSyncedPeers = useRef<{ [addr: string]: boolean }>({});
+
+  /**
    * Ref that stores the handle of the active 8-second connection timeout
    * so it can be cleared when the data channel opens successfully.
    */
@@ -472,6 +479,47 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [isWebRTCConnected]);
 
   /**
+   * Avatar Auto-Sync Effect.
+   *
+   * Fires the moment `isWebRTCConnected` becomes true for the current
+   * `activeChat`. Sends a `PROFILE_SYNC` protocol message carrying the
+   * local user's compressed Base64 avatar so the peer can persist it
+   * immediately upon handshake completion.
+   *
+   * An idempotency guard (`avatarSyncedPeers`) ensures the sync is
+   * transmitted exactly once per peer per session, even if this effect
+   * is re-evaluated due to ICE restarts or React re-renders. The guard
+   * entry is cleared whenever `activeChat` changes so that switching back
+   * to the same peer in a later session triggers a fresh sync.
+   */
+  useEffect(() => {
+    if (!isWebRTCConnected || !activeChat) return;
+    const peer = activeChat.toLowerCase();
+    if (avatarSyncedPeers.current[peer]) return;
+    const myAvatar = localStorage.getItem("my_avatar");
+    if (!myAvatar) return;
+    avatarSyncedPeers.current[peer] = true;
+    const payload = JSON.stringify({ type: "PROFILE_SYNC", avatar: myAvatar });
+    const encrypted = encrypt(peer, payload);
+    if (encrypted) sendDataViaWebRTC(peer, encrypted);
+  }, [isWebRTCConnected, activeChat, encrypt, sendDataViaWebRTC]);
+
+  /**
+   * Avatar Guard Reset Effect.
+   *
+   * Clears the idempotency flag for the previously active peer whenever
+   * `activeChat` changes so that the next connection to any peer always
+   * delivers a fresh avatar sync.
+   */
+  useEffect(() => {
+    if (!activeChat) return;
+    const peer = activeChat.toLowerCase();
+    return () => {
+      delete avatarSyncedPeers.current[peer];
+    };
+  }, [activeChat]);
+
+  /**
    * Auto-Reconnect Effect.
    *
    * When the state is 'offline', sets up a 10-second polling interval that
@@ -550,6 +598,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             if (encryptedResponse) {
               sendDataViaWebRTC(activeChat, encryptedResponse);
             }
+          }
+          if (latestMessage.id) {
+            await db.messages.delete(latestMessage.id);
+          }
+        }
+
+        if (parsedData.type === "PROFILE_SYNC" && parsedData.avatar && activeChat) {
+          const existing = await db.contacts.get(activeChat.toLowerCase());
+          if (existing) {
+            await db.contacts.put({ ...existing, avatar: parsedData.avatar });
           }
           if (latestMessage.id) {
             await db.messages.delete(latestMessage.id);
