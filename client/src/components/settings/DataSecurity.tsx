@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
 import GlassDropdown from "@/components/ui/GlassDropdown";
@@ -19,6 +19,8 @@ import {
  */
 export default function DataSecurity(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const securityInfoRef = useRef<HTMLDivElement>(null);
+  const backupInfoRef = useRef<HTMLDivElement>(null);
 
   const {
     autoDeleteMode,
@@ -60,12 +62,53 @@ export default function DataSecurity(): React.JSX.Element {
     { value: "30", label: "Monthly (Every 30 Days)" },
   ];
 
+  useEffect(() => {
+    const handlePointerOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (
+        showSecurityInfo &&
+        securityInfoRef.current &&
+        !securityInfoRef.current.contains(target)
+      ) {
+        setShowSecurityInfo(false);
+      }
+
+      if (
+        showBackupInfo &&
+        backupInfoRef.current &&
+        !backupInfoRef.current.contains(target)
+      ) {
+        setShowBackupInfo(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSecurityInfo(false);
+        setShowBackupInfo(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerOutside);
+    document.addEventListener("touchstart", handlePointerOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("touchstart", handlePointerOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showSecurityInfo, showBackupInfo]);
+
   return (
     <>
       <div className="flex flex-col h-full w-full shrink-0">
         <div className="space-y-4 w-full">
           <div>
-            <div className="flex items-center gap-1.5 mb-2 relative">
+            <div
+              className="flex items-center gap-1.5 mb-2 relative"
+              ref={securityInfoRef}
+            >
               <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                 Message Retention
               </label>
@@ -77,7 +120,7 @@ export default function DataSecurity(): React.JSX.Element {
                 <InfoIcon className="w-3.5 h-3.5" />
               </button>
               {showSecurityInfo && (
-                <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
+                <div className="absolute left-0 bottom-6 mb-2 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
                   <strong>Auto-Delete</strong> only removes messages from your
                   local device.
                 </div>
@@ -97,7 +140,10 @@ export default function DataSecurity(): React.JSX.Element {
           </div>
 
           <div>
-            <div className="flex items-center gap-1.5 mb-2 relative">
+            <div
+              className="flex items-center gap-1.5 mb-2 relative"
+              ref={backupInfoRef}
+            >
               <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                 Data Backup
               </label>
@@ -109,7 +155,7 @@ export default function DataSecurity(): React.JSX.Element {
                 <InfoIcon className="w-3.5 h-3.5" />
               </button>
               {showBackupInfo && (
-                <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
+                <div className="absolute left-0 bottom-6 mb-2 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
                   Export chats and identity as an encrypted file, or import to
                   restore data.
                 </div>

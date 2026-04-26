@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ethers } from "ethers";
 import { useCrypto } from "@/hooks/security/useCrypto";
 import { useUIStore } from "@/store";
@@ -40,6 +40,7 @@ const ESTIMATED_GAS = 0.001;
 export default function Web3Wallet(): React.JSX.Element {
   const { encryptLocalDB, decryptLocalDB } = useCrypto();
   const { showToast } = useUIStore();
+  const walletInfoRef = useRef<HTMLDivElement>(null);
 
   const [showWalletInfoTooltip, setShowWalletInfoTooltip] =
     useState<boolean>(false);
@@ -78,6 +79,35 @@ export default function Web3Wallet(): React.JSX.Element {
       fetchWalletDetails(savedExternal, true);
     }
   }, []);
+
+  useEffect(() => {
+    const handlePointerOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (
+        showWalletInfoTooltip &&
+        walletInfoRef.current &&
+        !walletInfoRef.current.contains(target)
+      ) {
+        setShowWalletInfoTooltip(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowWalletInfoTooltip(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerOutside);
+    document.addEventListener("touchstart", handlePointerOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("touchstart", handlePointerOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showWalletInfoTooltip]);
 
   const fetchWalletDetails = async (
     address: string,
@@ -291,7 +321,10 @@ export default function Web3Wallet(): React.JSX.Element {
   return (
     <>
       <div>
-        <div className="flex items-center gap-1.5 mb-2 relative">
+        <div
+          className="flex items-center gap-1.5 mb-2 relative"
+          ref={walletInfoRef}
+        >
           <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
             Web3 Wallet (Transaction)
           </label>
@@ -303,7 +336,7 @@ export default function Web3Wallet(): React.JSX.Element {
             <InfoIcon className="w-3.5 h-3.5" />
           </button>
           {showWalletInfoTooltip && (
-            <div className="absolute left-0 top-6 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
+            <div className="absolute left-0 top-6 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
               Create or import an internal wallet, or link an external wallet
               (e.g., MetaMask) for P2P transfers.
             </div>
@@ -374,13 +407,18 @@ export default function Web3Wallet(): React.JSX.Element {
                       onClick={() => {
                         navigator.clipboard.writeText(txWalletAddress ?? "");
                         setCopiedWalletAddr(true);
-                        setTimeout(() => setCopiedWalletAddr(false), ms("1.8s"));
+                        setTimeout(
+                          () => setCopiedWalletAddr(false),
+                          ms("1.8s"),
+                        );
                       }}
                       className="shrink-0 text-zinc-600 hover:text-indigo-400 transition-colors p-0.5"
                       title="Copy address"
                     >
                       {copiedWalletAddr ? (
-                        <span className="text-[9px] font-bold text-emerald-400">Copied!</span>
+                        <span className="text-[9px] font-bold text-emerald-400">
+                          Copied!
+                        </span>
                       ) : (
                         <ClipboardDocumentIcon className="w-3.5 h-3.5" />
                       )}
@@ -416,65 +454,64 @@ export default function Web3Wallet(): React.JSX.Element {
                   External Withdrawal
                 </p>
                 <div className="flex flex-col gap-4">
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                          Destination Address
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="0x..."
-                            value={withdrawAddress}
-                            onChange={(e) => setWithdrawAddress(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 font-mono"
-                          />
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                        Destination Address
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="0x..."
+                          value={withdrawAddress}
+                          onChange={(e) => setWithdrawAddress(e.target.value)}
+                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 font-mono"
+                        />
                       </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                          Amount (ETH)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.0001"
-                            min="0"
-                            placeholder="0.0000"
-                            value={withdrawAmount}
-                            onChange={(e) => setWithdrawAmount(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 pr-14 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleMaxAmount}
-                            disabled={!walletDetails || parseFloat(walletDetails.balance) <= ESTIMATED_GAS}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
-                          >
-                            MAX
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
-                          Est. network fee: ~{ESTIMATED_GAS} ETH
-                        </p>
-                      </div>
-
                     </div>
 
-                    <button
-                      onClick={handleInitiateWithdrawal}
-                      disabled={!withdrawAddress || !withdrawAmount}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-                    >
-                      <SendIcon className="w-3.5 h-3.5" />
-                      Execute Transfer
-                    </button>
-
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                        Amount (ETH)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.0001"
+                          min="0"
+                          placeholder="0.0000"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl px-3 py-2.5 pr-14 text-xs text-zinc-200 outline-none transition-all placeholder:text-zinc-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleMaxAmount}
+                          disabled={
+                            !walletDetails ||
+                            parseFloat(walletDetails.balance) <= ESTIMATED_GAS
+                          }
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
+                        >
+                          MAX
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
+                        Est. network fee: ~{ESTIMATED_GAS} ETH
+                      </p>
+                    </div>
                   </div>
+
+                  <button
+                    onClick={handleInitiateWithdrawal}
+                    disabled={!withdrawAddress || !withdrawAmount}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <SendIcon className="w-3.5 h-3.5" />
+                    Execute Transfer
+                  </button>
                 </div>
+              </div>
             )}
           </div>
         )}
