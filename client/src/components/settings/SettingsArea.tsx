@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
+import { useUIStore } from "@/store";
 import ProfileSettings from "@/components/settings/ProfileSettings";
 import Web3Wallet from "@/components/settings/Web3Wallet";
 import DataSecurity from "@/components/settings/DataSecurity";
@@ -8,11 +9,11 @@ import BlockedUsers from "@/components/settings/BlockedUsers";
 import RelaySelector from "@/components/ui/RelaySelector";
 import {
   ShieldCheckIcon,
-  XIcon,
   LockSessionIcon,
   DatabaseIcon,
   ServerIcon,
   GlobeIcon,
+  MenuIcon,
 } from "@/components/icons";
 
 /**
@@ -45,6 +46,8 @@ const CardHeader = ({
  * @returns {React.JSX.Element} The Settings Area component.
  */
 export default function SettingsArea(): React.JSX.Element {
+  const { setIsMobileSidebarOpen } = useUIStore();
+
   const {
     isConnected,
     activeRelay,
@@ -55,17 +58,28 @@ export default function SettingsArea(): React.JSX.Element {
     logout,
   } = useChatContext();
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveAreaView("chat");
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [setActiveAreaView]);
+
   return (
     <div className="flex flex-col h-full bg-zinc-950 w-full overflow-hidden">
-      <div className="h-14 shrink-0 border-b border-zinc-800/60 flex items-center px-5 bg-zinc-950/95 backdrop-blur-sm justify-between z-10">
+      <div className="relative h-16 shrink-0 border-b border-zinc-800 flex items-center px-4 md:px-8 bg-zinc-950 w-full z-10 justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveAreaView("chat")}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-all"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-all md:hidden"
           >
-            <XIcon className="w-4 h-4" />
+            <MenuIcon className="w-4 h-4" />
           </button>
-          <span className="text-xs font-semibold text-zinc-400 tracking-wide">
+          <span className="text-xl font-bold text-zinc-400 tracking-wide">
             Settings
           </span>
         </div>
@@ -79,7 +93,7 @@ export default function SettingsArea(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto relative w-full custom-scrollbar">
         <div className="p-5 space-y-4">
           <ProfileSettings />
 
@@ -94,8 +108,8 @@ export default function SettingsArea(): React.JSX.Element {
               </div>
             </div>
 
-            <div className="lg:col-span-2 flex flex-col gap-4 relative z-50">
-              <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible relative z-20">
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible">
                 <CardHeader
                   label="Data Management"
                   icon={<ServerIcon className="w-3.5 h-3.5 text-indigo-400" />}
@@ -105,7 +119,7 @@ export default function SettingsArea(): React.JSX.Element {
                 </div>
               </div>
 
-              <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible relative z-10">
+              <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible">
                 <CardHeader
                   label="Network Node"
                   icon={<GlobeIcon className="w-3.5 h-3.5 text-indigo-400" />}
@@ -127,7 +141,7 @@ export default function SettingsArea(): React.JSX.Element {
                     {isConnected ? "Active" : "Offline"}
                   </span>
                 </div>
-                <div className="px-4 pb-4 overflow-visible relative z-[50]">
+                <div className="px-4 pb-4 overflow-visible">
                   <NetworkNode
                     nodeSelector={
                       <RelaySelector

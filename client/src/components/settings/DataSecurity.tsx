@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
 import GlassDropdown from "@/components/ui/GlassDropdown";
 import { SeedPhraseModalInput } from "@/components/ui";
+import { updateLastExportTime } from "@/utils/exportUtils";
 import {
   ImportIcon,
   ExportIcon,
@@ -25,8 +26,8 @@ export default function DataSecurity(): React.JSX.Element {
     handleExportChat,
     handleImportChat,
     handleWipeData,
+    handleCancelSeedModal,
     seedModal,
-    closeSeedModal,
     seedInput,
     setSeedInput,
     modalError,
@@ -61,108 +62,118 @@ export default function DataSecurity(): React.JSX.Element {
 
   return (
     <>
-      <div>
-        <div className="flex items-center gap-1.5 mb-2 relative">
-          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-            Message Retention
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowSecurityInfo(!showSecurityInfo)}
-            className={`transition-colors focus:outline-none ${showSecurityInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
-          >
-            <InfoIcon className="w-3.5 h-3.5" />
-          </button>
-          {showSecurityInfo && (
-            <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
-              <strong>Auto-Delete</strong> only removes messages from your local
-              device.
+      <div className="flex flex-col h-full w-full shrink-0">
+        <div className="space-y-4 w-full">
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 relative">
+              <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                Message Retention
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowSecurityInfo(!showSecurityInfo)}
+                className={`transition-colors focus:outline-none ${showSecurityInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                <InfoIcon className="w-3.5 h-3.5" />
+              </button>
+              {showSecurityInfo && (
+                <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
+                  <strong>Auto-Delete</strong> only removes messages from your
+                  local device.
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <GlassDropdown
-          value={autoDeleteMode}
-          options={deleteOptions}
-          onChange={(val) => {
-            handleModeChange({ target: { value: val } } as any);
-            const selectedOpt = deleteOptions.find((opt) => opt.value === val);
-            showToast(`Policy updated: ${selectedOpt?.label}`, "success");
-          }}
-        />
-      </div>
+            <GlassDropdown
+              value={autoDeleteMode}
+              options={deleteOptions}
+              onChange={(val) => {
+                handleModeChange({ target: { value: val } } as any);
+                const selectedOpt = deleteOptions.find(
+                  (opt) => opt.value === val,
+                );
+                showToast(`Policy updated: ${selectedOpt?.label}`, "success");
+              }}
+            />
+          </div>
 
-      <div>
-        <div className="flex items-center gap-1.5 mb-2 relative">
-          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-            Data Backup
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowBackupInfo(!showBackupInfo)}
-            className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
-          >
-            <InfoIcon className="w-3.5 h-3.5" />
-          </button>
-          {showBackupInfo && (
-            <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
-              Export chats and identity as an encrypted file, or import to
-              restore data.
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 relative">
+              <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                Data Backup
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowBackupInfo(!showBackupInfo)}
+                className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                <InfoIcon className="w-3.5 h-3.5" />
+              </button>
+              {showBackupInfo && (
+                <div className="absolute left-0 bottom-6 mb-2 z-50 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
+                  Export chats and identity as an encrypted file, or import to
+                  restore data.
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (isIncognito)
-                showToast("Disable Incognito Mode to import data.", "error");
-              else fileInputRef.current?.click();
-            }}
-            className={`flex-1 text-xs font-medium py-2.5 rounded-xl border transition-colors flex items-center justify-center gap-1.5 shadow-sm ${
-              isIncognito
-                ? "bg-zinc-950 border-zinc-800/50 text-zinc-600 cursor-not-allowed opacity-60"
-                : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800"
-            }`}
-          >
-            <ImportIcon className="w-3.5 h-3.5" /> Import
-          </button>
-          <button
-            onClick={handleExportChat}
-            className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <ExportIcon className="w-3.5 h-3.5" /> Export
-          </button>
-        </div>
-        <input
-          type="file"
-          accept=".securep2p"
-          ref={fileInputRef}
-          onChange={handleImportChat}
-          className="hidden"
-        />
-        <div className="mt-3">
-          <GlassDropdown
-            value={autoBackupMode}
-            options={backupOptions}
-            onChange={(val) => {
-              setAutoBackupMode(val);
-              localStorage.setItem("securep2p_auto_backup_mode", val);
-              const selectedOpt = backupOptions.find(
-                (opt) => opt.value === val,
-              );
-              showToast(`Schedule set: ${selectedOpt?.label}`, "success");
-            }}
-          />
-        </div>
-      </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isIncognito)
+                    showToast(
+                      "Disable Incognito Mode to import data.",
+                      "error",
+                    );
+                  else fileInputRef.current?.click();
+                }}
+                className={`flex-1 text-xs font-medium py-2.5 rounded-xl border transition-colors flex items-center justify-center gap-1.5 shadow-sm ${
+                  isIncognito
+                    ? "bg-zinc-950 border-zinc-800/50 text-zinc-600 cursor-not-allowed opacity-60"
+                    : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800"
+                }`}
+              >
+                <ImportIcon className="w-3.5 h-3.5" /> Import
+              </button>
+              <button
+                onClick={handleExportChat}
+                className="flex-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl border border-zinc-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <ExportIcon className="w-3.5 h-3.5" /> Export
+              </button>
+            </div>
+            <input
+              type="file"
+              accept=".securep2p"
+              ref={fileInputRef}
+              onChange={handleImportChat}
+              className="hidden"
+            />
+            <div className="mt-3">
+              <GlassDropdown
+                value={autoBackupMode}
+                options={backupOptions}
+                onChange={(val) => {
+                  setAutoBackupMode(val);
+                  localStorage.setItem("securep2p_auto_backup_mode", val);
+                  updateLastExportTime();
+                  const selectedOpt = backupOptions.find(
+                    (opt) => opt.value === val,
+                  );
+                  showToast(`Schedule set: ${selectedOpt?.label}`, "success");
+                }}
+              />
+            </div>
+          </div>
 
-      <div className="pt-2 border-t border-zinc-800/50">
-        <button
-          onClick={handleWipeData}
-          className="w-full text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
-        >
-          <TrashIcon className="w-3.5 h-3.5" /> Wipe Local Identity
-        </button>
+          <div className="pt-2 border-t border-zinc-800/50">
+            <button
+              onClick={handleWipeData}
+              className="w-full text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 py-2.5 rounded-xl border border-red-500/10 transition-colors flex items-center justify-center gap-2"
+            >
+              <TrashIcon className="w-3.5 h-3.5" /> Wipe Local Identity
+            </button>
+          </div>
+        </div>
       </div>
 
       {seedModal.isOpen &&
@@ -201,7 +212,7 @@ export default function DataSecurity(): React.JSX.Element {
               )}
               <div className="flex gap-3 mt-4">
                 <button
-                  onClick={closeSeedModal}
+                  onClick={handleCancelSeedModal}
                   className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:bg-zinc-800 transition-colors"
                 >
                   Cancel

@@ -1,9 +1,11 @@
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useCallback, useEffect } from "react";
 import { ethers } from "ethers";
+import ms from "ms";
 import { db } from "@/utils/db";
 import { formatTime } from "@/utils/format";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useUIStore, useSessionStore, useWalletStore } from "@/store";
+import { getLastExportTime, updateLastExportTime } from "@/utils/exportUtils";
 
 /**
  * Interface defining the methods and states provided by the useSecurityHandlers hook.
@@ -14,6 +16,7 @@ export interface UseSecurityHandlersReturn {
   handleExportChat: () => Promise<void>;
   handleImportChat: (e: ChangeEvent<HTMLInputElement>) => void;
   handleWipeData: () => void;
+  handleCancelSeedModal: () => void;
   seedModal: {
     isOpen: boolean;
     type: "import" | "export" | "wipe" | null;
@@ -41,6 +44,98 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
 
   const [seedInput, setSeedInput] = useState<string>("");
   const [modalError, setModalError] = useState<string>("");
+  const [verifiedExportSeed, setVerifiedExportSeed] = useState<string>("");
+
+  /**
+   * Resolves the scheduler interval for automatic backup mode.
+   *
+   * @param {string} mode - Backup mode value from localStorage.
+   * @returns {number} Interval duration in milliseconds.
+   */
+  const getAutoBackupIntervalMs = (mode: string): number => {
+    if (mode === "1") return ms("24h");
+    if (mode === "3") return ms("3d");
+    if (mode === "7") return ms("7d");
+    if (mode === "30") return ms("30d");
+    return 0;
+  };
+
+  useEffect(() => {
+    const checkDueExportOnBoot = async () => {
+      if (seedModal.isOpen) return;
+      const autoBackupMode =
+        localStorage.getItem("securep2p_auto_backup_mode") || "never";
+      const intervalMs = getAutoBackupIntervalMs(autoBackupMode);
+      if (intervalMs <= 0) return;
+
+      const messageCount = await db.messages.count();
+      if (messageCount === 0) return;
+
+      const elapsed = Date.now() - getLastExportTime();
+      if (elapsed >= intervalMs) {
+        setSeedModal({ isOpen: true, type: "export" });
+      }
+    };
+
+    checkDueExportOnBoot();
+  }, [seedModal.isOpen, setSeedModal]);
+
+  /**
+   * Builds and downloads an encrypted backup file using the verified seed.
+   *
+   * @param {string} seed - Verified 12-word seed phrase.
+   * @returns {Promise<boolean>} True when export succeeds.
+   */
+  const executeExportWithSeed = useCallback(
+    async (seed: string): Promise<boolean> => {
+      try {
+        const allMessages = await db.messages.toArray();
+        const dataStr = JSON.stringify(allMessages);
+        const encodedData = btoa(
+          unescape(encodeURIComponent(dataStr + "|||SECURE_P2P|||" + seed)),
+        );
+        const backupPayload = {
+          version: "3.0",
+          encrypted: true,
+          data: encodedData,
+        };
+
+        const blob = new Blob([JSON.stringify(backupPayload)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `securep2p_backup_${formatTime(Date.now()).replace(/:/g, "-")}.securep2p`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const autoBackupMode =
+      localStorage.getItem("securep2p_auto_backup_mode") || "never";
+    const intervalMs = getAutoBackupIntervalMs(autoBackupMode);
+    if (!verifiedExportSeed || intervalMs <= 0) return;
+
+    const runAutoExportIfDue = async () => {
+      const elapsed = Date.now() - getLastExportTime();
+      if (elapsed < intervalMs) return;
+      const exported = await executeExportWithSeed(verifiedExportSeed);
+      if (!exported) return;
+      updateLastExportTime();
+      showToast("Auto-backup completed.", "success");
+    };
+
+    runAutoExportIfDue();
+    const timerId = window.setInterval(runAutoExportIfDue, ms("1m"));
+    return () => window.clearInterval(timerId);
+  }, [executeExportWithSeed, showToast, verifiedExportSeed]);
 
   /**
    * Updates the global auto-delete (incognito) mode preference.
@@ -98,6 +193,20 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
   };
 
   /**
+   * Closes the seed modal and resets export timing when export is declined.
+   *
+   * @returns {void}
+   */
+  const handleCancelSeedModal = (): void => {
+    if (seedModal.type === "export") {
+      updateLastExportTime();
+    }
+    closeSeedModal();
+    setSeedInput("");
+    setModalError("");
+  };
+
+  /**
    * Verifies the provided seed phrase against the active wallet address.
    * If verified, executes the requested action (Wipe, Export, or Import).
    * @returns {Promise<void>}
@@ -120,6 +229,7 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
           "Access Denied! Seed phrase does not match the active account.",
         );
       }
+      setVerifiedExportSeed(seed);
     } catch {
       return setModalError("Invalid seed phrase format or typo detected!");
     }
@@ -156,27 +266,12 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
         console.log(
           "[Security] Authorized Export initiated. Compiling chat history...",
         );
-        const allMessages = await db.messages.toArray();
-        const dataStr = JSON.stringify(allMessages);
-
-        const encodedData = btoa(
-          unescape(encodeURIComponent(dataStr + "|||SECURE_P2P|||" + seed)),
-        );
-        const backupPayload = {
-          version: "3.0",
-          encrypted: true,
-          data: encodedData,
-        };
-
-        const blob = new Blob([JSON.stringify(backupPayload)], {
-          type: "application/json",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `securep2p_backup_${formatTime(Date.now()).replace(/:/g, "-")}.securep2p`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const exported = await executeExportWithSeed(seed);
+        if (!exported) {
+          setModalError("Failed to export chat history.");
+          return;
+        }
+        updateLastExportTime();
 
         closeSeedModal();
         setSeedInput("");
@@ -232,6 +327,7 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
     handleExportChat,
     handleImportChat,
     handleWipeData,
+    handleCancelSeedModal,
     seedModal,
     closeSeedModal,
     seedInput,

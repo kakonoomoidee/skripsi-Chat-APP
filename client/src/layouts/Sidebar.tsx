@@ -76,6 +76,7 @@ export default function Sidebar(): React.JSX.Element {
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
 
   const headerMenuRef = useRef<HTMLDivElement>(null);
+  const sessionMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -89,6 +90,32 @@ export default function Sidebar(): React.JSX.Element {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleMenuOutsideClick = (e: MouseEvent) => {
+      if (!openMenuFor) return;
+      if (
+        sessionMenuRef.current &&
+        !sessionMenuRef.current.contains(e.target as Node)
+      ) {
+        setOpenMenuFor(null);
+      }
+    };
+
+    const handleMenuEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenMenuFor(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleMenuOutsideClick);
+    document.addEventListener("keydown", handleMenuEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleMenuOutsideClick);
+      document.removeEventListener("keydown", handleMenuEscape);
+    };
+  }, [openMenuFor]);
 
   const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
@@ -294,7 +321,7 @@ export default function Sidebar(): React.JSX.Element {
                 e.stopPropagation();
                 setOpenMenuFor(menuOpen ? null : addr);
               }}
-              className="p-1 rounded-full text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+              className="p-1 rounded-full text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
               title="More options"
             >
               <MoreVerticalIcon className="w-3.5 h-3.5" />
@@ -302,7 +329,8 @@ export default function Sidebar(): React.JSX.Element {
 
             {menuOpen && (
               <div
-                className="absolute right-0 top-full mt-1 w-36 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1"
+                ref={sessionMenuRef}
+                className="absolute right-0 top-full mt-1 w-36 bg-zinc-900 text-zinc-300 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1"
                 onMouseLeave={() => setOpenMenuFor(null)}
               >
                 <button
@@ -323,7 +351,7 @@ export default function Sidebar(): React.JSX.Element {
                     );
                     setOpenMenuFor(null);
                   }}
-                  className="w-full text-left text-xs text-red-300 px-4 py-2.5 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                  className="w-full text-left text-xs text-red-300 px-4 py-2.5 hover:bg-zinc-800 transition-colors flex items-center gap-2"
                 >
                   <BanIcon className="w-3.5 h-3.5" />
                   <span>Disconnect</span>
@@ -335,7 +363,7 @@ export default function Sidebar(): React.JSX.Element {
                       await unarchiveContact(addr);
                       setOpenMenuFor(null);
                     }}
-                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors"
+                    className="w-full text-left text-xs text-zinc-300 px-4 py-2.5 hover:bg-zinc-800 transition-colors"
                   >
                     Unarchive
                   </button>
@@ -346,7 +374,7 @@ export default function Sidebar(): React.JSX.Element {
                       await archiveContact(addr);
                       setOpenMenuFor(null);
                     }}
-                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors flex items-center gap-2 group"
+                    className="w-full text-left text-xs text-zinc-300 px-4 py-2.5 hover:bg-zinc-800 transition-colors flex items-center gap-2 group"
                   >
                     <ArchiveIcon className="w-3.5 h-3.5 text-zinc-400 transition-colors group-hover:text-zinc-200" />
                     <span>Archive</span>
