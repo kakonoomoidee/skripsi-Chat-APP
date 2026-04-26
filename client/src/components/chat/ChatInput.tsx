@@ -365,7 +365,7 @@ export const ChatInput = ({
           onSend={(base64) => handleSendCameraPhoto(base64)}
         />
       )}
-      <div className="shrink-0 p-4 md:p-6 bg-zinc-950 w-full z-20 pb-safe relative">
+      <div className="shrink-0 p-2 pb-[calc(env(safe-area-inset-bottom)+1rem)] md:p-6 md:pb-6 bg-zinc-950 w-full z-20 relative">
         <div className="max-w-5xl mx-auto flex flex-col gap-2 relative">
           {replyingTo && (
             <div className="bg-zinc-900 border-l-4 border-indigo-500 rounded-xl p-3 flex justify-between items-start animate-in slide-in-from-bottom-2 fade-in shadow-md">
@@ -534,7 +534,9 @@ export const ChatInput = ({
               )}
             </div>
 
-            {!messageInput.trim() && connectionState === "connected" && !isRecording ? (
+            {!messageInput.trim() &&
+            connectionState === "connected" &&
+            !isRecording ? (
               <button
                 type="button"
                 onClick={startRecording}
