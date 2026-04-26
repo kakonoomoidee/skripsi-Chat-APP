@@ -54,3 +54,4 @@ export { DatabaseIcon } from "./DatabaseIcon";
 export { ServerIcon } from "./ServerIcon";
 export { GlobeIcon } from "./GlobeIcon";
 export { BanIcon } from "./BanIcon";
+export { ArchiveIcon } from "./ArchiveIcon";

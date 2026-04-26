@@ -3,6 +3,33 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/utils/db";
 import ms from "ms";
 
+const HIDDEN_PROTOCOL_TYPES = new Set([
+  "PROFILE_SYNC",
+  "WALLET_REQUEST",
+  "WALLET_RESPONSE",
+]);
+
+/**
+ * Determines whether a decrypted message is an internal protocol payload that
+ * must not be rendered in user-facing UI.
+ *
+ * @param {string} text - Decrypted message content.
+ * @returns {boolean} True when the message should be hidden from UI rendering.
+ */
+const shouldHideProtocolMessage = (text: string): boolean => {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  if (!normalized.startsWith("{")) return false;
+  try {
+    const parsed = JSON.parse(normalized) as { type?: unknown };
+    if (!parsed || typeof parsed !== "object") return false;
+    if (typeof parsed.type !== "string") return false;
+    return HIDDEN_PROTOCOL_TYPES.has(parsed.type);
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Interface defining the dependencies for the useMessageData hook.
  */
@@ -46,10 +73,12 @@ export const useMessageData = ({
 
   const messages = useMemo(() => {
     if (!rawMessages) return [];
-    return rawMessages.map((msg) => ({
-      ...msg,
-      text: decryptLocalDB(msg.text),
-    }));
+    return rawMessages
+      .map((msg) => ({
+        ...msg,
+        text: decryptLocalDB(msg.text),
+      }))
+      .filter((msg) => !shouldHideProtocolMessage(msg.text));
   }, [rawMessages, decryptLocalDB]);
 
   const globalUnreadMessages = useLiveQuery(
@@ -83,9 +112,9 @@ export const useMessageData = ({
       if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
       const now = Date.now();
       let thresholdTime = now;
-      if (autoDeleteMode === "1")       thresholdTime = now - ms("1d");
-      else if (autoDeleteMode === "3")  thresholdTime = now - ms("3d");
-      else if (autoDeleteMode === "7")  thresholdTime = now - ms("7d");
+      if (autoDeleteMode === "1") thresholdTime = now - ms("1d");
+      else if (autoDeleteMode === "3") thresholdTime = now - ms("3d");
+      else if (autoDeleteMode === "7") thresholdTime = now - ms("7d");
       else if (autoDeleteMode === "30") thresholdTime = now - ms("30d");
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();

@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+  useCallback,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useWallet } from "@/hooks/security/useWallet";
@@ -44,6 +52,7 @@ export interface ChatContextValue {
   handleConnectPeer: () => void;
   handleAcceptRequest: (req: any) => void;
   handleRejectRequest: (addr: string) => void;
+  removeActiveSession: (addr: string) => void;
   connectedPeers: string[];
   isWebRTCConnected: boolean;
   connectionStates: Record<string, ConnectionState>;
@@ -91,10 +100,14 @@ const ChatContext = createContext<ChatContextValue | undefined>(undefined);
  */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
-  const { token, logout, isAuthenticated } = useAuth();
+  const { token, logout: authLogout, isAuthenticated } = useAuth();
   const { address, resetWallet } = useWallet();
-  const { activeRelay, changeRelay, defaultRelays, addCustomRelay } = useRelay();
-  const { socket, isConnected, isSessionRevoked } = useSocket(token, activeRelay);
+  const { activeRelay, changeRelay, defaultRelays, addCustomRelay } =
+    useRelay();
+  const { socket, isConnected, isSessionRevoked } = useSocket(
+    token,
+    activeRelay,
+  );
 
   const {
     generateHandshakeKeys,
@@ -110,7 +123,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { autoDeleteMode } = useSessionStore();
   const { setPeerWalletAddress, peerWalletAddress } = useWalletStore();
-  
+
   const chatStore = useChatStore();
 
   const [isIncomingCall, setIsIncomingCall] = useState(false);
@@ -158,7 +171,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     relayUrl: activeRelay,
     removeSecret,
     forceDisconnectPeer: handleForceDisconnect,
-    onHandshakeComplete: (addr: string) => connectionManagerRefs.current.handleHandshakeComplete?.(addr),
+    onHandshakeComplete: (addr: string) =>
+      connectionManagerRefs.current.handleHandshakeComplete?.(addr),
   });
 
   const {
@@ -195,8 +209,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setIsMuted(false);
       showToast("Call ended.", "error");
     },
-    onPeerDisconnected: (addr: string) => connectionManagerRefs.current.handlePeerDisconnected?.(addr),
-    onPongReceived: (addr: string) => connectionManagerRefs.current.handlePongReceived?.(addr),
+    onPeerDisconnected: (addr: string) =>
+      connectionManagerRefs.current.handlePeerDisconnected?.(addr),
+    onPongReceived: (addr: string) =>
+      connectionManagerRefs.current.handlePongReceived?.(addr),
   });
 
   useEffect(() => {
@@ -279,6 +295,59 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setIsMobileSidebarOpen(false);
   };
 
+  /**
+   * Terminates all active peer resources, resets chat session state, and then
+   * completes authentication logout and navigation to the login route.
+   *
+   * @returns {void}
+   */
+  const logout = useCallback((): void => {
+    const managerRefs = connectionManagerRefs.current ?? {};
+    const peerConnectionsRef = managerRefs.peerConnections;
+    const peerConnectionKeys =
+      peerConnectionsRef && peerConnectionsRef.current
+        ? Object.keys(peerConnectionsRef.current)
+        : [];
+    const state = useChatStore.getState();
+    const fallbackPeers = Object.keys(state.connectionStates);
+    const allPeers = Array.from(
+      new Set([...peerConnectionKeys, ...fallbackPeers, ...connectedPeers]),
+    );
+
+    allPeers.forEach((addr) => {
+      forceDisconnectPeer(addr);
+    });
+
+    const webrtcInitiatedRef = managerRefs.webrtcInitiated;
+    if (webrtcInitiatedRef && webrtcInitiatedRef.current) {
+      webrtcInitiatedRef.current = {};
+    }
+
+    const pingTimeoutRef = managerRefs.pingTimeoutRef;
+    if (pingTimeoutRef && pingTimeoutRef.current) {
+      Object.values(pingTimeoutRef.current).forEach((timeoutId: any) =>
+        clearTimeout(timeoutId),
+      );
+      pingTimeoutRef.current = {};
+    }
+
+    const reconnectIntervalRef = managerRefs.reconnectIntervalRef;
+    if (reconnectIntervalRef && reconnectIntervalRef.current) {
+      Object.values(reconnectIntervalRef.current).forEach((intervalId: any) =>
+        clearInterval(intervalId),
+      );
+      reconnectIntervalRef.current = {};
+    }
+
+    state.setActiveSessions([]);
+    state.setActiveChat(null);
+    state.setActiveUsername("");
+    state.setConnectionStates({});
+
+    authLogout();
+    navigate("/login");
+  }, [authLogout, connectedPeers, forceDisconnectPeer, navigate]);
+
   const value: ChatContextValue = {
     isAuthenticated,
     logout,
@@ -301,6 +370,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     handleConnectPeer,
     handleAcceptRequest: handleAcceptRequestWrapped,
     handleRejectRequest,
+    removeActiveSession,
     connectedPeers,
     isWebRTCConnected,
     connectionStates: chatStore.connectionStates,

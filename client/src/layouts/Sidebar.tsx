@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { shortenAddress } from "@/utils/format";
 import { useChatContext } from "@/context/ChatContext";
 import { db } from "@/utils/db";
 import {
@@ -8,6 +7,8 @@ import {
   SearchIcon,
   WarningIcon,
   GhostIcon,
+  BanIcon,
+  ArchiveIcon,
   ArrowRightIcon,
   ArrowDownIcon,
   MoreVerticalIcon,
@@ -15,6 +16,9 @@ import {
 } from "@/components/icons";
 import { GlassBadge } from "../components/ui/GlassBadge";
 import { PeerAvatar } from "../components/ui/PeerAvatar";
+import { useUIStore } from "@/store";
+import { useChatStore } from "@/store/useChatStore";
+import { useCrypto } from "@/hooks/security/useCrypto";
 
 /**
  * Interface for contact history stored in localStorage.
@@ -40,6 +44,7 @@ interface ContactHistory {
  */
 export default function Sidebar(): React.JSX.Element {
   const {
+    address,
     myUsername,
     activeSessions,
     activeChat,
@@ -50,12 +55,21 @@ export default function Sidebar(): React.JSX.Element {
     isSearching,
     handleConnectPeer,
     logout,
+    closeChat,
     searchError,
     unreadCount,
     archiveContact,
     unarchiveContact,
+    forceDisconnectPeer,
+    removeActiveSession,
     setActiveAreaView,
   } = useChatContext();
+
+  const setConnectionStates = useChatStore(
+    (state) => state.setConnectionStates,
+  );
+  const showToast = useUIStore((state) => state.showToast);
+  const { decryptLocalDB } = useCrypto();
 
   const [headerMenuOpen, setHeaderMenuOpen] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
@@ -96,13 +110,19 @@ export default function Sidebar(): React.JSX.Element {
 
       activeSessions.forEach((session) => {
         if (!updated.find((c) => c.username === session.username)) {
-          updated.push({ username: session.username, address: session.address });
+          updated.push({
+            username: session.username,
+            address: session.address,
+          });
           isChanged = true;
         }
       });
 
       if (isChanged) {
-        localStorage.setItem("securep2p_recent_contacts", JSON.stringify(updated));
+        localStorage.setItem(
+          "securep2p_recent_contacts",
+          JSON.stringify(updated),
+        );
         setRecentContacts(updated);
       }
     }
@@ -114,6 +134,64 @@ export default function Sidebar(): React.JSX.Element {
   };
 
   const allContacts = useLiveQuery(() => db.contacts.toArray(), [], []);
+
+  const sessionLastMessagePreview = useLiveQuery(
+    async () => {
+      const ownerAddress = address?.toLowerCase();
+      if (!ownerAddress || activeSessions.length === 0)
+        return {} as Record<string, string>;
+
+      const activeChatIds = new Set(
+        activeSessions.map((session) => session.address.toLowerCase()),
+      );
+
+      const allSessionMessages = await db.messages
+        .filter(
+          (message) =>
+            message.ownerAddress === ownerAddress &&
+            activeChatIds.has(message.chatId),
+        )
+        .toArray();
+
+      const sortedRecentFirst = allSessionMessages.sort(
+        (a, b) => b.timestamp - a.timestamp,
+      );
+
+      const previews: Record<string, string> = {};
+
+      sortedRecentFirst.forEach((message) => {
+        if (previews[message.chatId]) return;
+        const decryptedText = decryptLocalDB(message.text);
+        let previewText = decryptedText;
+        try {
+          const parsed = JSON.parse(decryptedText) as {
+            type?: unknown;
+            text?: unknown;
+          };
+          if (parsed && typeof parsed === "object" && "type" in parsed) {
+            previewText = "Encrypted message...";
+          } else if (typeof parsed?.text === "string") {
+            previewText = parsed.text;
+          }
+        } catch {
+          previewText = decryptedText;
+        }
+        const normalizedText = previewText.trim();
+        previews[message.chatId] = normalizedText || "Start chatting...";
+      });
+
+      activeSessions.forEach((session) => {
+        const chatId = session.address.toLowerCase();
+        if (!previews[chatId]) {
+          previews[chatId] = "Start chatting...";
+        }
+      });
+
+      return previews;
+    },
+    [address, activeSessions, decryptLocalDB],
+    {} as Record<string, string>,
+  );
 
   const archivedAddresses = new Set(
     (allContacts ?? [])
@@ -171,6 +249,8 @@ export default function Sidebar(): React.JSX.Element {
     const isActive = activeChat?.toLowerCase() === addr;
     const menuOpen = openMenuFor === addr;
     const status = connectionStates[addr] || "idle";
+    const lastMessagePreview =
+      sessionLastMessagePreview?.[addr] ?? "Start chatting...";
 
     return (
       <div
@@ -195,14 +275,16 @@ export default function Sidebar(): React.JSX.Element {
             <p className="font-semibold text-sm text-zinc-100 capitalize leading-tight truncate">
               {session.username}
             </p>
-            <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
-              {shortenAddress(session.address)}
+            <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+              {lastMessagePreview}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${getStatusDotClass(status)}`} />
+          <div
+            className={`w-2 h-2 rounded-full ${getStatusDotClass(status)}`}
+          />
           <GlassBadge count={unreadCount[addr] ?? 0} variant="chat" />
 
           <div className="relative">
@@ -223,6 +305,29 @@ export default function Sidebar(): React.JSX.Element {
                 className="absolute right-0 top-full mt-1 w-36 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1"
                 onMouseLeave={() => setOpenMenuFor(null)}
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    forceDisconnectPeer(addr);
+                    removeActiveSession(addr);
+                    setConnectionStates((prev) => ({
+                      ...prev,
+                      [addr]: "idle",
+                    }));
+                    if (activeChat?.toLowerCase() === addr) {
+                      closeChat();
+                    }
+                    showToast(
+                      "Session terminated and moved to history.",
+                      "info",
+                    );
+                    setOpenMenuFor(null);
+                  }}
+                  className="w-full text-left text-xs text-red-300 px-4 py-2.5 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                >
+                  <BanIcon className="w-3.5 h-3.5" />
+                  <span>Disconnect</span>
+                </button>
                 {isArchived ? (
                   <button
                     onClick={async (e) => {
@@ -241,9 +346,10 @@ export default function Sidebar(): React.JSX.Element {
                       await archiveContact(addr);
                       setOpenMenuFor(null);
                     }}
-                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors"
+                    className="w-full text-left text-xs text-zinc-200 px-4 py-2.5 hover:bg-zinc-700 transition-colors flex items-center gap-2 group"
                   >
-                    Archive
+                    <ArchiveIcon className="w-3.5 h-3.5 text-zinc-400 transition-colors group-hover:text-zinc-200" />
+                    <span>Archive</span>
                   </button>
                 )}
               </div>
@@ -324,7 +430,9 @@ export default function Sidebar(): React.JSX.Element {
             <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-4 text-center shrink-0">
               <p className="text-xs text-zinc-400 mb-3">
                 No active session with{" "}
-                <span className="text-zinc-200 font-semibold">{targetUsername}</span>
+                <span className="text-zinc-200 font-semibold">
+                  {targetUsername}
+                </span>
               </p>
 
               {isSelfChat ? (
@@ -366,53 +474,56 @@ export default function Sidebar(): React.JSX.Element {
 
             {recentContacts.filter(
               (rc) => !activeSessions.some((as) => as.username === rc.username),
-            ).length > 0 && !targetUsername && (
-              <div className="pt-4">
-                <div className="px-2 flex justify-between items-center mb-2">
-                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                    Recent History
-                  </label>
-                  <button
-                    onClick={clearHistory}
-                    className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {recentContacts
-                    .filter(
-                      (rc) =>
-                        !activeSessions.some((as) => as.username === rc.username),
-                    )
-                    .map((contact) => (
-                      <div
-                        key={contact.username}
-                        onClick={() => setTargetUsername(contact.username)}
-                        className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
-                          <PeerAvatar
-                            peerAddress={contact.address}
-                            displayName={contact.username}
-                            sizeClassName="w-8 h-8"
-                            className="border border-zinc-700/50"
-                          />
-                          <div>
-                            <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
-                              {contact.username}
-                            </p>
-                            <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
-                              Disconnected
-                            </p>
+            ).length > 0 &&
+              !targetUsername && (
+                <div className="pt-4">
+                  <div className="px-2 flex justify-between items-center mb-2">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                      Recent History
+                    </label>
+                    <button
+                      onClick={clearHistory}
+                      className="text-[9px] font-semibold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {recentContacts
+                      .filter(
+                        (rc) =>
+                          !activeSessions.some(
+                            (as) => as.username === rc.username,
+                          ),
+                      )
+                      .map((contact) => (
+                        <div
+                          key={contact.username}
+                          onClick={() => setTargetUsername(contact.username)}
+                          className="p-2.5 rounded-xl cursor-pointer hover:bg-zinc-900 border border-transparent transition-all flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
+                            <PeerAvatar
+                              peerAddress={contact.address}
+                              displayName={contact.username}
+                              sizeClassName="w-8 h-8"
+                              className="border border-zinc-700/50"
+                            />
+                            <div>
+                              <p className="font-medium text-sm text-zinc-300 capitalize leading-tight">
+                                {contact.username}
+                              </p>
+                              <p className="font-mono text-[9px] text-zinc-600 mt-0.5">
+                                Disconnected
+                              </p>
+                            </div>
                           </div>
+                          <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
                         </div>
-                        <ArrowRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {activeSessions.length === 0 &&
               recentContacts.length === 0 &&
