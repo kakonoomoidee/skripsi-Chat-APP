@@ -2,6 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useUIStore } from "@/store";
 import { SendIcon, XIcon, RefreshIcon, CameraIcon } from "@/components/icons";
+import {
+  capturePhotoFromVideo,
+  detectMultipleCameras,
+  requestCameraStream,
+  stopMediaStream,
+  type CameraFacingMode,
+} from "@/utils/camera";
 
 /**
  * Fullscreen camera modal component with capture and preview functionality.
@@ -23,7 +30,7 @@ export const CameraModal = ({
   const streamRef = useRef<MediaStream | null>(null);
 
   const [photo, setPhoto] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
   const { showToast } = useUIStore();
@@ -31,19 +38,15 @@ export const CameraModal = ({
   /**
    * Initializes the device camera stream with the specified facing mode.
    *
-   * @param {"user" | "environment"} mode - Camera facing mode.
+   * @param {CameraFacingMode} mode - Camera facing mode.
    * @returns {Promise<void>}
    */
   const initCamera = useCallback(
-    async (mode: "user" | "environment"): Promise<void> => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+    async (mode: CameraFacingMode): Promise<void> => {
+      stopMediaStream(streamRef.current);
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: mode },
-        });
+        const stream = await requestCameraStream(mode);
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -57,21 +60,12 @@ export const CameraModal = ({
   );
 
   useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      const videoInputs = devices.filter(
-        (device) => device.kind === "videoinput",
-      );
-      if (videoInputs.length > 1) {
-        setHasMultipleCameras(true);
-      }
-    });
+    detectMultipleCameras().then(setHasMultipleCameras);
 
     initCamera(facingMode);
 
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
+      stopMediaStream(streamRef.current);
     };
   }, [facingMode, initCamera]);
 
@@ -90,23 +84,15 @@ export const CameraModal = ({
    * @returns {void}
    */
   const capture = (): void => {
-    if (videoRef.current && canvasRef.current) {
-      const ctx = canvasRef.current.getContext("2d");
-      const video = videoRef.current;
+    if (!videoRef.current || !canvasRef.current) return;
 
-      canvasRef.current.width = video.videoWidth;
-      canvasRef.current.height = video.videoHeight;
+    const capturedPhoto = capturePhotoFromVideo(
+      videoRef.current,
+      canvasRef.current,
+      facingMode,
+    );
 
-      if (ctx) {
-        if (facingMode === "user") {
-          ctx.translate(canvasRef.current.width, 0);
-          ctx.scale(-1, 1);
-        }
-
-        ctx.drawImage(video, 0, 0);
-        setPhoto(canvasRef.current.toDataURL("image/jpeg", 0.9));
-      }
-    }
+    if (capturedPhoto) setPhoto(capturedPhoto);
   };
 
   return createPortal(

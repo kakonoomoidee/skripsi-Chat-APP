@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import type React from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { PhoneIcon, MicIcon, MicOffIcon } from "@/components/icons";
 import { formatDuration } from "@/utils/format";
+import { useCallDuration } from "@/hooks/chat/useCallDuration";
+import { getCallDisplayInitial } from "@/utils/call";
 
 /**
  * Renders a full-screen overlay for active voice calls.
@@ -12,18 +14,7 @@ import { formatDuration } from "@/utils/format";
 export const InCallModal = (): React.JSX.Element | null => {
   const { isInCall, activeUsername, endCall, toggleMute, isMuted } =
     useChatContext();
-  const [duration, setDuration] = useState<number>(0);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isInCall) {
-      timer = setInterval(() => setDuration((prev) => prev + 1), 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-      setDuration(0);
-    };
-  }, [isInCall]);
+  const duration = useCallDuration(isInCall);
 
   if (!isInCall) return null;
 
@@ -32,7 +23,7 @@ export const InCallModal = (): React.JSX.Element | null => {
       <div className="flex flex-col items-center mb-16">
         <div className="w-32 h-32 rounded-full bg-indigo-600/20 flex items-center justify-center mb-6 animate-pulse shadow-[0_0_50px_rgba(79,70,229,0.2)]">
           <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center text-white text-4xl font-bold shadow-inner">
-            {activeUsername?.charAt(0).toUpperCase()}
+            {getCallDisplayInitial(activeUsername)}
           </div>
         </div>
         <h2 className="text-3xl font-bold text-white capitalize tracking-wide mb-2">

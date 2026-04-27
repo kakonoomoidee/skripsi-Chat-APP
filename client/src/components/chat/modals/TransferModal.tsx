@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { ethers } from "ethers";
 import { useChatContext } from "@/context/ChatContext";
 import { useWalletStore } from "@/store";
 import { XIcon } from "@/components/icons";
-import ms from "ms";
+import { fetchActiveWalletBalance } from "@/services/walletBalanceService";
+import {
+  getTransferValidationState,
+  TRANSFER_REQUEST_TIMEOUT_MS,
+} from "@/utils/transfer";
 
 /**
  * Interface defining the properties for the TransferModal component.
@@ -33,37 +36,19 @@ export const TransferModal = ({
   const [requestTimeout, setRequestTimeout] = useState<boolean>(false);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const getBalance = async (): Promise<void> => {
-      const externalAddress = localStorage.getItem("linked_metamask");
-      const internalAddress = localStorage.getItem("internal_tx_wallet");
-
-      const activeAddress = internalAddress || externalAddress;
-
-      if (isOpen && activeAddress) {
-        try {
-          let provider;
-
-          if (internalAddress) {
-            provider = new ethers.JsonRpcProvider(
-              import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
-            );
-          } else if (
-            externalAddress &&
-            typeof window.ethereum !== "undefined"
-          ) {
-            provider = new ethers.BrowserProvider(window.ethereum);
-          } else {
-            throw new Error("No valid provider found");
-          }
-
-          const balanceWei = await provider.getBalance(activeAddress);
-          const balanceEth = ethers.formatEther(balanceWei);
-          setCurrentBalance(parseFloat(balanceEth).toFixed(4));
-        } catch (err) {
-          console.error("Failed to fetch balance for modal", err);
-        }
+      try {
+        const balance = await fetchActiveWalletBalance(
+          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
+        );
+        setCurrentBalance(balance);
+      } catch (err) {
+        console.error("Failed to fetch balance for modal", err);
       }
     };
+
     getBalance();
   }, [isOpen]);
 
@@ -73,7 +58,7 @@ export const TransferModal = ({
       setRequestTimeout(false);
       timer = setTimeout(() => {
         setRequestTimeout(true);
-      }, ms("8s"));
+      }, TRANSFER_REQUEST_TIMEOUT_MS);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -82,14 +67,10 @@ export const TransferModal = ({
 
   if (!isOpen || typeof document === "undefined") return null;
 
-  const numericAmount = Number(transferAmount);
-  const numericBalance = Number(currentBalance);
-
-  const isInvalidAmount =
-    !transferAmount || isNaN(numericAmount) || numericAmount <= 0;
-  const isInsufficientFunds =
-    currentBalance !== null && numericAmount > numericBalance;
-  const isDisabled = isInvalidAmount || isInsufficientFunds;
+  const { isInsufficientFunds, isDisabled } = getTransferValidationState(
+    transferAmount,
+    currentBalance,
+  );
 
   /**
    * Triggers the Web3 transaction sequence if validations pass.
