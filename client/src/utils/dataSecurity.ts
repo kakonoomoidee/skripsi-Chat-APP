@@ -45,4 +45,5 @@ export const setStoredAutoBackupMode = (mode: string): void => {
 export const findOptionLabel = (
   options: ReadonlyArray<{ value: string; label: string }>,
   value: string,
-): string | undefined => options.find((option) => option.value === value)?.label;
+): string | undefined =>
+  options.find((option) => option.value === value)?.label;

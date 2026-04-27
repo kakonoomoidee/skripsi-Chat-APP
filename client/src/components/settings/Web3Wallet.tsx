@@ -86,7 +86,10 @@ export default function Web3Wallet(): React.JSX.Element {
     if (linkedWallet.address && linkedWallet.type) {
       setTxWalletAddress(linkedWallet.address);
       setTxWalletType(linkedWallet.type);
-      refreshWalletDetails(linkedWallet.address, linkedWallet.type === "external");
+      refreshWalletDetails(
+        linkedWallet.address,
+        linkedWallet.type === "external",
+      );
     }
   }, []);
 
@@ -206,7 +209,9 @@ export default function Web3Wallet(): React.JSX.Element {
         throw new Error("Seed phrase does not match active wallet.");
       }
 
-      const encryptedPk = localStorage.getItem(INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY);
+      const encryptedPk = localStorage.getItem(
+        INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
+      );
       if (!encryptedPk) throw new Error("Private key not found.");
 
       const internalPk = decryptLocalDB(encryptedPk);
@@ -340,7 +345,10 @@ export default function Web3Wallet(): React.JSX.Element {
                       onClick={() => {
                         navigator.clipboard.writeText(txWalletAddress ?? "");
                         setCopiedWalletAddr(true);
-                        setTimeout(() => setCopiedWalletAddr(false), COPIED_STATE_RESET_MS);
+                        setTimeout(
+                          () => setCopiedWalletAddr(false),
+                          COPIED_STATE_RESET_MS,
+                        );
                       }}
                       className="shrink-0 text-zinc-600 hover:text-indigo-400 transition-colors p-0.5"
                       title="Copy address"
@@ -419,7 +427,8 @@ export default function Web3Wallet(): React.JSX.Element {
                           onClick={handleMaxAmount}
                           disabled={
                             !walletDetails ||
-                            Number.parseFloat(walletDetails.balance) <= ESTIMATED_GAS_ETH
+                            Number.parseFloat(walletDetails.balance) <=
+                              ESTIMATED_GAS_ETH
                           }
                           className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
                         >

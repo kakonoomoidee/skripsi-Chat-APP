@@ -58,7 +58,10 @@ export const persistInternalWallet = (
   encryptedPrivateKey: string,
 ): void => {
   localStorage.setItem(INTERNAL_TX_WALLET_KEY, address);
-  localStorage.setItem(INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY, encryptedPrivateKey);
+  localStorage.setItem(
+    INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
+    encryptedPrivateKey,
+  );
 };
 
 /**
