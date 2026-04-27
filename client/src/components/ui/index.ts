@@ -10,3 +10,7 @@ export { PasswordInput, validatePasswordSecurity } from "./PasswordInput";
 export { SeedPhraseInput } from "./SeedPhraseInput";
 export { SeedPhraseModalInput } from "./SeedPhraseModalInput";
 export { GlassBadge } from "./GlassBadge";
+export { default as GlassDropdown } from "./GlassDropdown";
+export { default as DuplicateTabWarning } from "./DuplicateTabWarning";
+export { ImageCropModal } from "./ImageCropModal";
+export { PeerAvatar } from "./PeerAvatar";

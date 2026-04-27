@@ -1,6 +1,7 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/utils/db";
+import { getDisplayInitial } from "@/utils/identity";
 
 /**
  * Props accepted by the PeerAvatar component.
@@ -64,7 +65,7 @@ export const PeerAvatar = ({
           className="w-full h-full object-cover"
         />
       ) : (
-        <span>{displayName.charAt(0).toUpperCase()}</span>
+        <span>{getDisplayInitial(displayName)}</span>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { XIcon } from "@/components/icons";
+import { cropImageToDataUrl } from "@/utils/imageCrop";
 
 /**
  * Props for the ImageCropModal component.
@@ -13,45 +14,6 @@ interface ImageCropModalProps {
   /** Called when the user cancels or closes the modal. */
   onCancel: () => void;
 }
-
-/**
- * Draws the cropped region of an image onto a canvas and returns a compressed
- * Base64 JPEG string at 150×150 pixels and 60% quality.
- *
- * @param {string} imageSrc - The source image data URL.
- * @param {Area} pixelCrop - The crop area in pixel coordinates.
- * @returns {Promise<string>} The compressed Base64 data URL.
- */
-const getCroppedImg = (imageSrc: string, pixelCrop: Area): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      const OUTPUT_SIZE = 150;
-      canvas.width = OUTPUT_SIZE;
-      canvas.height = OUTPUT_SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas 2D context unavailable."));
-        return;
-      }
-      ctx.drawImage(
-        image,
-        pixelCrop.x,
-        pixelCrop.y,
-        pixelCrop.width,
-        pixelCrop.height,
-        0,
-        0,
-        OUTPUT_SIZE,
-        OUTPUT_SIZE,
-      );
-      resolve(canvas.toDataURL("image/jpeg", 0.6));
-    };
-    image.onerror = reject;
-    image.src = imageSrc;
-  });
-};
 
 /**
  * A centered pop-up modal that presents a pan-and-zoom image cropper powered
@@ -97,17 +59,21 @@ export const ImageCropModal = ({
     if (!croppedAreaPixels) return;
     setIsProcessing(true);
     try {
-      const croppedBase64 = await getCroppedImg(imageSrc, croppedAreaPixels);
+      const croppedBase64 = await cropImageToDataUrl(
+        imageSrc,
+        croppedAreaPixels,
+      );
       onConfirm(croppedBase64);
+    } catch (error) {
+      console.error("Failed to crop image", error);
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-lg bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
             <h3 className="text-sm font-bold text-zinc-100">Crop Avatar</h3>
@@ -124,7 +90,7 @@ export const ImageCropModal = ({
           </button>
         </div>
 
-        <div className="relative w-full h-[350px] sm:h-[400px] bg-black">
+        <div className="relative w-full h-87.5 sm:h-100 bg-black">
           <Cropper
             image={imageSrc}
             crop={crop}
@@ -178,7 +144,6 @@ export const ImageCropModal = ({
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );

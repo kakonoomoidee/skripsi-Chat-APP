@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { WarningIcon } from "@/components/icons";
 import SeedPhraseGrid from "./SeedPhraseGrid";
+import { copyTextWithFallback } from "@/utils/clipboard";
+import { SEED_MODAL_PROCEED_DELAY_MS } from "@/utils/seedPhrase";
 
 interface SeedPhraseModalProps {
   seedPhrase: string;
@@ -36,40 +38,23 @@ export default function SeedPhraseModal({
   const handleCopyAndProceed = (): void => {
     if (!seedPhrase) return;
 
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(seedPhrase);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = seedPhrase;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand("copy");
-        textArea.remove();
-      }
+    const proceed = () => {
+      setIsCopied(true);
+      setTimeout(() => {
+        if (onProceed) {
+          onProceed();
+        } else {
+          onClose();
+        }
+      }, SEED_MODAL_PROCEED_DELAY_MS);
+    };
 
-      setIsCopied(true);
-      setTimeout(() => {
-        if (onProceed) {
-          onProceed();
-        } else {
-          onClose();
-        }
-      }, 1500);
-    } catch (err) {
-      console.error("Failed to copy phrase", err);
-      setIsCopied(true);
-      setTimeout(() => {
-        if (onProceed) {
-          onProceed();
-        } else {
-          onClose();
-        }
-      }, 1500);
-    }
+    copyTextWithFallback(seedPhrase)
+      .then(proceed)
+      .catch((error) => {
+        console.error("Failed to copy phrase", error);
+        proceed();
+      });
   };
 
   return createPortal(

@@ -1,5 +1,10 @@
 import React, { useState } from "react";
 import { EyeIcon, EyeSlashIcon } from "@/components/icons";
+import {
+  getPasswordRuleStates,
+  isPasswordSecure,
+  stripWhitespace,
+} from "@/utils/password";
 
 /**
  * Interface for PasswordInput component properties.
@@ -30,12 +35,7 @@ export interface PasswordInputProps {
  * @returns {boolean} True if the password meets all criteria, false otherwise.
  */
 export const validatePasswordSecurity = (password: string): boolean => {
-  const minLength = password.length >= 8;
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(password);
-  return minLength && hasUpper && hasLower && hasNumber && hasSpecial;
+  return isPasswordSecure(password);
 };
 
 /**
@@ -55,14 +55,7 @@ export const PasswordInput = ({
   error,
 }: PasswordInputProps): React.JSX.Element => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
-
-  const rules = [
-    { id: 1, text: "Min. 8 characters", met: value.length >= 8 },
-    { id: 2, text: "Uppercase letter", met: /[A-Z]/.test(value) },
-    { id: 3, text: "Lowercase letter", met: /[a-z]/.test(value) },
-    { id: 4, text: "Number", met: /[0-9]/.test(value) },
-    { id: 5, text: "Special character", met: /[^A-Za-z0-9]/.test(value) },
-  ];
+  const rules = getPasswordRuleStates(value);
 
   /**
    * Intercepts the change event to strip out any whitespace before passing to parent.
@@ -73,7 +66,7 @@ export const PasswordInput = ({
   const handleNoSpaceChange = (
     e: React.ChangeEvent<HTMLInputElement>,
   ): void => {
-    e.target.value = e.target.value.replace(/\s/g, "");
+    e.target.value = stripWhitespace(e.target.value);
     onChange(e);
   };
 

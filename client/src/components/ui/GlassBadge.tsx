@@ -1,5 +1,11 @@
 import React from "react";
 
+const BADGE_VARIANT_STYLES: Record<"chat" | "request", string> = {
+  chat: "bg-indigo-500/80 shadow-[0_4px_12px_rgba(99,102,241,0.5)] border-indigo-400/30",
+  request:
+    "bg-orange-500/80 shadow-[0_4px_12px_rgba(249,115,22,0.5)] border-orange-400/30",
+};
+
 /**
  * Interface defining the properties for the GlassBadge component.
  */
@@ -24,22 +30,11 @@ export const GlassBadge = ({
   variant,
   className = "",
 }: GlassBadgeProps): React.JSX.Element | null => {
-  if (count <= 0) return null;
-
-  const getVariantStyles = (): string => {
-    switch (variant) {
-      case "chat":
-        return "bg-indigo-500/80 shadow-[0_4px_12px_rgba(99,102,241,0.5)] border-indigo-400/30";
-      case "request":
-        return "bg-orange-500/80 shadow-[0_4px_12px_rgba(249,115,22,0.5)] border-orange-400/30";
-      default:
-        return "bg-zinc-500/80 shadow-md border-zinc-400/30";
-    }
-  };
+  if (!Number.isFinite(count) || count <= 0) return null;
 
   return (
     <span
-      className={`min-w-[18px] h-[18px] backdrop-blur-md text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border ${getVariantStyles()} ${className}`}
+      className={`min-w-4.5 h-4.5 backdrop-blur-md text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border ${BADGE_VARIANT_STYLES[variant]} ${className}`}
     >
       {count > 99 ? "99+" : count}
     </span>

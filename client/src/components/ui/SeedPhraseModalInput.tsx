@@ -1,4 +1,9 @@
 import React, { useCallback } from "react";
+import {
+  getSeedPhraseProgress,
+  MAX_SEED_PHRASE_WORDS,
+  processSeedPhraseInput,
+} from "@/utils/seedPhrase";
 
 /**
  * Properties for the SeedPhraseModalInput component.
@@ -32,32 +37,12 @@ export const SeedPhraseModalInput = ({
   disabled = false,
   placeholder = "e.g. apple banana cat dog elephant frog grape hat ice juice kite lemon",
 }: SeedPhraseModalInputProps): React.JSX.Element => {
-  const words = value.trim().split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
-  const isComplete = wordCount === 12;
+  const { wordCount, isComplete } = getSeedPhraseProgress(value);
 
   const handleInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const rawValue = e.target.value;
-      let sanitizedValue = rawValue.replace(/[^a-zA-Z\s]/g, "");
-      sanitizedValue = sanitizedValue.replace(/\s+/g, " ");
-
-      if (sanitizedValue.length < value.length) {
-        onChange(sanitizedValue);
-        return;
-      }
-
-      const newWords = sanitizedValue.trim().split(/\s+/).filter(Boolean);
-
-      if (
-        newWords.length > 12 ||
-        (newWords.length === 12 && sanitizedValue.endsWith(" "))
-      ) {
-        onChange(newWords.slice(0, 12).join(" "));
-        return;
-      }
-
-      onChange(sanitizedValue);
+      const nextValue = processSeedPhraseInput(e.target.value, value);
+      onChange(nextValue);
     },
     [value, onChange],
   );
@@ -73,7 +58,7 @@ export const SeedPhraseModalInput = ({
             isComplete ? "text-emerald-400" : "text-zinc-500"
           }`}
         >
-          {wordCount} / 12
+          {wordCount} / {MAX_SEED_PHRASE_WORDS}
         </span>
       </div>
       <textarea

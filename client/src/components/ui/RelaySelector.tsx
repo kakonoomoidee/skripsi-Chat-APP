@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { InfoIcon } from "@/components/icons";
 import GlassDropdown from "@/components/ui/GlassDropdown";
+import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 
 /**
  * Interface defining the props for the RelaySelector component.
@@ -28,22 +29,14 @@ export default function RelaySelector({
   addCustomRelay,
   size = "sm",
 }: RelaySelectorProps): React.JSX.Element {
-  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const {
+    isOpen: showInfo,
+    containerRef: infoRef,
+    toggle: toggleInfo,
+  } = useDismissablePopover();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [customRelayInput, setCustomRelayInput] = useState<string>("");
   const [relayError, setRelayError] = useState<string>("");
-
-  const infoRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (infoRef.current && !infoRef.current.contains(event.target as Node)) {
-        setShowInfo(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   /**
    * Processes the addition of a new custom relay URL and prevents duplicates.
@@ -95,7 +88,7 @@ export default function RelaySelector({
 
           <button
             type="button"
-            onClick={() => setShowInfo(!showInfo)}
+            onClick={toggleInfo}
             className={`transition-colors focus:outline-none ${showInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
           >
             <InfoIcon className="w-3.5 h-3.5" />

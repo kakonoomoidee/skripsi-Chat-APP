@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 import { ChevronDownIcon } from "@/components/icons";
 
 export interface DropdownOption {
@@ -19,33 +19,16 @@ export default function GlassDropdown({
   onChange,
   placeholder = "Select Option",
 }: GlassDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Closes the dropdown automatically when the user clicks outside the component.
-   */
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const { isOpen, containerRef, toggle, close } = useDismissablePopover();
 
   const activeLabel =
     options.find((opt) => opt.value === value)?.label || placeholder;
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggle}
         className={`w-full bg-zinc-900 border ${
           isOpen
             ? "border-indigo-500 ring-1 ring-indigo-500"
@@ -69,7 +52,7 @@ export default function GlassDropdown({
                   type="button"
                   onClick={() => {
                     onChange(opt.value);
-                    setIsOpen(false);
+                    close();
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${
                     value === opt.value
