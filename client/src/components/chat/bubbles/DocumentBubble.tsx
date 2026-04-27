@@ -1,8 +1,9 @@
 import { formatTime } from "@/utils/format";
 import { DocumentIcon, ChevronDownIcon, ReplyIcon } from "@/components/icons";
 import { useSessionStore } from "@/store";
-import { useState, useRef, useEffect } from "react";
+import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
+import { createReplyTarget } from "@/utils/bubble";
 
 export const DocumentBubble = ({
   msg,
@@ -14,26 +15,7 @@ export const DocumentBubble = ({
   fileData: string;
 }) => {
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
-  const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node))
-        setShowMenu(false);
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowMenu(false);
-    };
-    if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEscape);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showMenu]);
+  const { showMenu, menuRef, closeMenu, toggleMenu } = useBubbleMenu();
 
   return (
     <div className="relative group w-full flex flex-col">
@@ -46,7 +28,7 @@ export const DocumentBubble = ({
       >
         <div className="absolute top-1 right-1 z-20" ref={menuRef}>
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={toggleMenu}
             className={`p-0.5 rounded-full bg-black/20 text-white hover:bg-black/40 transition-all opacity-0 group-hover:opacity-100 ${
               showMenu ? "opacity-100" : ""
             }`}
@@ -62,13 +44,10 @@ export const DocumentBubble = ({
             >
               <button
                 onClick={() => {
-                  setReplyingTo({
-                    id: msg.id,
-                    text: `Document: ${fileName}`,
-                    isMine: msg.isMine,
-                    timestamp: msg.timestamp,
-                  });
-                  setShowMenu(false);
+                  setReplyingTo(
+                    createReplyTarget(msg, `Document: ${fileName}`),
+                  );
+                  closeMenu();
                 }}
                 className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors flex items-center gap-2"
               >

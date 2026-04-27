@@ -1,7 +1,8 @@
 import { formatTime } from "@/utils/format";
 import { useUIStore, useSessionStore } from "@/store";
-import { useState, useRef, useEffect } from "react";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
+import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
+import { createReplyTarget } from "@/utils/bubble";
 import {
   ChevronDownIcon,
   ReplyIcon,
@@ -27,26 +28,7 @@ export const CryptoBubble = ({
 }) => {
   const { showToast } = useUIStore();
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
-  const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node))
-        setShowMenu(false);
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowMenu(false);
-    };
-    if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEscape);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showMenu]);
+  const { showMenu, menuRef, closeMenu, toggleMenu } = useBubbleMenu();
 
   return (
     <div className="relative group w-full flex flex-col">
@@ -59,7 +41,7 @@ export const CryptoBubble = ({
       >
         <div className="absolute top-2 right-2 z-30" ref={menuRef}>
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={toggleMenu}
             className={`p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100 ${
               showMenu ? "opacity-100" : ""
             }`}
@@ -73,13 +55,8 @@ export const CryptoBubble = ({
             >
               <button
                 onClick={() => {
-                  setReplyingTo({
-                    id: msg.id,
-                    text: "Crypto Transfer",
-                    isMine: msg.isMine,
-                    timestamp: msg.timestamp,
-                  });
-                  setShowMenu(false);
+                  setReplyingTo(createReplyTarget(msg, "Crypto Transfer"));
+                  closeMenu();
                 }}
                 className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors flex items-center gap-2"
               >

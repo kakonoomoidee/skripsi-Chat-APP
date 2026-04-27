@@ -6,22 +6,21 @@ import React, {
   useCallback,
 } from "react";
 import { formatTime } from "@/utils/format";
-import { PlayIcon, PauseIcon, ChevronDownIcon, ReplyIcon } from "@/components/icons";
+import {
+  PlayIcon,
+  PauseIcon,
+  ChevronDownIcon,
+  ReplyIcon,
+} from "@/components/icons";
 import { useSessionStore } from "@/store";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
-
-const formatDuration = (time: number) => {
-  if (!time || isNaN(time) || time === Infinity) return "0:00";
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-};
-
-const generateWaveform = (barsCount: number) => {
-  return Array.from({ length: barsCount }, () =>
-    Math.floor(Math.random() * (18 - 6 + 1) + 6),
-  );
-};
+import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
+import { createReplyTarget } from "@/utils/bubble";
+import {
+  AUDIO_METADATA_DELAY_MS,
+  formatAudioDuration,
+  generateWaveformHeights,
+} from "@/utils/audio";
 
 export const AudioBubble = ({
   msg,
@@ -41,28 +40,9 @@ export const AudioBubble = ({
   const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
 
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);
-  const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { showMenu, menuRef, closeMenu, toggleMenu } = useBubbleMenu();
 
-  const waveform = useMemo(() => generateWaveform(32), []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node))
-        setShowMenu(false);
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowMenu(false);
-    };
-    if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEscape);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showMenu]);
+  const waveform = useMemo(() => generateWaveformHeights(32), []);
 
   const updateProgress = useCallback(() => {
     if (audioRef.current) {
@@ -100,7 +80,7 @@ export const AudioBubble = ({
         if (audioRef.current && audioRef.current.duration !== Infinity) {
           setDuration(audioRef.current.duration);
         }
-      }, 200);
+      }, AUDIO_METADATA_DELAY_MS);
     }
   };
 
@@ -151,7 +131,7 @@ export const AudioBubble = ({
       >
         <div className="absolute top-1 right-1 z-20" ref={menuRef}>
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={toggleMenu}
             className={`p-0.5 rounded-full bg-black/20 text-white hover:bg-black/40 transition-all opacity-0 group-hover:opacity-100 ${
               showMenu ? "opacity-100" : ""
             }`}
@@ -165,13 +145,8 @@ export const AudioBubble = ({
             >
               <button
                 onClick={() => {
-                  setReplyingTo({
-                    id: msg.id,
-                    text: "Voice Message",
-                    isMine: msg.isMine,
-                    timestamp: msg.timestamp,
-                  });
-                  setShowMenu(false);
+                  setReplyingTo(createReplyTarget(msg, "Voice Message"));
+                  closeMenu();
                 }}
                 className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors flex items-center gap-2"
               >
@@ -264,7 +239,7 @@ export const AudioBubble = ({
               msg.isMine ? "text-indigo-200" : "text-zinc-400"
             }`}
           >
-            {formatDuration(currentTime > 0 ? currentTime : duration)}
+            {formatAudioDuration(currentTime > 0 ? currentTime : duration)}
           </span>
           <div className="flex items-center gap-1">
             <span
