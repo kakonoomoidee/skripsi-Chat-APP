@@ -1,12 +1,12 @@
 import React from "react";
 import { useChatContext } from "@/context/ChatContext";
 import type { ConnectionState } from "@/context/ChatContext";
-import { MenuIcon, PhoneIcon } from "@/components/icons";
+import { PhoneIcon } from "@/components/icons";
 import { useUIStore } from "@/store";
 import { CallNotification } from "./CallNotification";
 import { InCallModal } from "./modals/InCallModal";
-import { GlassBadge } from "@/components/ui";
 import { PeerAvatar } from "@/components/ui/PeerAvatar";
+import { MobileSidebarToggle } from "./MobileSidebarToggle";
 
 /**
  * Returns the status label element for the sub-header, driven by the connection state machine.
@@ -69,7 +69,9 @@ export const ChatHeader = (): React.JSX.Element => {
     unreadTotal,
   } = useChatContext();
 
-  const currentStatus = activeChat ? (connectionStates[activeChat.toLowerCase()] || "idle") : "idle";
+  const currentStatus = activeChat
+    ? connectionStates[activeChat.toLowerCase()] || "idle"
+    : "idle";
 
   const { setIsMobileSidebarOpen } = useUIStore();
 
@@ -79,22 +81,11 @@ export const ChatHeader = (): React.JSX.Element => {
       <InCallModal />
 
       <div className="flex items-center">
-        <button
-          onClick={() => setIsMobileSidebarOpen(true)}
-          className="md:hidden relative p-2 mr-2 -ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
-        >
-          <MenuIcon className="w-6 h-6" />
-          <GlassBadge
-            count={unreadTotal}
-            variant="chat"
-            className="absolute -top-1 -right-1"
-          />
-          <GlassBadge
-            count={pendingRequestsTotal}
-            variant="request"
-            className="absolute -bottom-1 -right-1"
-          />
-        </button>
+        <MobileSidebarToggle
+          unreadTotal={unreadTotal}
+          pendingRequestsTotal={pendingRequestsTotal}
+          onOpen={() => setIsMobileSidebarOpen(true)}
+        />
 
         <div className="flex items-center gap-3">
           {activeChat && (

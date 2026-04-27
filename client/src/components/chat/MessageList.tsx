@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { MessageBubble } from "./MessageBubble";
+import { useAutoScrollToBottom } from "@/hooks/chat/useAutoScrollToBottom";
 
 /**
  * Container component for iterating over and displaying the active chat's message history.
@@ -11,10 +12,7 @@ import { MessageBubble } from "./MessageBubble";
 export const MessageList = (): React.JSX.Element => {
   const { messages } = useChatContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useAutoScrollToBottom(messagesEndRef, messages);
 
   return (
     <div className="flex-1 min-h-0 px-4 md:px-8 py-6 overflow-y-auto custom-scrollbar">

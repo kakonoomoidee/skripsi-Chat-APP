@@ -7,6 +7,7 @@ import {
   DocumentBubble,
 } from "./bubbles/index";
 import { MessageStatus } from "@/utils/db";
+import { parseMessageBubbleData } from "@/utils/messageBubble";
 
 /**
  * Interface defining the structure of a chat message.
@@ -28,7 +29,6 @@ export interface ChatMessage {
   } | null;
 }
 
-
 /**
  * Interface defining the properties for the MessageBubble component.
  */
@@ -46,30 +46,15 @@ export interface MessageBubbleProps {
 export const MessageBubble = ({
   msg,
 }: MessageBubbleProps): React.JSX.Element => {
-  let parsedText = msg.text;
-  let replyData = null;
-  let docData: { fileName: string; fileData: string } | null = null;
-  let cryptoData: {
-    hash: string;
-    amount: string;
-    isVerification?: boolean;
-  } | null = null;
-
-  try {
-    const parsed = JSON.parse(msg.text);
-    if (parsed.type === "DOCUMENT") {
-      docData = { fileName: parsed.fileName, fileData: parsed.fileData };
-    } else if (parsed.type === "TX_SUCCESS") {
-      cryptoData = { hash: parsed.hash, amount: parsed.amount };
-    } else if (parsed.text !== undefined) {
-      parsedText = parsed.text;
-      replyData = parsed.replyTo || null;
-    }
-  } catch {}
-
-  const isLegacyCryptoTx =
-    parsedText?.startsWith("[SENT]") || parsedText?.startsWith("[RECEIVED]");
-  const isAudio = parsedText?.startsWith("[AUDIO]");
+  const {
+    parsedText,
+    replyData,
+    documentData,
+    cryptoData,
+    legacyCryptoData,
+    isAudio,
+    audioSource,
+  } = parseMessageBubbleData(msg.text);
 
   const cleanMsg: ChatMessage = {
     ...msg,
@@ -80,12 +65,7 @@ export const MessageBubble = ({
   let bubbleContent: React.JSX.Element;
 
   if (isAudio) {
-    bubbleContent = (
-      <AudioBubble
-        msg={cleanMsg}
-        audioSrc={cleanMsg.text.replace("[AUDIO]", "")}
-      />
-    );
+    bubbleContent = <AudioBubble msg={cleanMsg} audioSrc={audioSource} />;
   } else if (cryptoData) {
     bubbleContent = (
       <CryptoBubble
@@ -96,32 +76,22 @@ export const MessageBubble = ({
         isVerification={false}
       />
     );
-  } else if (isLegacyCryptoTx) {
-    const txType = cleanMsg.text.startsWith("[SENT]") ? "SENT" : "RECEIVED";
-    const parts = cleanMsg.text.split("\nTx Hash: ");
-    const rawAmount = parts[0].replace(`[${txType}] `, "");
-    const txHash = parts[1] || "";
-
-    const isVerification = rawAmount.includes("Transfer Verified!");
-    const txAmountOrStatus = isVerification
-      ? "Verified"
-      : rawAmount.replace(" ETH", "");
-
+  } else if (legacyCryptoData) {
     bubbleContent = (
       <CryptoBubble
         msg={cleanMsg}
-        txType={txType}
-        txAmountOrStatus={txAmountOrStatus}
-        txHash={txHash}
-        isVerification={isVerification}
+        txType={legacyCryptoData.txType}
+        txAmountOrStatus={legacyCryptoData.txAmountOrStatus}
+        txHash={legacyCryptoData.txHash}
+        isVerification={legacyCryptoData.isVerification}
       />
     );
-  } else if (docData) {
+  } else if (documentData) {
     bubbleContent = (
       <DocumentBubble
         msg={cleanMsg}
-        fileName={docData.fileName}
-        fileData={docData.fileData}
+        fileName={documentData.fileName}
+        fileData={documentData.fileData}
       />
     );
   } else if (cleanMsg.isImage) {

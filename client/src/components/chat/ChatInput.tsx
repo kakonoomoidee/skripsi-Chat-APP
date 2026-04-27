@@ -1,6 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { useSessionStore, useUIStore } from "@/store";
+import { formatDuration } from "@/utils/format";
+import {
+  DOCUMENT_MAX_SIZE_BYTES,
+  isFileSignatureSafe,
+  RECORDING_TIMER_TICK_MS,
+} from "@/utils/chatInput";
 import {
   AttachmentIcon,
   CryptoIcon,
@@ -12,6 +18,8 @@ import {
   GalleryIcon,
 } from "@/components/icons";
 import { CameraModal } from "./modals/CameraModal";
+import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
+import { useHasLinkedWallet } from "@/hooks/chat/useHasLinkedWallet";
 
 /**
  * Interface defining the properties for the ChatInput component.
@@ -19,55 +27,6 @@ import { CameraModal } from "./modals/CameraModal";
 export interface ChatInputProps {
   onOpenTransferModal: () => void;
 }
-
-/**
- * Evaluates the magic numbers (file signature) of an uploaded file to ensure it matches
- * its declared MIME type, preventing disguised malicious executables from being transmitted.
- *
- * @param {File} file - The raw file object selected by the user.
- * @returns {Promise<boolean>} Resolves to true if the file signature matches known safe formats.
- */
-const isFileSignatureSafe = (file: File): Promise<boolean> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = (e) => {
-      if (!e.target || !e.target.result) return resolve(false);
-
-      const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 4);
-      let header = "";
-      for (let i = 0; i < arr.length; i++) {
-        header += arr[i].toString(16);
-      }
-
-      const safeHeaders = [
-        "25504446", // PDF
-        "504b34", // ZIP/DOCX/XLSX
-        "89504e47", // PNG
-        "ffd8ffe0", // JPEG
-        "ffd8ffe1", // JPEG EXIF
-        "ffd8ffe2", // JPEG EXIF
-      ];
-
-      const isSafe = safeHeaders.some((h) =>
-        header.toLowerCase().startsWith(h),
-      );
-      resolve(isSafe || file.type.startsWith("text/"));
-    };
-    reader.readAsArrayBuffer(file.slice(0, 4));
-  });
-};
-
-/**
- * Formats a raw time duration in seconds into a standard MM:SS string representation.
- *
- * @param {number} time - Duration in seconds.
- * @returns {string} Formatted MM:SS string.
- */
-const formatDuration = (time: number): string => {
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-};
 
 /**
  * Renders the main input console for the chat interface, handling text input,
@@ -103,13 +62,17 @@ export const ChatInput = ({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const attachMenuRef = useRef<HTMLDivElement>(null);
+  const {
+    showMenu: showAttachMenu,
+    menuRef: attachMenuRef,
+    closeMenu: closeAttachMenu,
+    toggleMenu: toggleAttachMenu,
+  } = useBubbleMenu();
+  const hasLinkedWallet = useHasLinkedWallet();
 
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
-  const [showAttachMenu, setShowAttachMenu] = useState<boolean>(false);
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
-  const [hasLinkedWallet, setHasLinkedWallet] = useState<boolean>(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -120,51 +83,6 @@ export const ChatInput = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>(0);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
-
-  useEffect(() => {
-    const checkWallet = () => {
-      const hasExternal = !!localStorage.getItem("linked_metamask");
-      const hasInternal = !!localStorage.getItem("internal_tx_wallet");
-      setHasLinkedWallet(hasExternal || hasInternal);
-    };
-
-    checkWallet();
-    window.addEventListener("storage", checkWallet);
-
-    const interval = setInterval(checkWallet, 1500);
-
-    return () => {
-      window.removeEventListener("storage", checkWallet);
-      clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        attachMenuRef.current &&
-        !attachMenuRef.current.contains(event.target as Node)
-      ) {
-        setShowAttachMenu(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowAttachMenu(false);
-      }
-    };
-
-    if (showAttachMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showAttachMenu]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -282,7 +200,7 @@ export const ChatInput = ({
 
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
-      }, 1000);
+      }, RECORDING_TIMER_TICK_MS);
     } catch {
       showToast("Microphone access denied or not available.", "error");
     }
@@ -329,11 +247,11 @@ export const ChatInput = ({
     e: React.ChangeEvent<HTMLInputElement>,
   ): Promise<void> => {
     const file = e.target.files?.[0];
-    setShowAttachMenu(false);
+    closeAttachMenu();
 
     if (!file) return;
 
-    if (file.size > 1048576) {
+    if (file.size > DOCUMENT_MAX_SIZE_BYTES) {
       showToast("File too large! Max 1MB allowed.", "error");
       if (documentInputRef.current) documentInputRef.current.value = "";
       return;
@@ -395,7 +313,7 @@ export const ChatInput = ({
               accept="image/*"
               ref={imageInputRef}
               onChange={(e) => {
-                setShowAttachMenu(false);
+                closeAttachMenu();
                 handleSendImage(e);
               }}
               className="hidden"
@@ -433,7 +351,7 @@ export const ChatInput = ({
                   <div className="relative" ref={attachMenuRef}>
                     <button
                       type="button"
-                      onClick={() => setShowAttachMenu(!showAttachMenu)}
+                      onClick={toggleAttachMenu}
                       disabled={connectionState !== "connected"}
                       className="p-2 mb-0.5 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 shrink-0 mr-1"
                     >
@@ -455,7 +373,7 @@ export const ChatInput = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setShowAttachMenu(false);
+                            closeAttachMenu();
                             setIsCameraOpen(true);
                           }}
                           className="flex items-center gap-3 w-full p-2.5 hover:bg-zinc-700 rounded-xl transition-colors text-zinc-200 text-sm font-medium"

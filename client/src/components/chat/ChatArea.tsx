@@ -9,6 +9,7 @@ import { TransferModal } from "./modals/TransferModal";
 import { useUIStore } from "@/store";
 import { db } from "@/utils/db";
 import { ShieldCheckIcon, WarningIcon } from "@/components/icons";
+import { hasLinkedWallet } from "@/services/walletBalanceService";
 
 /**
  * Main chat area container orchestrating the header, message list, input, and modals.
@@ -43,10 +44,7 @@ export default function ChatArea(): React.JSX.Element {
    * @returns {void}
    */
   const handleOpenTransferModal = (): void => {
-    const hasExternal = !!localStorage.getItem("linked_metamask");
-    const hasInternal = !!localStorage.getItem("internal_tx_wallet");
-
-    if (!hasExternal && !hasInternal) {
+    if (!hasLinkedWallet()) {
       showToast(
         "Please link a transaction wallet in Security Settings first.",
         "error",
@@ -84,20 +82,13 @@ export default function ChatArea(): React.JSX.Element {
 
   if (!activeChat) return <EmptyChatState />;
 
-  const isPending =
-    !contactRecord || contactRecord.status === "pending";
+  const isPending = !contactRecord || contactRecord.status === "pending";
 
   return (
     <div className="flex flex-col bg-zinc-950 w-full h-full overflow-hidden relative">
       <ChatHeader />
 
       {isPending && (
-        /**
-         * Contact Request Banner.
-         *
-         * Displayed whenever the active peer has not yet been explicitly
-         * accepted. It persists until the user chooses Accept or Block.
-         */
         <div className="shrink-0 mx-4 mt-3 mb-1 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 animate-in slide-in-from-top-2 fade-in">
           <div className="flex items-center gap-2.5 min-w-0">
             <WarningIcon className="w-4 h-4 text-amber-400 shrink-0" />

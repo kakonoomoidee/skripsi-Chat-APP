@@ -26,6 +26,14 @@ export const getStoredWalletAddresses = (): StoredWalletAddresses => {
 };
 
 /**
+ * Returns whether at least one transaction wallet is linked in storage.
+ *
+ * @returns {boolean} True when internal or external wallet is available.
+ */
+export const hasLinkedWallet = (): boolean =>
+  Boolean(getStoredWalletAddresses().activeAddress);
+
+/**
  * Fetches the active wallet balance and returns a fixed ETH string.
  *
  * @param {string} rpcUrl - RPC URL used for internal wallet reads.

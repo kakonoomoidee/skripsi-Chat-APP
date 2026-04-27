@@ -1,7 +1,8 @@
 import React from "react";
 import { useChatContext } from "@/context/ChatContext";
-import { XIcon, PhoneIcon } from "@/components/icons/index";
-  
+import { XIcon, PhoneIcon } from "@/components/icons";
+import { getCallDisplayInitial } from "@/utils/call";
+
 /**
  * Renders a floating notification modal for incoming WebRTC voice calls.
  * Displays the caller's username and provides action buttons to accept or decline the call.
@@ -18,7 +19,7 @@ export const CallNotification = (): React.JSX.Element | null => {
     <div className="absolute top-20 right-4 md:right-8 z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-2xl shadow-2xl w-72 animate-in slide-in-from-top-5 fade-in duration-300">
       <div className="flex flex-col items-center mb-4">
         <div className="w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-inner mb-3 animate-pulse">
-          {activeUsername?.charAt(0).toUpperCase()}
+          {getCallDisplayInitial(activeUsername)}
         </div>
         <h3 className="font-semibold text-zinc-100 capitalize text-lg">
           {activeUsername}
