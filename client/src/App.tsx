@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,11 +8,13 @@ import {
 import { createPortal } from "react-dom";
 import { useUIStore } from "@/store";
 
-import LandingPage from "@/pages/landing/LandingClient";
-import LoginPage from "@/pages/auth/login/LoginClient";
-import RegisterPage from "@/pages/auth/register/RegisterClient";
-import ImportIdentityPage from "@/pages/auth/import/ImportIdentityClient";
-import ChatDashboard from "@/pages/chat/ChatClient";
+const LandingPage = lazy(() => import("@/pages/landing/LandingClient"));
+const LoginPage = lazy(() => import("@/pages/auth/login/LoginClient"));
+const RegisterPage = lazy(() => import("@/pages/auth/register/RegisterClient"));
+const ImportIdentityPage = lazy(
+  () => import("@/pages/auth/import/ImportIdentityClient"),
+);
+const ChatDashboard = lazy(() => import("@/pages/chat/ChatClient"));
 
 /**
  * 1. Main Application Router with Smart Routing

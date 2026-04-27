@@ -10,14 +10,13 @@ import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
  * JavaScript obfuscation specifically for production builds.
  * @returns {import('vite').UserConfig} The parsed Vite configuration object.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
     obfuscatorPlugin({
       include: ["src/**/*.ts", "src/**/*.tsx"],
       exclude: [/node_modules/],
-      // Apply ONLY when building for production, keep dev server fast
       apply: "build",
       options: {
         compact: true,
@@ -37,8 +36,38 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  // Optional: You can explicitly set build targets if needed
+  esbuild:
+    mode === "production"
+      ? {
+          pure: ["console.log", "console.info"],
+        }
+      : undefined,
   build: {
     target: "esnext",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("react") ||
+              id.includes("react-dom") ||
+              id.includes("react-router-dom")
+            ) {
+              return "vendor-ui-core";
+            }
+            if (id.includes("zustand") || id.includes("dexie")) {
+              return "vendor-state-db";
+            }
+            if (
+              id.includes("ethers") ||
+              id.includes("ms") ||
+              id.includes("dexie-react-hooks")
+            ) {
+              return "vendor-utils-heavy";
+            }
+          }
+        },
+      },
+    },
   },
-});
+}));

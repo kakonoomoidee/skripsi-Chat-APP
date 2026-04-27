@@ -4,5 +4,5 @@
  * JavaScript obfuscation specifically for production builds.
  * @returns {import('vite').UserConfig} The parsed Vite configuration object.
  */
-declare const _default: import("vite").UserConfig;
+declare const _default: import("vite").UserConfigFnObject;
 export default _default;
