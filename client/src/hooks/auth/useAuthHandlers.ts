@@ -2,10 +2,44 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import axios, { AxiosError } from "axios";
+import ms from "ms";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useUIStore } from "@/store";
+
+const USERNAME_CHECK_DEBOUNCE_MS = ms("500ms");
+const REQUIRED_SEED_WORD_COUNT = 12;
+const MIN_PASSWORD_LENGTH = 6;
+
+type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+const getPasswordValidationError = (
+  password: string,
+  confirmPassword: string,
+): string | null => {
+  if (!password) {
+    return "Username and Password are required.";
+  }
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return "Password must be at least 6 characters.";
+  }
+
+  if (password !== confirmPassword) {
+    return "Passwords do not match.";
+  }
+
+  return null;
+};
 
 /**
  * ============================================================================
@@ -43,13 +77,13 @@ export const useLoginHandler = () => {
       console.log("[Auth] Executing login flow...");
       const unlockedWallet = await decryptWallet(password);
 
-      await login(unlockedWallet as unknown as ethers.Wallet, activeRelay);
+      await login(unlockedWallet as AuthWallet, activeRelay);
       navigate("/chat");
     } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : "Login failed. Check your password.";
+      const errorMsg = getErrorMessage(
+        err,
+        "Login failed. Check your password.",
+      );
       console.error("[Auth Error] Login failed:", errorMsg);
       showToast(errorMsg, "error");
       setPassword("");
@@ -76,7 +110,7 @@ export const useLoginHandler = () => {
  * Custom hook to handle the registration flow, including username availability checks.
  * @returns {object} Registration state and handler function.
  */
-export const useRegisterHandler = (activeRelay: any) => {
+export const useRegisterHandler = (activeRelay: string) => {
   const { createAndEncryptWallet, loading: walletLoading } = useWallet();
   const { login, register, loading: authLoading } = useAuth();
   const { showToast } = useUIStore();
@@ -92,7 +126,9 @@ export const useRegisterHandler = (activeRelay: any) => {
   const isLoading = walletLoading || authLoading;
 
   useEffect(() => {
-    if (!username.trim()) {
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername || !activeRelay) {
       setIsAvailable(null);
       return;
     }
@@ -100,7 +136,7 @@ export const useRegisterHandler = (activeRelay: any) => {
     const delayDebounceFn = setTimeout(async () => {
       setIsChecking(true);
       try {
-        await axios.get(`${activeRelay}/auth/address/${username.trim()}`);
+        await axios.get(`${activeRelay}/auth/address/${normalizedUsername}`);
         setIsAvailable(false);
       } catch (error: unknown) {
         if (error instanceof AxiosError && error.response?.status === 404) {
@@ -111,7 +147,7 @@ export const useRegisterHandler = (activeRelay: any) => {
       } finally {
         setIsChecking(false);
       }
-    }, 500);
+    }, USERNAME_CHECK_DEBOUNCE_MS);
 
     return () => clearTimeout(delayDebounceFn);
   }, [username, activeRelay]);
@@ -123,28 +159,28 @@ export const useRegisterHandler = (activeRelay: any) => {
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!username.trim() || !password)
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername)
       return showToast("Username and Password are required.", "error");
-    if (password.length < 6)
-      return showToast("Password must be at least 6 characters.", "error");
-    if (password !== confirmPassword)
-      return showToast("Passwords do not match.", "error");
+    const passwordError = getPasswordValidationError(password, confirmPassword);
+    if (passwordError) return showToast(passwordError, "error");
     if (isAvailable === false)
       return showToast("Username is already taken.", "error");
+    if (!activeRelay) return showToast("No active relay selected.", "error");
 
     try {
       console.log("[Auth] Executing registration flow...");
       const { wallet: newWallet, seedPhrase: generatedSeed } =
         await createAndEncryptWallet(password);
-      const walletInstance = newWallet as unknown as ethers.Wallet;
+      const walletInstance = newWallet as AuthWallet;
 
-      await register(walletInstance, username.trim(), activeRelay);
+      await register(walletInstance, normalizedUsername, activeRelay);
       await login(walletInstance, activeRelay);
 
       setSeedPhrase(generatedSeed);
     } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Registration failed.";
+      const errorMsg = getErrorMessage(err, "Registration failed.");
       console.error("[Auth Error] Registration failed:", errorMsg);
       showToast(errorMsg, "error");
     }
@@ -177,7 +213,7 @@ export const useRegisterHandler = (activeRelay: any) => {
  * Custom hook to handle the identity recovery flow via seed phrase.
  * @returns {object} Import state and handler function.
  */
-export const useImportHandler = (activeRelay: any) => {
+export const useImportHandler = (activeRelay: string) => {
   const navigate = useNavigate();
   const { importAndEncryptWallet, loading: walletLoading } = useWallet();
   const { login, loading: authLoading } = useAuth();
@@ -197,28 +233,31 @@ export const useImportHandler = (activeRelay: any) => {
     e.preventDefault();
 
     const cleanSeed = seedImport.trim();
-    if (!cleanSeed || cleanSeed.split(/\s+/).length !== 12)
+    if (
+      !cleanSeed ||
+      cleanSeed.split(/\s+/).length !== REQUIRED_SEED_WORD_COUNT
+    )
       return showToast("Invalid! Must be exactly 12 words.", "error");
     if (!password)
       return showToast(
         "Please set a password to encrypt your local identity.",
         "error",
       );
-    if (password.length < 6)
+    if (password.length < MIN_PASSWORD_LENGTH)
       return showToast("Password must be at least 6 characters.", "error");
     if (password !== confirmPassword)
       return showToast("Passwords do not match.", "error");
+    if (!activeRelay) return showToast("No active relay selected.", "error");
 
     try {
       console.log("[Auth] Executing import flow...");
       const importedWallet = await importAndEncryptWallet(cleanSeed, password);
-      await login(importedWallet as unknown as ethers.Wallet, activeRelay);
+      await login(importedWallet as AuthWallet, activeRelay);
 
       showToast("Identity imported securely!", "success");
       navigate("/chat");
     } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to import identity.";
+      const errorMsg = getErrorMessage(err, "Failed to import identity.");
       console.error("[Auth Error] Import failed:", errorMsg);
       showToast(errorMsg, "error");
     }

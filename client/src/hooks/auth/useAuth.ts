@@ -2,12 +2,40 @@ import { useState, useCallback } from "react";
 import axios, { AxiosError } from "axios";
 import { ethers } from "ethers";
 
+const AUTH_TOKEN_KEY = "auth_token";
+const LAST_ACTIVITY_KEY = "securep2p_last_activity";
+const PUBLIC_KEY_PLACEHOLDER = "PUBKEY_PLACEHOLDER";
+
+type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof AxiosError) {
+    return error.response?.data?.error || error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+const saveSessionToken = (token: string): void => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+};
+
+const clearSessionToken = (): void => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(LAST_ACTIVITY_KEY);
+};
+
 /**
  * Interface representing the standard authentication response payload.
  */
 export interface AuthResponse {
   token?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -18,11 +46,11 @@ export interface UseAuthReturn {
   loading: boolean;
   error: string | null;
   register: (
-    wallet: ethers.Wallet,
+    wallet: AuthWallet,
     username: string,
     relayUrl: string,
   ) => Promise<AuthResponse>;
-  login: (wallet: ethers.Wallet, relayUrl: string) => Promise<string>;
+  login: (wallet: AuthWallet, relayUrl: string) => Promise<string>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -37,7 +65,7 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(
-    localStorage.getItem("auth_token"),
+    localStorage.getItem(AUTH_TOKEN_KEY),
   );
 
   /**
@@ -50,7 +78,7 @@ export const useAuth = (): UseAuthReturn => {
    * @throws {Error} Throws an error if the network request or signing process fails.
    */
   const register = async (
-    wallet: ethers.Wallet,
+    wallet: AuthWallet,
     username: string,
     relayUrl: string,
   ): Promise<AuthResponse> => {
@@ -65,7 +93,7 @@ export const useAuth = (): UseAuthReturn => {
 
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "string", "string"],
-        [wallet.address, username, "PUBKEY_PLACEHOLDER"],
+        [wallet.address, username, PUBLIC_KEY_PLACEHOLDER],
       );
 
       console.log("[AUTH LOG] Constructed Message Hash:", messageHash);
@@ -80,7 +108,7 @@ export const useAuth = (): UseAuthReturn => {
         {
           userAddress: wallet.address,
           username,
-          publicKey: "PUBKEY_PLACEHOLDER",
+          publicKey: PUBLIC_KEY_PLACEHOLDER,
           signature,
         },
       );
@@ -93,12 +121,10 @@ export const useAuth = (): UseAuthReturn => {
 
       return response.data;
     } catch (err: unknown) {
-      let msg = "An unknown error occurred during registration.";
-      if (err instanceof AxiosError) {
-        msg = err.response?.data?.error || err.message;
-      } else if (err instanceof Error) {
-        msg = err.message;
-      }
+      const msg = getErrorMessage(
+        err,
+        "An unknown error occurred during registration.",
+      );
       setError(msg);
       console.error("[AUTH ERROR] Registration Failed:", msg);
       throw new Error(msg);
@@ -117,7 +143,7 @@ export const useAuth = (): UseAuthReturn => {
    * @throws {Error} Throws an error if the challenge fetch, signature, or verification fails.
    */
   const login = async (
-    wallet: ethers.Wallet,
+    wallet: AuthWallet,
     relayUrl: string,
   ): Promise<string> => {
     setLoading(true);
@@ -164,18 +190,15 @@ export const useAuth = (): UseAuthReturn => {
       );
       console.log("=========================================");
 
-      localStorage.setItem("auth_token", newToken);
-      localStorage.setItem("securep2p_last_activity", Date.now().toString());
+      saveSessionToken(newToken);
       setToken(newToken);
 
       return newToken;
     } catch (err: unknown) {
-      let msg = "An unknown error occurred during login.";
-      if (err instanceof AxiosError) {
-        msg = err.response?.data?.error || err.message;
-      } else if (err instanceof Error) {
-        msg = err.message;
-      }
+      const msg = getErrorMessage(
+        err,
+        "An unknown error occurred during login.",
+      );
       setError(msg);
       console.error("[AUTH ERROR] Login Failed:", msg);
       throw new Error(msg);
@@ -191,8 +214,7 @@ export const useAuth = (): UseAuthReturn => {
    * @returns {void}
    */
   const logout = useCallback((): void => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("securep2p_last_activity");
+    clearSessionToken();
     setToken(null);
     console.log(
       "[AUTH LOG] Session Terminated. Token and activity timestamp removed from local storage.",
