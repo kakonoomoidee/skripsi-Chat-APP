@@ -26,6 +26,13 @@ export interface UseCallActionsReturn {
   toggleMute: () => void;
 }
 
+const CALL_SIGNAL_TYPES = {
+  offer: "CALL_OFFER",
+  accepted: "CALL_ACCEPTED",
+  rejected: "CALL_REJECTED",
+  ended: "CALL_ENDED",
+} as const;
+
 /**
  * Custom hook to manage WebRTC voice call signaling and actions.
  * Encapsulates the logic for offering, answering, rejecting, and ending calls.
@@ -45,15 +52,31 @@ export const useCallActions = ({
   setIsMuted,
   showToast,
 }: UseCallActionsParams): UseCallActionsReturn => {
+  const sendCallSignal = (
+    signalType: (typeof CALL_SIGNAL_TYPES)[keyof typeof CALL_SIGNAL_TYPES],
+  ): boolean => {
+    if (!activeChat) {
+      return false;
+    }
+
+    const payload = JSON.stringify({ type: signalType });
+    const encryptedPayload = encrypt(activeChat, payload);
+
+    if (!encryptedPayload) {
+      return false;
+    }
+
+    sendDataViaWebRTC(activeChat, encryptedPayload);
+    return true;
+  };
+
   const initiateCall = (): void => {
     if (!activeChat || !isWebRTCConnected) return;
 
     console.log(`[Call Action] Initiating call to peer: ${activeChat}`);
-    const payload = JSON.stringify({ type: "CALL_OFFER" });
-    const encryptedCall = encrypt(activeChat, payload);
+    const wasSent = sendCallSignal(CALL_SIGNAL_TYPES.offer);
 
-    if (encryptedCall) {
-      sendDataViaWebRTC(activeChat, encryptedCall);
+    if (wasSent) {
       showToast("Calling...", "success");
     }
   };
@@ -70,11 +93,9 @@ export const useCallActions = ({
       return;
     }
 
-    const payload = JSON.stringify({ type: "CALL_ACCEPTED" });
-    const encryptedAccept = encrypt(activeChat, payload);
+    const wasSent = sendCallSignal(CALL_SIGNAL_TYPES.accepted);
 
-    if (encryptedAccept) {
-      sendDataViaWebRTC(activeChat, encryptedAccept);
+    if (wasSent) {
       setIsIncomingCall(false);
       setIsInCall(true);
       console.log("[Call Action] Call connected successfully.");
@@ -85,11 +106,9 @@ export const useCallActions = ({
     if (!activeChat || !isWebRTCConnected) return;
 
     console.log("[Call Action] Declining incoming call.");
-    const payload = JSON.stringify({ type: "CALL_REJECTED" });
-    const encryptedReject = encrypt(activeChat, payload);
+    const wasSent = sendCallSignal(CALL_SIGNAL_TYPES.rejected);
 
-    if (encryptedReject) {
-      sendDataViaWebRTC(activeChat, encryptedReject);
+    if (wasSent) {
       setIsIncomingCall(false);
     }
   };
@@ -100,11 +119,8 @@ export const useCallActions = ({
     console.log("[Call Action] Terminating active call.");
     stopVoiceCall(activeChat);
 
-    const payload = JSON.stringify({ type: "CALL_ENDED" });
-    const encrypted = encrypt(activeChat, payload);
-
-    if (encrypted && isWebRTCConnected) {
-      sendDataViaWebRTC(activeChat, encrypted);
+    if (isWebRTCConnected) {
+      sendCallSignal(CALL_SIGNAL_TYPES.ended);
     }
 
     setIsInCall(false);

@@ -1,6 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "@/store/useChatStore";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
 import ms from "ms";
+
+const PING_TIMEOUT_MS = ms("5s");
+const RECONNECT_INTERVAL_MS = ms("10s");
+const AVATAR_STORAGE_KEY = "my_avatar";
+
+type TimeoutHandle = number;
+type IntervalHandle = number;
 
 /**
  * Interface defining the dependencies for the useConnectionManager hook.
@@ -37,14 +45,32 @@ export const useConnectionManager = ({
   initiateWebRTCConnection,
   initiateHandshake,
 }: UseConnectionManagerProps) => {
-  const { activeChat, initiators, connectionStates, setConnectionStates } = useChatStore();
+  const { activeChat, initiators, connectionStates, setConnectionStates } =
+    useChatStore();
 
   const webrtcInitiated = useRef<{ [addr: string]: boolean }>({});
   const connectedPeersRef = useRef<string[]>([]);
   const avatarSyncedPeers = useRef<{ [addr: string]: boolean }>({});
-  const pingTimeoutRef = useRef<{ [addr: string]: NodeJS.Timeout }>({});
-  const reconnectIntervalRef = useRef<{ [addr: string]: NodeJS.Timeout }>({});
+  const pingTimeoutRef = useRef<{ [addr: string]: TimeoutHandle }>({});
+  const reconnectIntervalRef = useRef<{ [addr: string]: IntervalHandle }>({});
   const pendingWebRTCAfterHandshake = useRef<Set<string>>(new Set());
+
+  const syncAvatarIfNeeded = (peer: string): void => {
+    if (avatarSyncedPeers.current[peer]) return;
+
+    const myAvatar = localStorage.getItem(AVATAR_STORAGE_KEY);
+    if (!myAvatar) return;
+
+    avatarSyncedPeers.current[peer] = true;
+    const payload = JSON.stringify({
+      type: CHAT_PROTOCOL_TYPES.profileSync,
+      avatar: myAvatar,
+    });
+    const encryptedPayload = encrypt(peer, payload);
+    if (encryptedPayload) {
+      sendDataViaWebRTC(peer, encryptedPayload);
+    }
+  };
 
   useEffect(() => {
     connectedPeersRef.current = connectedPeers;
@@ -71,14 +97,21 @@ export const useConnectionManager = ({
 
     checkPeerStatus(current);
 
-    pingTimeoutRef.current[current] = setTimeout(() => {
+    pingTimeoutRef.current[current] = window.setTimeout(() => {
       delete pingTimeoutRef.current[current];
       pendingWebRTCAfterHandshake.current.delete(current);
       setConnectionStates((prev) => ({ ...prev, [current]: "idle" }));
       showToast("Peer is offline or unreachable.", "error");
       removeActiveSession(current);
-    }, ms("5s"));
-  }, [activeChat, checkPeerStatus, initiators, showToast, removeActiveSession, setConnectionStates]);
+    }, PING_TIMEOUT_MS);
+  }, [
+    activeChat,
+    checkPeerStatus,
+    initiators,
+    showToast,
+    removeActiveSession,
+    setConnectionStates,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -96,10 +129,10 @@ export const useConnectionManager = ({
       delete pingTimeoutRef.current[current];
     }
     if (reconnectIntervalRef.current[current]) {
-      clearInterval(reconnectIntervalRef.current[current]);
+      window.clearInterval(reconnectIntervalRef.current[current]);
       delete reconnectIntervalRef.current[current];
     }
-    
+
     webrtcInitiated.current[current] = false;
     setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
   }, [isWebRTCConnected, activeChat, setConnectionStates]);
@@ -107,13 +140,7 @@ export const useConnectionManager = ({
   useEffect(() => {
     if (!isWebRTCConnected || !activeChat) return;
     const peer = activeChat.toLowerCase();
-    if (avatarSyncedPeers.current[peer]) return;
-    const myAvatar = localStorage.getItem("my_avatar");
-    if (!myAvatar) return;
-    avatarSyncedPeers.current[peer] = true;
-    const payload = JSON.stringify({ type: "PROFILE_SYNC", avatar: myAvatar });
-    const encrypted = encrypt(peer, payload);
-    if (encrypted) sendDataViaWebRTC(peer, encrypted);
+    syncAvatarIfNeeded(peer);
   }, [isWebRTCConnected, activeChat, encrypt, sendDataViaWebRTC]);
 
   useEffect(() => {
@@ -132,10 +159,10 @@ export const useConnectionManager = ({
         clearInterval(reconnectIntervalRef.current[current]);
       }
 
-      reconnectIntervalRef.current[current] = setInterval(() => {
+      reconnectIntervalRef.current[current] = window.setInterval(() => {
         if (connectedPeersRef.current.includes(current)) {
           if (reconnectIntervalRef.current[current]) {
-            clearInterval(reconnectIntervalRef.current[current]);
+            window.clearInterval(reconnectIntervalRef.current[current]);
             delete reconnectIntervalRef.current[current];
           }
           setConnectionStates((prev) => ({ ...prev, [current]: "connected" }));
@@ -143,7 +170,7 @@ export const useConnectionManager = ({
         }
         webrtcInitiated.current[current] = false;
         checkPeerStatus(current);
-      }, ms("10s"));
+      }, RECONNECT_INTERVAL_MS);
     } else if (current) {
       if (reconnectIntervalRef.current[current]) {
         clearInterval(reconnectIntervalRef.current[current]);

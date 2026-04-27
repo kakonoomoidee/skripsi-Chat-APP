@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchActiveWalletBalance } from "@/services/walletBalanceService";
-
-const FALLBACK_RPC_URL = "http://127.0.0.1:7545";
+import { resolveRpcUrl } from "@/services/web3WalletService";
 
 /**
  * Retrieves and tracks the active wallet balance while transfer modal is open.
@@ -17,9 +16,7 @@ export const useTransferBalance = (isOpen: boolean): string | null => {
 
     const loadBalance = async (): Promise<void> => {
       try {
-        const balance = await fetchActiveWalletBalance(
-          import.meta.env.VITE_RPC_URL || FALLBACK_RPC_URL,
-        );
+        const balance = await fetchActiveWalletBalance(resolveRpcUrl());
         setCurrentBalance(balance);
       } catch (error) {
         console.error("Failed to fetch balance for transfer modal", error);

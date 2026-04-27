@@ -16,21 +16,21 @@ export const useHasLinkedWallet = (): boolean => {
   );
 
   useEffect(() => {
-    const updateWalletLinkState = () => {
+    const updateWalletLinkState = (): void => {
       setHasLinkedWallet(resolveHasLinkedWallet());
     };
 
     updateWalletLinkState();
     window.addEventListener("storage", updateWalletLinkState);
 
-    const intervalId = setInterval(
+    const intervalId = window.setInterval(
       updateWalletLinkState,
       WALLET_LINK_CHECK_INTERVAL_MS,
     );
 
     return () => {
       window.removeEventListener("storage", updateWalletLinkState);
-      clearInterval(intervalId);
+      window.clearInterval(intervalId);
     };
   }, []);
 

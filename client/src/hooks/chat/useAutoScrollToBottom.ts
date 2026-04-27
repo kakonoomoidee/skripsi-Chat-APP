@@ -12,6 +12,11 @@ export const useAutoScrollToBottom = (
   dependency: unknown,
 ): void => {
   useEffect(() => {
-    targetRef.current?.scrollIntoView({ behavior: "smooth" });
+    const targetElement = targetRef.current;
+    if (!targetElement) {
+      return;
+    }
+
+    targetElement.scrollIntoView({ behavior: "smooth" });
   }, [targetRef, dependency]);
 };

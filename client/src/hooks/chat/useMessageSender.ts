@@ -1,15 +1,48 @@
 import { db } from "@/utils/db";
 import { useSessionStore } from "@/store";
+import { type ReplyMessage } from "@/store/useSessionStore";
+import { getStoredWalletAddresses } from "@/services/walletBalanceService";
+import {
+  INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
+  resolveRpcUrl,
+} from "@/services/web3WalletService";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
 import {
   transferViaInjectedProvider,
   transferViaInternalWallet,
 } from "@/utils/transaction";
 
-declare global {
-  interface Window {
-    ethereum?: any;
+const MAX_P2P_FILE_SIZE_BYTES = 500 * 1024;
+const AUDIO_PREFIX = "[AUDIO]";
+
+type TextMessagePayload = {
+  text: string;
+  replyTo?: ReplyMessage;
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    return error.message;
   }
-}
+
+  return fallback;
+};
+
+const readAsDataUrl = (file: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === "string") {
+        resolve(result);
+        return;
+      }
+
+      reject(new Error("Failed to read file data."));
+    };
+    reader.onerror = () => reject(new Error("Failed to read file data."));
+    reader.readAsDataURL(file);
+  });
 
 /**
  * Interface defining the dependencies required by the useMessageSender hook.
@@ -62,6 +95,34 @@ export const useMessageSender = ({
   const { messageInput, setMessageInput, replyingTo, setReplyingTo } =
     useSessionStore();
 
+  const addOutgoingMessage = async (
+    chatId: string,
+    ownerAddress: string,
+    encryptedText: string,
+    isImage?: boolean,
+  ): Promise<void> => {
+    await db.messages.add({
+      ownerAddress: ownerAddress.toLowerCase(),
+      chatId: chatId.toLowerCase(),
+      text: encryptLocalDB(encryptedText),
+      isMine: true,
+      timestamp: Date.now(),
+      ...(isImage ? { isImage: true } : {}),
+      status: isWebRTCConnected ? "delivered" : "pending",
+    });
+  };
+
+  const encryptAndSendPayload = (chatId: string, payload: string): boolean => {
+    const encryptedPayload = encrypt(chatId, payload);
+
+    if (!encryptedPayload) {
+      return false;
+    }
+
+    sendDataViaWebRTC(chatId, encryptedPayload);
+    return true;
+  };
+
   /**
    * Encrypts and sends a text message via WebRTC.
    *
@@ -80,32 +141,17 @@ export const useMessageSender = ({
       return;
 
     try {
-      const payloadObj: Record<string, any> = { text: messageInput };
+      const payloadObj: TextMessagePayload = { text: messageInput };
 
       if (replyingTo) {
-        payloadObj.replyTo = {
-          id: replyingTo.id,
-          text: replyingTo.text,
-          isMine: replyingTo.isMine,
-          timestamp: replyingTo.timestamp,
-        };
+        payloadObj.replyTo = replyingTo;
       }
 
       const stringifiedPayload = JSON.stringify(payloadObj);
-      const encryptedMsg = encrypt(activeChat, stringifiedPayload);
+      const wasSent = encryptAndSendPayload(activeChat, stringifiedPayload);
+      if (!wasSent) throw new Error("Encryption failed");
 
-      if (!encryptedMsg) throw new Error("Encryption failed");
-
-      sendDataViaWebRTC(activeChat, encryptedMsg);
-
-      await db.messages.add({
-        ownerAddress: address.toLowerCase(),
-        chatId: activeChat.toLowerCase(),
-        text: encryptLocalDB(stringifiedPayload),
-        isMine: true,
-        timestamp: Date.now(),
-        status: isWebRTCConnected ? "delivered" : "pending",
-      });
+      await addOutgoingMessage(activeChat, address, stringifiedPayload);
 
       setMessageInput("");
       setReplyingTo(null);
@@ -127,36 +173,21 @@ export const useMessageSender = ({
     const file = e.target.files?.[0];
     if (!file || !activeChat || !isWebRTCConnected || !address) return;
 
-    if (file.size > 1024 * 500) {
+    if (file.size > MAX_P2P_FILE_SIZE_BYTES) {
       showToast("File too large! Max 500KB for P2P.", "error");
       return;
     }
 
-    const reader = new FileReader();
+    try {
+      const base64 = await readAsDataUrl(file);
+      const wasSent = encryptAndSendPayload(activeChat, base64);
+      if (!wasSent) throw new Error("Encryption failed");
 
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const encryptedImage = encrypt(activeChat, base64);
-        if (!encryptedImage) throw new Error("Encryption failed");
-
-        sendDataViaWebRTC(activeChat, encryptedImage);
-
-        await db.messages.add({
-          ownerAddress: address.toLowerCase(),
-          chatId: activeChat.toLowerCase(),
-          text: encryptLocalDB(base64),
-          isMine: true,
-          timestamp: Date.now(),
-          isImage: true,
-          status: isWebRTCConnected ? "delivered" : "pending",
-        });
-      } catch (err) {
-        console.error("[Message Sender] Image send error:", err);
-        showToast("Encryption failed.", "error");
-      }
-    };
-    reader.readAsDataURL(file);
+      await addOutgoingMessage(activeChat, address, base64, true);
+    } catch (err) {
+      console.error("[Message Sender] Image send error:", err);
+      showToast("Encryption failed.", "error");
+    }
   };
 
   /**
@@ -177,19 +208,10 @@ export const useMessageSender = ({
       const payloadObj = { type: "DOCUMENT", fileName, fileData: base64 };
       const stringifiedPayload = JSON.stringify(payloadObj);
 
-      const encryptedDoc = encrypt(activeChat, stringifiedPayload);
-      if (!encryptedDoc) throw new Error("Encryption failed");
+      const wasSent = encryptAndSendPayload(activeChat, stringifiedPayload);
+      if (!wasSent) throw new Error("Encryption failed");
 
-      sendDataViaWebRTC(activeChat, encryptedDoc);
-
-      await db.messages.add({
-        ownerAddress: address.toLowerCase(),
-        chatId: activeChat.toLowerCase(),
-        text: encryptLocalDB(stringifiedPayload),
-        isMine: true,
-        timestamp: Date.now(),
-        status: isWebRTCConnected ? "delivered" : "pending",
-      });
+      await addOutgoingMessage(activeChat, address, stringifiedPayload);
     } catch (err) {
       console.error("[Message Sender] Document send error:", err);
       showToast("Document encryption failed.", "error");
@@ -207,20 +229,10 @@ export const useMessageSender = ({
       return;
 
     try {
-      const encryptedImage = encrypt(activeChat, base64);
-      if (!encryptedImage) throw new Error("Encryption failed");
+      const wasSent = encryptAndSendPayload(activeChat, base64);
+      if (!wasSent) throw new Error("Encryption failed");
 
-      sendDataViaWebRTC(activeChat, encryptedImage);
-
-      await db.messages.add({
-        ownerAddress: address.toLowerCase(),
-        chatId: activeChat.toLowerCase(),
-        text: encryptLocalDB(base64),
-        isMine: true,
-        timestamp: Date.now(),
-        isImage: true,
-        status: isWebRTCConnected ? "delivered" : "pending",
-      });
+      await addOutgoingMessage(activeChat, address, base64, true);
     } catch (err) {
       console.error("[Message Sender] Camera photo send error:", err);
       showToast("Camera image encryption failed.", "error");
@@ -236,30 +248,17 @@ export const useMessageSender = ({
   const handleSendAudio = async (audioBlob: Blob): Promise<void> => {
     if (!audioBlob || !activeChat || !isWebRTCConnected || !address) return;
 
-    const reader = new FileReader();
+    try {
+      const encodedAudio = await readAsDataUrl(audioBlob);
+      const base64Audio = `${AUDIO_PREFIX}${encodedAudio}`;
+      const wasSent = encryptAndSendPayload(activeChat, base64Audio);
+      if (!wasSent) throw new Error("Encryption failed");
 
-    reader.onload = async (event) => {
-      const base64Audio = `[AUDIO]${event.target?.result as string}`;
-      try {
-        const encryptedAudio = encrypt(activeChat, base64Audio);
-        if (!encryptedAudio) throw new Error("Encryption failed");
-
-        sendDataViaWebRTC(activeChat, encryptedAudio);
-
-        await db.messages.add({
-          ownerAddress: address.toLowerCase(),
-          chatId: activeChat.toLowerCase(),
-          text: encryptLocalDB(base64Audio),
-          isMine: true,
-          timestamp: Date.now(),
-          status: isWebRTCConnected ? "delivered" : "pending",
-        });
-      } catch (err) {
-        console.error("[Message Sender] Audio send error:", err);
-        showToast("Audio encryption failed.", "error");
-      }
-    };
-    reader.readAsDataURL(audioBlob);
+      await addOutgoingMessage(activeChat, address, base64Audio);
+    } catch (err) {
+      console.error("[Message Sender] Audio send error:", err);
+      showToast("Audio encryption failed.", "error");
+    }
   };
 
   /**
@@ -270,12 +269,8 @@ export const useMessageSender = ({
   const handleTyping = (): void => {
     if (!activeChat || !isWebRTCConnected) return;
 
-    const payload = JSON.stringify({ type: "TYPING" });
-    const encryptedTyping = encrypt(activeChat, payload);
-
-    if (encryptedTyping) {
-      sendDataViaWebRTC(activeChat, encryptedTyping);
-    }
+    const payload = JSON.stringify({ type: CHAT_PROTOCOL_TYPES.typing });
+    encryptAndSendPayload(activeChat, payload);
   };
 
   /**
@@ -286,12 +281,10 @@ export const useMessageSender = ({
   const requestPeerWallet = (): void => {
     if (!activeChat || !hasSecret(activeChat) || !isWebRTCConnected) return;
 
-    const requestPayload = JSON.stringify({ type: "WALLET_REQUEST" });
-    const encryptedPayload = encrypt(activeChat, requestPayload);
-
-    if (encryptedPayload) {
-      sendDataViaWebRTC(activeChat, encryptedPayload);
-    }
+    const requestPayload = JSON.stringify({
+      type: CHAT_PROTOCOL_TYPES.walletRequest,
+    });
+    encryptAndSendPayload(activeChat, requestPayload);
   };
 
   /**
@@ -302,13 +295,13 @@ export const useMessageSender = ({
    * @returns {Promise<void>}
    */
   const handleSendCrypto = async (amount: string): Promise<void> => {
-    if (!peerWalletAddress) {
+    if (!peerWalletAddress || !activeChat || !address) {
       throw new Error("Peer wallet address not resolved yet.");
     }
 
-    const encryptedPk = localStorage.getItem("internal_tx_pk");
+    const encryptedPk = localStorage.getItem(INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY);
     const internalPk = encryptedPk ? decryptLocalDB(encryptedPk) : null;
-    const externalAddress = localStorage.getItem("linked_metamask");
+    const { internalAddress, externalAddress } = getStoredWalletAddresses();
 
     if (!internalPk && !externalAddress) {
       throw new Error(
@@ -319,8 +312,7 @@ export const useMessageSender = ({
     if (
       (externalAddress &&
         externalAddress.toLowerCase() === peerWalletAddress.toLowerCase()) ||
-      localStorage.getItem("internal_tx_wallet")?.toLowerCase() ===
-        peerWalletAddress.toLowerCase()
+      internalAddress?.toLowerCase() === peerWalletAddress.toLowerCase()
     ) {
       throw new Error(
         "Self-Transfer Blocked. You cannot send crypto to yourself.",
@@ -331,7 +323,7 @@ export const useMessageSender = ({
       let txHash = "";
 
       if (internalPk) {
-        const rpcUrl = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545";
+        const rpcUrl = resolveRpcUrl();
         txHash = await transferViaInternalWallet(
           internalPk,
           peerWalletAddress,
@@ -343,26 +335,23 @@ export const useMessageSender = ({
       }
 
       const successPayload = JSON.stringify({
-        type: "TX_SUCCESS",
+        type: CHAT_PROTOCOL_TYPES.txSuccess,
         hash: txHash,
       });
 
-      const encryptedSuccess = encrypt(activeChat as string, successPayload);
-      if (encryptedSuccess) {
-        sendDataViaWebRTC(activeChat as string, encryptedSuccess);
-      }
+      encryptAndSendPayload(activeChat, successPayload);
 
       await db.messages.add({
-        ownerAddress: (address as string).toLowerCase(),
-        chatId: (activeChat as string).toLowerCase(),
+        ownerAddress: address.toLowerCase(),
+        chatId: activeChat.toLowerCase(),
         text: encryptLocalDB(`[SENT] ${amount} ETH\nTx Hash: ${txHash}`),
         isMine: true,
         timestamp: Date.now(),
         status: "delivered",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Message Sender] Transaction failed:", err);
-      showToast(err.message || "Crypto transfer failed", "error");
+      showToast(getErrorMessage(err, "Crypto transfer failed"), "error");
       throw err;
     }
   };

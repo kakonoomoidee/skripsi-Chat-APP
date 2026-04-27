@@ -1,33 +1,24 @@
 import { useMemo, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/utils/db";
+import { type Message } from "@/utils/db";
+import { isNonRenderableProtocolMessage } from "@/utils/chatProtocol";
 import ms from "ms";
 
-const HIDDEN_PROTOCOL_TYPES = new Set([
-  "PROFILE_SYNC",
-  "WALLET_REQUEST",
-  "WALLET_RESPONSE",
-]);
+const AUTO_DELETE_THRESHOLD_MS_BY_MODE: Record<string, number> = {
+  "1": ms("1d"),
+  "3": ms("3d"),
+  "7": ms("7d"),
+  "30": ms("30d"),
+};
 
-/**
- * Determines whether a decrypted message is an internal protocol payload that
- * must not be rendered in user-facing UI.
- *
- * @param {string} text - Decrypted message content.
- * @returns {boolean} True when the message should be hidden from UI rendering.
- */
-const shouldHideProtocolMessage = (text: string): boolean => {
-  const normalized = text.trim();
-  if (!normalized) return false;
-  if (!normalized.startsWith("{")) return false;
-  try {
-    const parsed = JSON.parse(normalized) as { type?: unknown };
-    if (!parsed || typeof parsed !== "object") return false;
-    if (typeof parsed.type !== "string") return false;
-    return HIDDEN_PROTOCOL_TYPES.has(parsed.type);
-  } catch {
-    return false;
+const resolveAutoDeleteThresholdTime = (mode: string): number | null => {
+  const thresholdMs = AUTO_DELETE_THRESHOLD_MS_BY_MODE[mode];
+  if (!thresholdMs) {
+    return null;
   }
+
+  return Date.now() - thresholdMs;
 };
 
 /**
@@ -68,8 +59,7 @@ export const useMessageData = ({
         .sortBy("timestamp");
     },
     [activeChat, address],
-    [],
-  );
+  ) as Message[] | undefined;
 
   const messages = useMemo(() => {
     if (!rawMessages) return [];
@@ -78,7 +68,7 @@ export const useMessageData = ({
         ...msg,
         text: decryptLocalDB(msg.text),
       }))
-      .filter((msg) => !shouldHideProtocolMessage(msg.text));
+      .filter((msg) => !isNonRenderableProtocolMessage(msg.text));
   }, [rawMessages, decryptLocalDB]);
 
   const globalUnreadMessages = useLiveQuery(
@@ -94,8 +84,7 @@ export const useMessageData = ({
         .toArray();
     },
     [address],
-    [],
-  );
+  ) as Message[] | undefined;
 
   const unreadCount = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -110,15 +99,15 @@ export const useMessageData = ({
   useEffect(() => {
     const sweepOldMessages = async () => {
       if (autoDeleteMode === "never" || autoDeleteMode === "close") return;
-      const now = Date.now();
-      let thresholdTime = now;
-      if (autoDeleteMode === "1") thresholdTime = now - ms("1d");
-      else if (autoDeleteMode === "3") thresholdTime = now - ms("3d");
-      else if (autoDeleteMode === "7") thresholdTime = now - ms("7d");
-      else if (autoDeleteMode === "30") thresholdTime = now - ms("30d");
+
+      const thresholdTime = resolveAutoDeleteThresholdTime(autoDeleteMode);
+      if (!thresholdTime) return;
+
       try {
         await db.messages.where("timestamp").below(thresholdTime).delete();
-      } catch (_) {}
+      } catch {
+        return;
+      }
     };
     sweepOldMessages();
   }, [autoDeleteMode]);

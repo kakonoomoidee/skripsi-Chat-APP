@@ -67,6 +67,26 @@ export const useChatLogic = ({
     undefined,
   );
 
+  const upsertActiveSession = useCallback(
+    (session: ActiveSession): void => {
+      setActiveSessions((prev) => {
+        if (prev.find((item) => item.address === session.address)) {
+          return prev;
+        }
+
+        return [...prev, session];
+      });
+    },
+    [setActiveSessions],
+  );
+
+  const setPeerInitiator = useCallback(
+    (peerAddress: string, isInitiator: boolean): void => {
+      setInitiators((prev) => ({ ...prev, [peerAddress]: isInitiator }));
+    },
+    [setInitiators],
+  );
+
   useEffect(() => {
     onHandshakeCompleteRef.current = onHandshakeComplete;
   }, [onHandshakeComplete]);
@@ -142,7 +162,7 @@ export const useChatLogic = ({
           ephemeralPublicKey: myNewPubKey,
         });
 
-        setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
+        setPeerInitiator(peerAddress, false);
         return;
       }
 
@@ -161,12 +181,9 @@ export const useChatLogic = ({
         ephemeralPublicKey: myNewPubKey,
       });
 
-      setActiveSessions((prev) => {
-        if (prev.find((s) => s.address === peerAddress)) return prev;
-        return [...prev, { address: peerAddress, username: incomingUser }];
-      });
+      upsertActiveSession({ address: peerAddress, username: incomingUser });
 
-      setInitiators((prev) => ({ ...prev, [peerAddress]: false }));
+      setPeerInitiator(peerAddress, false);
 
       await db.contacts.put({
         address: peerAddress,
@@ -208,6 +225,8 @@ export const useChatLogic = ({
     relayUrl,
     generateHandshakeKeys,
     forceDisconnectPeer,
+    setPeerInitiator,
+    upsertActiveSession,
   ]);
 
   /**
@@ -246,8 +265,9 @@ export const useChatLogic = ({
     setSearchError("");
 
     try {
+      const normalizedUsername = targetUsername.trim();
       const peerAddress = (
-        await getAddressByUsername(relayUrl, targetUsername.trim())
+        await getAddressByUsername(relayUrl, normalizedUsername)
       ).toLowerCase();
 
       if (address && peerAddress === address.toLowerCase()) {
@@ -256,20 +276,11 @@ export const useChatLogic = ({
         return;
       }
 
-      setActiveSessions((prev) => {
-        if (prev.find((s) => s.address === peerAddress)) return prev;
-        return [
-          ...prev,
-          { address: peerAddress, username: targetUsername.trim() },
-        ];
-      });
+      upsertActiveSession({ address: peerAddress, username: normalizedUsername });
 
       setActiveChat(peerAddress);
-      setActiveUsername(targetUsername.trim());
-      setInitiators((prev: Record<string, boolean>) => ({
-        ...prev,
-        [peerAddress]: true,
-      }));
+      setActiveUsername(normalizedUsername);
+      setPeerInitiator(peerAddress, true);
 
       setTargetUsername("");
     } catch {
@@ -293,10 +304,7 @@ export const useChatLogic = ({
     const myNewPubKey = generateHandshakeKeys(peerAddress);
 
     computeSecret(peerAddress, request.ephemeralPublicKey);
-    setInitiators((prev: Record<string, boolean>) => ({
-      ...prev,
-      [peerAddress]: false,
-    }));
+    setPeerInitiator(peerAddress, false);
 
     if (socket) {
       socket.emit("handshake_response", {
@@ -314,10 +322,7 @@ export const useChatLogic = ({
         ? request.username
         : "Unknown User";
 
-    setActiveSessions((prev) => {
-      if (prev.find((s) => s.address === request.from)) return prev;
-      return [...prev, { address: request.from, username: finalUsername }];
-    });
+    upsertActiveSession({ address: request.from, username: finalUsername });
 
     setActiveChat(request.from);
     setActiveUsername(finalUsername);
@@ -361,7 +366,7 @@ export const useChatLogic = ({
         prev.filter((s) => s.address.toLowerCase() !== addr),
       );
 
-      setInitiators((prev: Record<string, boolean>) => {
+      setInitiators((prev) => {
         const next = { ...prev };
         delete next[addr];
         return next;

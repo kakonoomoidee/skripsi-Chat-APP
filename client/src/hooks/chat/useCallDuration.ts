@@ -16,11 +16,11 @@ export const useCallDuration = (isInCall: boolean): number => {
       return;
     }
 
-    const timer = setInterval(() => {
+    const timerId = window.setInterval(() => {
       setDuration((previous) => previous + 1);
     }, CALL_DURATION_TICK_MS);
 
-    return () => clearInterval(timer);
+    return () => window.clearInterval(timerId);
   }, [isInCall]);
 
   return duration;

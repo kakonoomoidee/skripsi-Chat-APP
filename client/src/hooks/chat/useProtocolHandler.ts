@@ -1,13 +1,48 @@
 import { useEffect } from "react";
 import { db } from "@/utils/db";
+import { type Message } from "@/utils/db";
+import { getStoredWalletAddresses } from "@/services/walletBalanceService";
+import {
+  CHAT_PROTOCOL_TYPES,
+  parseChatProtocolPayload,
+} from "@/utils/chatProtocol";
 import { useChatStore } from "@/store/useChatStore";
 import { useWalletStore } from "@/store";
+
+const removeProtocolMessage = async (messageId?: number): Promise<void> => {
+  if (!messageId) {
+    return;
+  }
+
+  await db.messages.delete(messageId);
+};
+
+const resolveTransactionAddress = (fallbackAddress: string | null): string | null => {
+  const { internalAddress, externalAddress } = getStoredWalletAddresses();
+  return internalAddress || externalAddress || fallbackAddress;
+};
+
+const sendWalletResponse = (
+  activeChat: string,
+  txAddress: string,
+  encrypt: (peer: string, data: string) => string | null,
+  sendDataViaWebRTC: (peer: string, data: string) => void,
+): void => {
+  const responsePayload = JSON.stringify({
+    type: CHAT_PROTOCOL_TYPES.walletResponse,
+    address: txAddress,
+  });
+  const encryptedResponse = encrypt(activeChat, responsePayload);
+  if (encryptedResponse) {
+    sendDataViaWebRTC(activeChat, encryptedResponse);
+  }
+};
 
 /**
  * Interface defining the dependencies for the useProtocolHandler hook.
  */
 export interface UseProtocolHandlerProps {
-  messages: any[];
+  messages: Message[];
   address: string | null;
   encrypt: (peer: string, data: string) => string | null;
   sendDataViaWebRTC: (peer: string, data: string) => void;
@@ -34,40 +69,40 @@ export const useProtocolHandler = ({
       const latestMessage = messages[messages.length - 1];
       if (!latestMessage?.text) return;
       const { peerWalletAddress, setPeerWalletAddress } = useWalletStore.getState();
-      try {
-        const parsedData = JSON.parse(latestMessage.text);
+      const parsedPayload = parseChatProtocolPayload(latestMessage.text);
+      if (!parsedPayload) return;
 
-        if (parsedData.type === "WALLET_RESPONSE" && parsedData.address) {
-          if (peerWalletAddress !== parsedData.address) {
-            setPeerWalletAddress(parsedData.address);
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
+      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletResponse) {
+        if (peerWalletAddress !== parsedPayload.address) {
+          setPeerWalletAddress(parsedPayload.address);
+        }
+        await removeProtocolMessage(latestMessage.id);
+        return;
+      }
+
+      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletRequest) {
+        const txAddress = resolveTransactionAddress(address);
+
+        if (txAddress && activeChat) {
+          sendWalletResponse(
+            activeChat,
+            txAddress,
+            encrypt,
+            sendDataViaWebRTC,
+          );
         }
 
-        if (parsedData.type === "WALLET_REQUEST") {
-          const txAddress =
-            localStorage.getItem("internal_tx_wallet") ||
-            localStorage.getItem("linked_metamask") ||
-            address;
-          if (txAddress && activeChat) {
-            const responsePayload = JSON.stringify({
-              type: "WALLET_RESPONSE",
-              address: txAddress,
-            });
-            const encryptedResponse = encrypt(activeChat, responsePayload);
-            if (encryptedResponse) sendDataViaWebRTC(activeChat, encryptedResponse);
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
-        }
+        await removeProtocolMessage(latestMessage.id);
+        return;
+      }
 
-        if (parsedData.type === "PROFILE_SYNC" && parsedData.avatar && activeChat) {
-          const existing = await db.contacts.get(activeChat.toLowerCase());
-          if (existing) {
-            await db.contacts.put({ ...existing, avatar: parsedData.avatar });
-          }
-          if (latestMessage.id) await db.messages.delete(latestMessage.id);
+      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.profileSync && activeChat) {
+        const existing = await db.contacts.get(activeChat.toLowerCase());
+        if (existing) {
+          await db.contacts.put({ ...existing, avatar: parsedPayload.avatar });
         }
-      } catch (_) {}
+        await removeProtocolMessage(latestMessage.id);
+      }
     };
     handleProtocolMessages();
   }, [messages, activeChat, address, encrypt, sendDataViaWebRTC]);
