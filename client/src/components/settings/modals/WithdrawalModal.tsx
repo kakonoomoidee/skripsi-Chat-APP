@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { createPortal } from "react-dom";
 import { SeedPhraseModalInput } from "@/components/ui";
+import { useSeedInputModal } from "@/hooks/ui/useSeedInputModal";
 
 export interface WithdrawalModalProps {
   isOpen: boolean;
@@ -25,7 +26,8 @@ export default function WithdrawalModal({
   onClose,
   onConfirm,
 }: WithdrawalModalProps): React.JSX.Element | null {
-  const [withdrawSeedInput, setWithdrawSeedInput] = useState<string>("");
+  const { seedInput, setSeedInput, clearSeedInput, canSubmit } =
+    useSeedInputModal();
 
   if (!isOpen || typeof document === "undefined") return null;
 
@@ -41,8 +43,8 @@ export default function WithdrawalModal({
         </p>
 
         <SeedPhraseModalInput
-          value={withdrawSeedInput}
-          onChange={setWithdrawSeedInput}
+          value={seedInput}
+          onChange={setSeedInput}
           disabled={isWithdrawing}
         />
 
@@ -54,7 +56,7 @@ export default function WithdrawalModal({
         <div className="flex gap-3 mt-4">
           <button
             onClick={() => {
-              setWithdrawSeedInput("");
+              clearSeedInput();
               onClose();
             }}
             className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:bg-zinc-800 transition-colors"
@@ -62,8 +64,8 @@ export default function WithdrawalModal({
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(withdrawSeedInput)}
-            disabled={!withdrawSeedInput.trim() || isWithdrawing}
+            onClick={() => onConfirm(seedInput)}
+            disabled={!canSubmit || isWithdrawing}
             className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50"
           >
             {isWithdrawing ? "Processing..." : "Confirm Transfer"}

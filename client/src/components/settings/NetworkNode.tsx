@@ -13,7 +13,5 @@ export interface NetworkNodeProps {
 export default function NetworkNode({
   nodeSelector,
 }: NetworkNodeProps): React.JSX.Element | null {
-  if (!nodeSelector) return null;
-
-  return <div>{nodeSelector}</div>;
+  return nodeSelector ? <div>{nodeSelector}</div> : null;
 }

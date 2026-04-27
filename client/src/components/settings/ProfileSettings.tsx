@@ -3,6 +3,12 @@ import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
 import { CameraIcon } from "@/components/icons";
+import { getDisplayInitial } from "@/utils/identity";
+import {
+  getStoredAvatar,
+  readFileAsDataUrl,
+  setStoredAvatar,
+} from "@/utils/profile";
 
 /**
  * ProfileSettings component manages the user's avatar upload,
@@ -16,9 +22,7 @@ export default function ProfileSettings(): React.JSX.Element {
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const [myAvatar, setMyAvatar] = useState<string | null>(() =>
-    localStorage.getItem("my_avatar"),
-  );
+  const [myAvatar, setMyAvatar] = useState<string | null>(getStoredAvatar);
   const [rawAvatarSrc, setRawAvatarSrc] = useState<string | null>(null);
 
   /**
@@ -28,14 +32,11 @@ export default function ProfileSettings(): React.JSX.Element {
    * @returns {void}
    */
   const handleAvatarChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
+    async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setRawAvatarSrc(ev.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      const avatarDataUrl = await readFileAsDataUrl(file);
+      setRawAvatarSrc(avatarDataUrl);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
     },
     [],
@@ -50,7 +51,7 @@ export default function ProfileSettings(): React.JSX.Element {
    */
   const handleCropConfirm = useCallback(
     (croppedBase64: string): void => {
-      localStorage.setItem("my_avatar", croppedBase64);
+      setStoredAvatar(croppedBase64);
       setMyAvatar(croppedBase64);
       setRawAvatarSrc(null);
       showToast("Profile picture updated.", "success");
@@ -81,8 +82,8 @@ export default function ProfileSettings(): React.JSX.Element {
               className="w-12 h-12 rounded-full object-cover"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-              {myUsername?.charAt(0)?.toUpperCase() ?? "?"}
+            <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+              {getDisplayInitial(myUsername)}
             </div>
           )}
           <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { useCrypto } from "@/hooks/security/useCrypto";
+import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 import { useUIStore } from "@/store";
 import { transferViaInternalWallet } from "@/utils/transaction";
 import { shortenAddress } from "@/utils/format";
@@ -9,27 +10,27 @@ import SeedPhraseModal from "@/components/ui/SeedPhraseModal";
 import ImportWalletModal from "./modals/ImportWalletModal";
 import WithdrawalModal from "./modals/WithdrawalModal";
 import { ClipboardDocumentIcon } from "@/components/icons";
-import ms from "ms";
+import {
+  clearWalletLinkage,
+  COPIED_STATE_RESET_MS,
+  ESTIMATED_GAS_ETH,
+  fetchWalletDetailsFromProvider,
+  getFallbackWalletDetails,
+  getLinkedWalletState,
+  getSafeMaxWithdrawal,
+  INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
+  persistExternalWallet,
+  persistInternalWallet,
+  resolveRpcUrl,
+  validateWithdrawal,
+  type WalletDetails,
+} from "@/services/web3WalletService";
 
 declare global {
   interface Window {
     ethereum?: any;
   }
 }
-
-interface WalletDetails {
-  balance: string;
-  network: string;
-  chainId: string;
-}
-
-/**
- * Flat ETH amount reserved for standard transfer gas costs.
- * Used to compute the safe-maximum withdrawal amount and validate inputs.
- *
- * @constant {number}
- */
-const ESTIMATED_GAS = 0.001;
 
 /**
  * Renders the Web3 wallet management interface.
@@ -40,10 +41,8 @@ const ESTIMATED_GAS = 0.001;
 export default function Web3Wallet(): React.JSX.Element {
   const { encryptLocalDB, decryptLocalDB } = useCrypto();
   const { showToast } = useUIStore();
-  const walletInfoRef = useRef<HTMLDivElement>(null);
+  const walletInfo = useDismissablePopover();
 
-  const [showWalletInfoTooltip, setShowWalletInfoTooltip] =
-    useState<boolean>(false);
   const [txWalletAddress, setTxWalletAddress] = useState<string | null>(null);
   const [txWalletType, setTxWalletType] = useState<
     "internal" | "external" | null
@@ -65,81 +64,31 @@ export default function Web3Wallet(): React.JSX.Element {
   const [withdrawError, setWithdrawError] = useState<string>("");
   const [isWithdrawing, setIsWithdrawing] = useState<boolean>(false);
 
-  useEffect(() => {
-    const savedExternal = localStorage.getItem("linked_metamask");
-    const savedInternal = localStorage.getItem("internal_tx_wallet");
-
-    if (savedInternal) {
-      setTxWalletAddress(savedInternal);
-      setTxWalletType("internal");
-      fetchWalletDetails(savedInternal, false);
-    } else if (savedExternal && typeof window.ethereum !== "undefined") {
-      setTxWalletAddress(savedExternal);
-      setTxWalletType("external");
-      fetchWalletDetails(savedExternal, true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handlePointerOutside = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node;
-      if (
-        showWalletInfoTooltip &&
-        walletInfoRef.current &&
-        !walletInfoRef.current.contains(target)
-      ) {
-        setShowWalletInfoTooltip(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowWalletInfoTooltip(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerOutside);
-    document.addEventListener("touchstart", handlePointerOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerOutside);
-      document.removeEventListener("touchstart", handlePointerOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showWalletInfoTooltip]);
-
-  const fetchWalletDetails = async (
+  const refreshWalletDetails = async (
     address: string,
     isExternal: boolean,
   ): Promise<void> => {
     try {
-      let provider;
-      if (isExternal && typeof window.ethereum !== "undefined") {
-        provider = new ethers.BrowserProvider(window.ethereum);
-      } else {
-        provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
-        );
-      }
-
-      const network = await provider.getNetwork();
-      const balanceWei = await provider.getBalance(address);
-      const balanceEth = ethers.formatEther(balanceWei);
-
-      setWalletDetails({
-        balance: parseFloat(balanceEth).toFixed(4),
-        network: network.name === "unknown" ? "Localhost" : network.name,
-        chainId: network.chainId.toString(),
-      });
+      const details = await fetchWalletDetailsFromProvider(
+        address,
+        isExternal,
+        resolveRpcUrl(),
+      );
+      setWalletDetails(details);
     } catch {
-      setWalletDetails({
-        balance: "0.0000",
-        network: "Unknown",
-        chainId: "0",
-      });
+      setWalletDetails(getFallbackWalletDetails());
     }
   };
+
+  useEffect(() => {
+    const linkedWallet = getLinkedWalletState();
+
+    if (linkedWallet.address && linkedWallet.type) {
+      setTxWalletAddress(linkedWallet.address);
+      setTxWalletType(linkedWallet.type);
+      refreshWalletDetails(linkedWallet.address, linkedWallet.type === "external");
+    }
+  }, []);
 
   const handleCreateInternalWallet = (): void => {
     setIsConnecting(true);
@@ -150,13 +99,12 @@ export default function Web3Wallet(): React.JSX.Element {
         const phrase = newWallet.mnemonic.phrase;
         const privateKey = newWallet.privateKey;
 
-        localStorage.setItem("internal_tx_wallet", address);
-        localStorage.setItem("internal_tx_pk", encryptLocalDB(privateKey));
+        persistInternalWallet(address, encryptLocalDB(privateKey));
 
         setTxWalletAddress(address);
         setTxWalletType("internal");
         setNewInternalSeed(phrase);
-        fetchWalletDetails(address, false);
+        refreshWalletDetails(address, false);
       }
     } finally {
       setIsConnecting(false);
@@ -171,12 +119,11 @@ export default function Web3Wallet(): React.JSX.Element {
       const address = importedWallet.address;
       const privateKey = importedWallet.privateKey;
 
-      localStorage.setItem("internal_tx_wallet", address);
-      localStorage.setItem("internal_tx_pk", encryptLocalDB(privateKey));
+      persistInternalWallet(address, encryptLocalDB(privateKey));
 
       setTxWalletAddress(address);
       setTxWalletType("internal");
-      fetchWalletDetails(address, false);
+      refreshWalletDetails(address, false);
       setIsImportModalOpen(false);
     } catch {
       setImportError("Invalid seed phrase.");
@@ -203,10 +150,8 @@ export default function Web3Wallet(): React.JSX.Element {
         const linkedAddress = accounts[0];
         setTxWalletAddress(linkedAddress);
         setTxWalletType("external");
-        localStorage.setItem("linked_metamask", linkedAddress);
-        localStorage.removeItem("internal_tx_wallet");
-        localStorage.removeItem("internal_tx_pk");
-        await fetchWalletDetails(linkedAddress, true);
+        persistExternalWallet(linkedAddress);
+        await refreshWalletDetails(linkedAddress, true);
       }
     } catch {
     } finally {
@@ -218,9 +163,7 @@ export default function Web3Wallet(): React.JSX.Element {
     setTxWalletAddress(null);
     setTxWalletType(null);
     setWalletDetails(null);
-    localStorage.removeItem("linked_metamask");
-    localStorage.removeItem("internal_tx_wallet");
-    localStorage.removeItem("internal_tx_pk");
+    clearWalletLinkage();
   };
 
   /**
@@ -230,25 +173,15 @@ export default function Web3Wallet(): React.JSX.Element {
    * @returns {void}
    */
   const handleInitiateWithdrawal = (): void => {
-    if (!ethers.isAddress(withdrawAddress)) {
-      showToast("Invalid destination address.", "error");
-      return;
-    }
+    const validation = validateWithdrawal(
+      withdrawAddress,
+      withdrawAmount,
+      walletDetails?.balance,
+      ESTIMATED_GAS_ETH,
+    );
 
-    const numericAmount = Number(withdrawAmount);
-    const currentBalance = Number(walletDetails?.balance || "0");
-    const safeMax = Math.max(0, currentBalance - ESTIMATED_GAS);
-
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      showToast("Invalid withdrawal amount.", "error");
-      return;
-    }
-
-    if (numericAmount > safeMax) {
-      showToast(
-        `Amount exceeds safe maximum. Max: ${safeMax.toFixed(4)} ETH (after ~${ESTIMATED_GAS} ETH gas fee).`,
-        "error",
-      );
+    if (!validation.valid) {
+      showToast(validation.error || "Invalid withdrawal request.", "error");
       return;
     }
 
@@ -273,11 +206,11 @@ export default function Web3Wallet(): React.JSX.Element {
         throw new Error("Seed phrase does not match active wallet.");
       }
 
-      const encryptedPk = localStorage.getItem("internal_tx_pk");
+      const encryptedPk = localStorage.getItem(INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY);
       if (!encryptedPk) throw new Error("Private key not found.");
 
       const internalPk = decryptLocalDB(encryptedPk);
-      const rpcUrl = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545";
+      const rpcUrl = resolveRpcUrl();
 
       await transferViaInternalWallet(
         internalPk,
@@ -296,7 +229,7 @@ export default function Web3Wallet(): React.JSX.Element {
       setIsWithdrawModalOpen(false);
 
       if (txWalletAddress) {
-        fetchWalletDetails(txWalletAddress, false);
+        refreshWalletDetails(txWalletAddress, false);
       }
     } catch (error: any) {
       setWithdrawError(error.message || "Failed to process withdrawal.");
@@ -313,8 +246,8 @@ export default function Web3Wallet(): React.JSX.Element {
    * @returns {void}
    */
   const handleMaxAmount = (): void => {
-    const currentBalance = parseFloat(walletDetails?.balance || "0");
-    const safeMax = Math.max(0, currentBalance - ESTIMATED_GAS);
+    const currentBalance = Number.parseFloat(walletDetails?.balance || "0");
+    const safeMax = getSafeMaxWithdrawal(currentBalance, ESTIMATED_GAS_ETH);
     setWithdrawAmount(safeMax > 0 ? safeMax.toFixed(4) : "0");
   };
 
@@ -323,19 +256,19 @@ export default function Web3Wallet(): React.JSX.Element {
       <div>
         <div
           className="flex items-center gap-1.5 mb-2 relative"
-          ref={walletInfoRef}
+          ref={walletInfo.containerRef}
         >
           <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
             Web3 Wallet (Transaction)
           </label>
           <button
             type="button"
-            onClick={() => setShowWalletInfoTooltip(!showWalletInfoTooltip)}
-            className={`transition-colors focus:outline-none ${showWalletInfoTooltip ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+            onClick={walletInfo.toggle}
+            className={`transition-colors focus:outline-none ${walletInfo.isOpen ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
           >
             <InfoIcon className="w-3.5 h-3.5" />
           </button>
-          {showWalletInfoTooltip && (
+          {walletInfo.isOpen && (
             <div className="absolute left-0 top-6 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-150">
               Create or import an internal wallet, or link an external wallet
               (e.g., MetaMask) for P2P transfers.
@@ -407,10 +340,7 @@ export default function Web3Wallet(): React.JSX.Element {
                       onClick={() => {
                         navigator.clipboard.writeText(txWalletAddress ?? "");
                         setCopiedWalletAddr(true);
-                        setTimeout(
-                          () => setCopiedWalletAddr(false),
-                          ms("1.8s"),
-                        );
+                        setTimeout(() => setCopiedWalletAddr(false), COPIED_STATE_RESET_MS);
                       }}
                       className="shrink-0 text-zinc-600 hover:text-indigo-400 transition-colors p-0.5"
                       title="Copy address"
@@ -489,7 +419,7 @@ export default function Web3Wallet(): React.JSX.Element {
                           onClick={handleMaxAmount}
                           disabled={
                             !walletDetails ||
-                            parseFloat(walletDetails.balance) <= ESTIMATED_GAS
+                            Number.parseFloat(walletDetails.balance) <= ESTIMATED_GAS_ETH
                           }
                           className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
                         >
@@ -497,7 +427,7 @@ export default function Web3Wallet(): React.JSX.Element {
                         </button>
                       </div>
                       <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
-                        Est. network fee: ~{ESTIMATED_GAS} ETH
+                        Est. network fee: ~{ESTIMATED_GAS_ETH} ETH
                       </p>
                     </div>
                   </div>

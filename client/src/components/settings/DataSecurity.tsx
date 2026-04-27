@@ -1,9 +1,17 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
+import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 import GlassDropdown from "@/components/ui/GlassDropdown";
 import { SeedPhraseModalInput } from "@/components/ui";
 import { updateLastExportTime } from "@/utils/exportUtils";
+import {
+  BACKUP_OPTIONS,
+  DELETE_OPTIONS,
+  findOptionLabel,
+  getStoredAutoBackupMode,
+  setStoredAutoBackupMode,
+} from "@/utils/dataSecurity";
 import {
   ImportIcon,
   ExportIcon,
@@ -19,8 +27,8 @@ import {
  */
 export default function DataSecurity(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const securityInfoRef = useRef<HTMLDivElement>(null);
-  const backupInfoRef = useRef<HTMLDivElement>(null);
+  const securityInfo = useDismissablePopover();
+  const backupInfo = useDismissablePopover();
 
   const {
     autoDeleteMode,
@@ -37,68 +45,11 @@ export default function DataSecurity(): React.JSX.Element {
     showToast,
   } = useSecurityHandlers();
 
-  const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
-  const [showBackupInfo, setShowBackupInfo] = useState<boolean>(false);
-  const [autoBackupMode, setAutoBackupMode] = useState<string>(() => {
-    return localStorage.getItem("securep2p_auto_backup_mode") || "never";
-  });
+  const [autoBackupMode, setAutoBackupMode] = useState<string>(
+    getStoredAutoBackupMode,
+  );
 
   const isIncognito = autoDeleteMode === "close";
-
-  const deleteOptions = [
-    { value: "never", label: "Auto-Delete: Never" },
-    { value: "30", label: "Delete Older than 30 Days" },
-    { value: "7", label: "Delete Older than 7 Days" },
-    { value: "3", label: "Delete Older than 3 Days" },
-    { value: "1", label: "Delete Older than 24 Hours" },
-    { value: "close", label: "Burn on Close (Incognito)" },
-  ];
-
-  const backupOptions = [
-    { value: "never", label: "Auto-Backup: Never" },
-    { value: "1", label: "Daily (Every 24 Hours)" },
-    { value: "3", label: "Every 3 Days" },
-    { value: "7", label: "Weekly (Every 7 Days)" },
-    { value: "30", label: "Monthly (Every 30 Days)" },
-  ];
-
-  useEffect(() => {
-    const handlePointerOutside = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node;
-      if (
-        showSecurityInfo &&
-        securityInfoRef.current &&
-        !securityInfoRef.current.contains(target)
-      ) {
-        setShowSecurityInfo(false);
-      }
-
-      if (
-        showBackupInfo &&
-        backupInfoRef.current &&
-        !backupInfoRef.current.contains(target)
-      ) {
-        setShowBackupInfo(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowSecurityInfo(false);
-        setShowBackupInfo(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerOutside);
-    document.addEventListener("touchstart", handlePointerOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerOutside);
-      document.removeEventListener("touchstart", handlePointerOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showSecurityInfo, showBackupInfo]);
 
   return (
     <>
@@ -107,19 +58,19 @@ export default function DataSecurity(): React.JSX.Element {
           <div>
             <div
               className="flex items-center gap-1.5 mb-2 relative"
-              ref={securityInfoRef}
+              ref={securityInfo.containerRef}
             >
               <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                 Message Retention
               </label>
               <button
                 type="button"
-                onClick={() => setShowSecurityInfo(!showSecurityInfo)}
-                className={`transition-colors focus:outline-none ${showSecurityInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+                onClick={securityInfo.toggle}
+                className={`transition-colors focus:outline-none ${securityInfo.isOpen ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
               >
                 <InfoIcon className="w-3.5 h-3.5" />
               </button>
-              {showSecurityInfo && (
+              {securityInfo.isOpen && (
                 <div className="absolute left-0 bottom-6 mb-2 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
                   <strong>Auto-Delete</strong> only removes messages from your
                   local device.
@@ -128,13 +79,11 @@ export default function DataSecurity(): React.JSX.Element {
             </div>
             <GlassDropdown
               value={autoDeleteMode}
-              options={deleteOptions}
+              options={DELETE_OPTIONS}
               onChange={(val) => {
                 handleModeChange({ target: { value: val } } as any);
-                const selectedOpt = deleteOptions.find(
-                  (opt) => opt.value === val,
-                );
-                showToast(`Policy updated: ${selectedOpt?.label}`, "success");
+                const selectedLabel = findOptionLabel(DELETE_OPTIONS, val);
+                showToast(`Policy updated: ${selectedLabel}`, "success");
               }}
             />
           </div>
@@ -142,19 +91,19 @@ export default function DataSecurity(): React.JSX.Element {
           <div>
             <div
               className="flex items-center gap-1.5 mb-2 relative"
-              ref={backupInfoRef}
+              ref={backupInfo.containerRef}
             >
               <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                 Data Backup
               </label>
               <button
                 type="button"
-                onClick={() => setShowBackupInfo(!showBackupInfo)}
-                className={`transition-colors focus:outline-none ${showBackupInfo ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
+                onClick={backupInfo.toggle}
+                className={`transition-colors focus:outline-none ${backupInfo.isOpen ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"}`}
               >
                 <InfoIcon className="w-3.5 h-3.5" />
               </button>
-              {showBackupInfo && (
+              {backupInfo.isOpen && (
                 <div className="absolute left-0 bottom-6 mb-2 z-40 w-64 p-3 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl text-xs text-zinc-300 leading-relaxed animate-in fade-in slide-in-from-bottom-1">
                   Export chats and identity as an encrypted file, or import to
                   restore data.
@@ -197,15 +146,13 @@ export default function DataSecurity(): React.JSX.Element {
             <div className="mt-3">
               <GlassDropdown
                 value={autoBackupMode}
-                options={backupOptions}
+                options={BACKUP_OPTIONS}
                 onChange={(val) => {
                   setAutoBackupMode(val);
-                  localStorage.setItem("securep2p_auto_backup_mode", val);
+                  setStoredAutoBackupMode(val);
                   updateLastExportTime();
-                  const selectedOpt = backupOptions.find(
-                    (opt) => opt.value === val,
-                  );
-                  showToast(`Schedule set: ${selectedOpt?.label}`, "success");
+                  const selectedLabel = findOptionLabel(BACKUP_OPTIONS, val);
+                  showToast(`Schedule set: ${selectedLabel}`, "success");
                 }}
               />
             </div>

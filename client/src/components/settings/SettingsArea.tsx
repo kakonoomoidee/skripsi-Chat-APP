@@ -6,6 +6,7 @@ import Web3Wallet from "@/components/settings/Web3Wallet";
 import DataSecurity from "@/components/settings/DataSecurity";
 import NetworkNode from "@/components/settings/NetworkNode";
 import BlockedUsers from "@/components/settings/BlockedUsers";
+import { SettingsCardHeader } from "@/components/settings/SettingsCardHeader";
 import RelaySelector from "@/components/ui/RelaySelector";
 import {
   ShieldCheckIcon,
@@ -15,29 +16,6 @@ import {
   GlobeIcon,
   MenuIcon,
 } from "@/components/icons";
-
-/**
- * Renders a consistent card section header with an icon and label.
- *
- * @param {{ icon: React.ReactNode; label: string }} props - Component props.
- * @returns {React.JSX.Element} The Card Header component.
- */
-const CardHeader = ({
-  icon,
-  label,
-}: {
-  icon: React.ReactNode;
-  label: string;
-}): React.JSX.Element => (
-  <div className="flex items-center gap-2.5 px-5 py-4 border-b border-zinc-800/60">
-    <div className="w-6 h-6 rounded-md bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center shrink-0">
-      {icon}
-    </div>
-    <h3 className="text-[11px] font-bold text-zinc-300 uppercase tracking-[0.12em]">
-      {label}
-    </h3>
-  </div>
-);
 
 /**
  * Full-panel Settings view.
@@ -99,7 +77,7 @@ export default function SettingsArea(): React.JSX.Element {
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-3 bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible">
-              <CardHeader
+              <SettingsCardHeader
                 label="Web3 Wallet Configuration"
                 icon={<DatabaseIcon className="w-3.5 h-3.5 text-indigo-400" />}
               />
@@ -110,7 +88,7 @@ export default function SettingsArea(): React.JSX.Element {
 
             <div className="lg:col-span-2 flex flex-col gap-4">
               <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible">
-                <CardHeader
+                <SettingsCardHeader
                   label="Data Management"
                   icon={<ServerIcon className="w-3.5 h-3.5 text-indigo-400" />}
                 />
@@ -120,7 +98,7 @@ export default function SettingsArea(): React.JSX.Element {
               </div>
 
               <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-visible">
-                <CardHeader
+                <SettingsCardHeader
                   label="Network Node"
                   icon={<GlobeIcon className="w-3.5 h-3.5 text-indigo-400" />}
                 />
@@ -163,7 +141,7 @@ export default function SettingsArea(): React.JSX.Element {
             </div>
 
             <div className="bg-zinc-900/60 border border-zinc-800/70 rounded-2xl overflow-hidden">
-              <CardHeader
+              <SettingsCardHeader
                 label="Security & Privacy"
                 icon={<ShieldCheckIcon className="w-3.5 h-3.5 text-red-400" />}
               />

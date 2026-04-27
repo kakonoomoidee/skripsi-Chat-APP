@@ -1,8 +1,12 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/utils/db";
 import { shortenAddress } from "@/utils/format";
 import { BanIcon } from "@/components/icons";
+import { getDisplayInitial } from "@/utils/identity";
+import {
+  getBlockedContacts,
+  unblockContactToPending,
+} from "@/services/contactService";
 
 /**
  * Renders the list of blocked users and provides functionality to unblock them.
@@ -10,11 +14,7 @@ import { BanIcon } from "@/components/icons";
  * @returns {React.JSX.Element} The Blocked Users component.
  */
 export default function BlockedUsers(): React.JSX.Element {
-  const blockedContacts = useLiveQuery(
-    () => db.contacts.where("status").equals("blocked").toArray(),
-    [],
-    [],
-  );
+  const blockedContacts = useLiveQuery(() => getBlockedContacts(), [], []);
 
   /**
    * Resets a blocked contact to `'pending'` so they can re-initiate a handshake.
@@ -23,9 +23,7 @@ export default function BlockedUsers(): React.JSX.Element {
    * @returns {Promise<void>}
    */
   const handleUnblock = async (peerAddress: string): Promise<void> => {
-    const existing = await db.contacts.get(peerAddress);
-    if (!existing) return;
-    await db.contacts.put({ ...existing, status: "pending" });
+    await unblockContactToPending(peerAddress);
   };
 
   return (
@@ -55,7 +53,7 @@ export default function BlockedUsers(): React.JSX.Element {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 font-bold text-xs shrink-0">
-                  {(contact.username ?? "?").charAt(0).toUpperCase()}
+                  {getDisplayInitial(contact.username)}
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-zinc-200 capitalize truncate">
