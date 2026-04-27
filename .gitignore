@@ -32,3 +32,6 @@ coverage/
 blockchain/build/
 relay-server/abis/
 *.tsbuildinfo
+
+# --- agent skills ---
+skills/
