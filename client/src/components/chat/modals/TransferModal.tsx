@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useChatContext } from "@/context/ChatContext";
 import { useWalletStore } from "@/store";
 import { XIcon } from "@/components/icons";
-import { fetchActiveWalletBalance } from "@/services/walletBalanceService";
+import { useTransferBalance } from "@/hooks/chat/useTransferBalance";
 import {
   getTransferValidationState,
   TRANSFER_REQUEST_TIMEOUT_MS,
@@ -32,25 +32,8 @@ export const TransferModal = ({
   const { peerWalletAddress } = useWalletStore();
 
   const [transferAmount, setTransferAmount] = useState<string>("");
-  const [currentBalance, setCurrentBalance] = useState<string | null>(null);
+  const currentBalance = useTransferBalance(isOpen);
   const [requestTimeout, setRequestTimeout] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const getBalance = async (): Promise<void> => {
-      try {
-        const balance = await fetchActiveWalletBalance(
-          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:7545",
-        );
-        setCurrentBalance(balance);
-      } catch (err) {
-        console.error("Failed to fetch balance for modal", err);
-      }
-    };
-
-    getBalance();
-  }, [isOpen]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
