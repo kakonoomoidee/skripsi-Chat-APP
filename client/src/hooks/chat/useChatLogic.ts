@@ -276,7 +276,10 @@ export const useChatLogic = ({
         return;
       }
 
-      upsertActiveSession({ address: peerAddress, username: normalizedUsername });
+      upsertActiveSession({
+        address: peerAddress,
+        username: normalizedUsername,
+      });
 
       setActiveChat(peerAddress);
       setActiveUsername(normalizedUsername);

@@ -299,7 +299,9 @@ export const useMessageSender = ({
       throw new Error("Peer wallet address not resolved yet.");
     }
 
-    const encryptedPk = localStorage.getItem(INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY);
+    const encryptedPk = localStorage.getItem(
+      INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
+    );
     const internalPk = encryptedPk ? decryptLocalDB(encryptedPk) : null;
     const { internalAddress, externalAddress } = getStoredWalletAddresses();
 

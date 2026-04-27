@@ -48,18 +48,15 @@ export const useMessageData = ({
   decryptLocalDB,
   autoDeleteMode,
 }: UseMessageDataProps) => {
-  const rawMessages = useLiveQuery(
-    () => {
-      if (!activeChat || !address) return [];
-      return db.messages
-        .where({
-          ownerAddress: address.toLowerCase(),
-          chatId: activeChat.toLowerCase(),
-        })
-        .sortBy("timestamp");
-    },
-    [activeChat, address],
-  ) as Message[] | undefined;
+  const rawMessages = useLiveQuery(() => {
+    if (!activeChat || !address) return [];
+    return db.messages
+      .where({
+        ownerAddress: address.toLowerCase(),
+        chatId: activeChat.toLowerCase(),
+      })
+      .sortBy("timestamp");
+  }, [activeChat, address]) as Message[] | undefined;
 
   const messages = useMemo(() => {
     if (!rawMessages) return [];
@@ -71,20 +68,17 @@ export const useMessageData = ({
       .filter((msg) => !isNonRenderableProtocolMessage(msg.text));
   }, [rawMessages, decryptLocalDB]);
 
-  const globalUnreadMessages = useLiveQuery(
-    () => {
-      if (!address) return [];
-      return db.messages
-        .filter(
-          (msg) =>
-            msg.ownerAddress === address.toLowerCase() &&
-            !msg.isMine &&
-            msg.status !== "read",
-        )
-        .toArray();
-    },
-    [address],
-  ) as Message[] | undefined;
+  const globalUnreadMessages = useLiveQuery(() => {
+    if (!address) return [];
+    return db.messages
+      .filter(
+        (msg) =>
+          msg.ownerAddress === address.toLowerCase() &&
+          !msg.isMine &&
+          msg.status !== "read",
+      )
+      .toArray();
+  }, [address]) as Message[] | undefined;
 
   const unreadCount = useMemo(() => {
     const counts: Record<string, number> = {};

@@ -116,7 +116,9 @@ export const useConnectionManager = ({
   useEffect(() => {
     return () => {
       Object.values(pingTimeoutRef.current).forEach((t) => clearTimeout(t));
-      Object.values(reconnectIntervalRef.current).forEach((t) => clearInterval(t));
+      Object.values(reconnectIntervalRef.current).forEach((t) =>
+        clearInterval(t),
+      );
     };
   }, []);
 

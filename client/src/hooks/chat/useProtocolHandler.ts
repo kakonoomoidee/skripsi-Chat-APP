@@ -17,7 +17,9 @@ const removeProtocolMessage = async (messageId?: number): Promise<void> => {
   await db.messages.delete(messageId);
 };
 
-const resolveTransactionAddress = (fallbackAddress: string | null): string | null => {
+const resolveTransactionAddress = (
+  fallbackAddress: string | null,
+): string | null => {
   const { internalAddress, externalAddress } = getStoredWalletAddresses();
   return internalAddress || externalAddress || fallbackAddress;
 };
@@ -68,7 +70,8 @@ export const useProtocolHandler = ({
       if (!messages || messages.length === 0) return;
       const latestMessage = messages[messages.length - 1];
       if (!latestMessage?.text) return;
-      const { peerWalletAddress, setPeerWalletAddress } = useWalletStore.getState();
+      const { peerWalletAddress, setPeerWalletAddress } =
+        useWalletStore.getState();
       const parsedPayload = parseChatProtocolPayload(latestMessage.text);
       if (!parsedPayload) return;
 
@@ -84,19 +87,17 @@ export const useProtocolHandler = ({
         const txAddress = resolveTransactionAddress(address);
 
         if (txAddress && activeChat) {
-          sendWalletResponse(
-            activeChat,
-            txAddress,
-            encrypt,
-            sendDataViaWebRTC,
-          );
+          sendWalletResponse(activeChat, txAddress, encrypt, sendDataViaWebRTC);
         }
 
         await removeProtocolMessage(latestMessage.id);
         return;
       }
 
-      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.profileSync && activeChat) {
+      if (
+        parsedPayload.type === CHAT_PROTOCOL_TYPES.profileSync &&
+        activeChat
+      ) {
         const existing = await db.contacts.get(activeChat.toLowerCase());
         if (existing) {
           await db.contacts.put({ ...existing, avatar: parsedPayload.avatar });
