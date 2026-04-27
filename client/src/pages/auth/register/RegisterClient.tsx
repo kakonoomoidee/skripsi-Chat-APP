@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import ms from "ms";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useRegisterHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
+import { copyTextWithFallback } from "@/utils/clipboard";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
 import {
@@ -15,6 +17,8 @@ import {
   validatePasswordSecurity,
 } from "@/components/ui";
 import { WarningIcon } from "@/components/icons";
+
+const COPY_AND_CONTINUE_DELAY_MS = ms("1500ms");
 
 /**
  * Registration page component handling identity creation and seed phrase backup.
@@ -64,27 +68,12 @@ export default function RegisterPage(): React.JSX.Element {
   const handleCopyAndProceed = (): void => {
     if (!seedPhrase) return;
 
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(seedPhrase);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = seedPhrase;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand("copy");
-        textArea.remove();
-      }
-
-      setIsCopied(true);
-      setTimeout(() => navigate("/chat"), 1500);
-    } catch (err) {
-      setIsCopied(true);
-      setTimeout(() => navigate("/chat"), 1500);
-    }
+    copyTextWithFallback(seedPhrase)
+      .catch(() => undefined)
+      .finally(() => {
+        setIsCopied(true);
+        setTimeout(() => navigate("/chat"), COPY_AND_CONTINUE_DELAY_MS);
+      });
   };
 
   if (seedPhrase) {

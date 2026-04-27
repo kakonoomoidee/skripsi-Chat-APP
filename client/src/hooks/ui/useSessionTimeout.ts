@@ -1,4 +1,16 @@
 import { useEffect, useCallback } from "react";
+import ms from "ms";
+
+const LAST_ACTIVITY_KEY = "securep2p_last_activity";
+const DEFAULT_TIMEOUT_MS = ms("1h");
+const INACTIVITY_CHECK_INTERVAL_MS = ms("1m");
+const ACTIVITY_EVENTS = [
+  "mousedown",
+  "mousemove",
+  "keydown",
+  "scroll",
+  "touchstart",
+] as const;
 
 /**
  * Custom hook to securely manage user session timeout due to inactivity.
@@ -8,14 +20,14 @@ import { useEffect, useCallback } from "react";
  */
 export const useSessionTimeout = (
   onTimeout: () => void,
-  timeoutMs: number = 3600000,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): void => {
   const updateLastActivity = useCallback((): void => {
-    localStorage.setItem("securep2p_last_activity", Date.now().toString());
+    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
   }, []);
 
   const checkInactivity = useCallback((): void => {
-    const lastActivityStr = localStorage.getItem("securep2p_last_activity");
+    const lastActivityStr = localStorage.getItem(LAST_ACTIVITY_KEY);
     if (lastActivityStr) {
       const lastActivity = parseInt(lastActivityStr, 10);
       if (Date.now() - lastActivity > timeoutMs) {
@@ -28,21 +40,16 @@ export const useSessionTimeout = (
     checkInactivity();
     updateLastActivity();
 
-    const intervalId = setInterval(checkInactivity, 60000);
-
-    const events = [
-      "mousedown",
-      "mousemove",
-      "keydown",
-      "scroll",
-      "touchstart",
-    ];
+    const intervalId = window.setInterval(
+      checkInactivity,
+      INACTIVITY_CHECK_INTERVAL_MS,
+    );
 
     const handleActivity = (): void => {
       updateLastActivity();
     };
 
-    events.forEach((event) => {
+    ACTIVITY_EVENTS.forEach((event) => {
       window.addEventListener(event, handleActivity);
     });
 
@@ -55,8 +62,8 @@ export const useSessionTimeout = (
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearInterval(intervalId);
-      events.forEach((event) => {
+      window.clearInterval(intervalId);
+      ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, handleActivity);
       });
       document.removeEventListener("visibilitychange", handleVisibilityChange);

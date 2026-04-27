@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
-import axios, { AxiosError } from "axios";
 import ms from "ms";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
+import { checkUsernameAvailability } from "@/services/api";
 import { useUIStore } from "@/store";
 
 const USERNAME_CHECK_DEBOUNCE_MS = ms("500ms");
@@ -136,14 +136,13 @@ export const useRegisterHandler = (activeRelay: string) => {
     const delayDebounceFn = setTimeout(async () => {
       setIsChecking(true);
       try {
-        await axios.get(`${activeRelay}/auth/address/${normalizedUsername}`);
-        setIsAvailable(false);
+        const available = await checkUsernameAvailability(
+          activeRelay,
+          normalizedUsername,
+        );
+        setIsAvailable(available);
       } catch (error: unknown) {
-        if (error instanceof AxiosError && error.response?.status === 404) {
-          setIsAvailable(true);
-        } else {
-          setIsAvailable(null);
-        }
+        setIsAvailable(null);
       } finally {
         setIsChecking(false);
       }

@@ -1,24 +1,18 @@
 import { useState, useCallback } from "react";
-import axios, { AxiosError } from "axios";
 import { ethers } from "ethers";
+import {
+  type AuthResponse,
+  getApiErrorMessage,
+  loginWithSignature,
+  registerIdentity,
+  requestAuthChallenge,
+} from "@/services/api";
 
 const AUTH_TOKEN_KEY = "auth_token";
 const LAST_ACTIVITY_KEY = "securep2p_last_activity";
 const PUBLIC_KEY_PLACEHOLDER = "PUBKEY_PLACEHOLDER";
 
 type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof AxiosError) {
-    return error.response?.data?.error || error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return fallback;
-};
 
 const saveSessionToken = (token: string): void => {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
@@ -29,14 +23,6 @@ const clearSessionToken = (): void => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(LAST_ACTIVITY_KEY);
 };
-
-/**
- * Interface representing the standard authentication response payload.
- */
-export interface AuthResponse {
-  token?: string;
-  [key: string]: unknown;
-}
 
 /**
  * Interface representing the hook's return values and methods.
@@ -103,25 +89,19 @@ export const useAuth = (): UseAuthReturn => {
       console.log("[AUTH LOG] ECDSA Signature Generated:", signature);
       console.log("[AUTH LOG] Transmitting payload to relay server...");
 
-      const response = await axios.post<AuthResponse>(
-        `${relayUrl}/auth/register`,
-        {
-          userAddress: wallet.address,
-          username,
-          publicKey: PUBLIC_KEY_PLACEHOLDER,
-          signature,
-        },
-      );
+      const response = await registerIdentity(relayUrl, {
+        userAddress: wallet.address,
+        username,
+        publicKey: PUBLIC_KEY_PLACEHOLDER,
+        signature,
+      });
 
-      console.log(
-        "[AUTH LOG] Registration Successful. Response:",
-        response.data,
-      );
+      console.log("[AUTH LOG] Registration Successful. Response:", response);
       console.log("=========================================");
 
-      return response.data;
+      return response;
     } catch (err: unknown) {
-      const msg = getErrorMessage(
+      const msg = getApiErrorMessage(
         err,
         "An unknown error occurred during registration.",
       );
@@ -156,13 +136,7 @@ export const useAuth = (): UseAuthReturn => {
         `[AUTH LOG] Requesting nonce from: ${relayUrl}/auth/challenge`,
       );
 
-      const resNonce = await axios.post<{ nonce: string }>(
-        `${relayUrl}/auth/challenge`,
-        {
-          address: wallet.address,
-        },
-      );
-      const { nonce } = resNonce.data;
+      const { nonce } = await requestAuthChallenge(relayUrl, wallet.address);
 
       console.log(`[AUTH LOG] Nonce Received: ${nonce}`);
 
@@ -174,15 +148,10 @@ export const useAuth = (): UseAuthReturn => {
         signature,
       );
 
-      const resLogin = await axios.post<{ token: string }>(
-        `${relayUrl}/auth/login`,
-        {
-          address: wallet.address,
-          signature,
-        },
-      );
-
-      const { token: newToken } = resLogin.data;
+      const { token: newToken } = await loginWithSignature(relayUrl, {
+        address: wallet.address,
+        signature,
+      });
 
       console.log(
         "[AUTH LOG] Server Verification Passed. JWT Token acquired :",
@@ -195,7 +164,7 @@ export const useAuth = (): UseAuthReturn => {
 
       return newToken;
     } catch (err: unknown) {
-      const msg = getErrorMessage(
+      const msg = getApiErrorMessage(
         err,
         "An unknown error occurred during login.",
       );
