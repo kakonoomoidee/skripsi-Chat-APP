@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { isEventOutsideElement, shouldCloseMenuOnEscape } from "@/utils/bubble";
+import { useRef, useState } from "react";
+import { useDismissableLayer } from "@/hooks/ui/useDismissableLayer";
 
 /**
  * Manages contextual bubble menu open/close behavior and outside-dismiss events.
@@ -18,25 +18,11 @@ export const useBubbleMenu = () => {
   const closeMenu = () => setShowMenu(false);
   const toggleMenu = () => setShowMenu((current) => !current);
 
-  useEffect(() => {
-    if (!showMenu) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (isEventOutsideElement(menuRef.current, event.target)) closeMenu();
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (shouldCloseMenuOnEscape(event.key)) closeMenu();
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showMenu]);
+  useDismissableLayer({
+    enabled: showMenu,
+    ref: menuRef,
+    onDismiss: closeMenu,
+  });
 
   return { showMenu, menuRef, closeMenu, toggleMenu };
 };

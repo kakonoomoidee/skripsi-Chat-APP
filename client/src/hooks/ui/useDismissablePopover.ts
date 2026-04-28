@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { isEventOutsideElement, shouldCloseMenuOnEscape } from "@/utils/bubble";
+import { useRef, useState } from "react";
+import { useDismissableLayer } from "@/hooks/ui/useDismissableLayer";
 
 /**
  * Manages open/close behavior for dismissable popovers with outside click and escape handling.
@@ -20,27 +20,12 @@ export const useDismissablePopover = () => {
   const close = () => setIsOpen(false);
   const toggle = () => setIsOpen((current) => !current);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (isEventOutsideElement(containerRef.current, event.target)) close();
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (shouldCloseMenuOnEscape(event.key)) close();
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isOpen]);
+  useDismissableLayer({
+    enabled: isOpen,
+    ref: containerRef,
+    onDismiss: close,
+    pointerEvents: ["mousedown", "touchstart"],
+  });
 
   return { isOpen, containerRef, open, close, toggle };
 };

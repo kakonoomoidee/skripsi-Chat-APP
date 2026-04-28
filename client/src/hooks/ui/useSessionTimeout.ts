@@ -1,7 +1,10 @@
 import { useEffect, useCallback } from "react";
 import ms from "ms";
+import {
+  getStoredLastActivity,
+  updateStoredLastActivity,
+} from "@/utils/session";
 
-const LAST_ACTIVITY_KEY = "securep2p_last_activity";
 const DEFAULT_TIMEOUT_MS = ms("1h");
 const INACTIVITY_CHECK_INTERVAL_MS = ms("1m");
 const ACTIVITY_EVENTS = [
@@ -23,16 +26,13 @@ export const useSessionTimeout = (
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): void => {
   const updateLastActivity = useCallback((): void => {
-    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+    updateStoredLastActivity();
   }, []);
 
   const checkInactivity = useCallback((): void => {
-    const lastActivityStr = localStorage.getItem(LAST_ACTIVITY_KEY);
-    if (lastActivityStr) {
-      const lastActivity = parseInt(lastActivityStr, 10);
-      if (Date.now() - lastActivity > timeoutMs) {
-        onTimeout();
-      }
+    const lastActivity = getStoredLastActivity();
+    if (lastActivity !== null && Date.now() - lastActivity > timeoutMs) {
+      onTimeout();
     }
   }, [onTimeout, timeoutMs]);
 

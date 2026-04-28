@@ -7,21 +7,24 @@ import {
   registerIdentity,
   requestAuthChallenge,
 } from "@/services/api";
+import {
+  clearStoredLastActivity,
+  updateStoredLastActivity,
+} from "@/utils/session";
 
 const AUTH_TOKEN_KEY = "auth_token";
-const LAST_ACTIVITY_KEY = "securep2p_last_activity";
 const PUBLIC_KEY_PLACEHOLDER = "PUBKEY_PLACEHOLDER";
 
 type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;
 
 const saveSessionToken = (token: string): void => {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
-  localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+  updateStoredLastActivity();
 };
 
 const clearSessionToken = (): void => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(LAST_ACTIVITY_KEY);
+  clearStoredLastActivity();
 };
 
 /**
