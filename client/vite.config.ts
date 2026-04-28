@@ -1,3 +1,5 @@
+/// <reference types="vitest" />
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
@@ -6,8 +8,8 @@ import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
 
 /**
  * Configures the Vite bundler for the client application.
- * Integrates React, TailwindCSS, path aliasing, and aggressive
- * JavaScript obfuscation specifically for production builds.
+ * Integrates React, TailwindCSS, path aliasing, aggressive
+ * JavaScript obfuscation for production, and Vitest configuration.
  * Excludes App.tsx to preserve dynamic import paths for lazy loading.
  *
  * @returns {import('vite').UserConfig} The parsed Vite configuration object.
@@ -37,6 +39,11 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+  },
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["test/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
   },
   esbuild:
     mode === "production"
