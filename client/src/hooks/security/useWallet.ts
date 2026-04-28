@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { ethers } from "ethers";
-
-const KEYSTORE_KEY = "chat_app_keystore";
+import {
+  KEYSTORE_STORAGE_KEY,
+  getStoredWalletAddressFromKeystore,
+} from "@/utils/security";
 
 /**
  * Interface defining the result of a wallet creation operation.
@@ -36,28 +38,14 @@ export interface UseWalletReturn {
  * @returns {UseWalletReturn} Wallet state and cryptographic management functions.
  */
 export const useWallet = (): UseWalletReturn => {
-  /**
-   * Retrieves and parses the stored wallet address from the local keystore JSON.
-   *
-   * @returns {string | null} The checksummed Ethereum address, or null if not found/corrupt.
-   */
-  const getStoredAddress = (): string | null => {
-    const keystore = localStorage.getItem(KEYSTORE_KEY);
-    if (keystore) {
-      try {
-        const parsed = JSON.parse(keystore);
-        return parsed.address ? `0x${parsed.address}` : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
   const [wallet, setWallet] = useState<
     ethers.Wallet | ethers.HDNodeWallet | null
   >(null);
-  const [address, setAddress] = useState<string | null>(getStoredAddress());
+  const [address, setAddress] = useState<string | null>(
+    getStoredWalletAddressFromKeystore(
+      localStorage.getItem(KEYSTORE_STORAGE_KEY),
+    ),
+  );
   const [loading, setLoading] = useState<boolean>(false);
 
   /**
@@ -82,7 +70,7 @@ export const useWallet = (): UseWalletReturn => {
       );
       const keystoreJson = await newWallet.encrypt(password);
 
-      localStorage.setItem(KEYSTORE_KEY, keystoreJson);
+      localStorage.setItem(KEYSTORE_STORAGE_KEY, keystoreJson);
       setWallet(newWallet);
       setAddress(newWallet.address);
 
@@ -111,7 +99,7 @@ export const useWallet = (): UseWalletReturn => {
       console.log(
         "[Wallet Manager] Attempting to decrypt local Keystore JSON...",
       );
-      const keystoreJson = localStorage.getItem(KEYSTORE_KEY);
+      const keystoreJson = localStorage.getItem(KEYSTORE_STORAGE_KEY);
 
       if (!keystoreJson) {
         throw new Error("No Identity found. Please register.");
@@ -162,7 +150,7 @@ export const useWallet = (): UseWalletReturn => {
       );
       const keystoreJson = await importedWallet.encrypt(password);
 
-      localStorage.setItem(KEYSTORE_KEY, keystoreJson);
+      localStorage.setItem(KEYSTORE_STORAGE_KEY, keystoreJson);
       setWallet(importedWallet);
       setAddress(importedWallet.address);
 
@@ -188,7 +176,7 @@ export const useWallet = (): UseWalletReturn => {
     console.log(
       "[Wallet Manager] Executing wallet wipe protocol. Purging local storage...",
     );
-    localStorage.removeItem(KEYSTORE_KEY);
+    localStorage.removeItem(KEYSTORE_STORAGE_KEY);
     window.location.reload();
   }, []);
 

@@ -6,6 +6,16 @@ import { formatTime } from "@/utils/format";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useUIStore, useSessionStore, useWalletStore } from "@/store";
 import { getLastExportTime, updateLastExportTime } from "@/utils/exportUtils";
+import { getStoredAutoBackupMode } from "@/utils/dataSecurity";
+
+const AUTO_BACKUP_INTERVAL_MS_BY_MODE: Record<string, number> = {
+  "1": ms("24h"),
+  "3": ms("3d"),
+  "7": ms("7d"),
+  "30": ms("30d"),
+};
+
+const AUTO_BACKUP_TICK_MS = ms("1m");
 
 /**
  * Interface defining the methods and states provided by the useSecurityHandlers hook.
@@ -52,19 +62,13 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
    * @param {string} mode - Backup mode value from localStorage.
    * @returns {number} Interval duration in milliseconds.
    */
-  const getAutoBackupIntervalMs = (mode: string): number => {
-    if (mode === "1") return ms("24h");
-    if (mode === "3") return ms("3d");
-    if (mode === "7") return ms("7d");
-    if (mode === "30") return ms("30d");
-    return 0;
-  };
+  const getAutoBackupIntervalMs = (mode: string): number =>
+    AUTO_BACKUP_INTERVAL_MS_BY_MODE[mode] || 0;
 
   useEffect(() => {
     const checkDueExportOnBoot = async () => {
       if (seedModal.isOpen) return;
-      const autoBackupMode =
-        localStorage.getItem("securep2p_auto_backup_mode") || "never";
+      const autoBackupMode = getStoredAutoBackupMode();
       const intervalMs = getAutoBackupIntervalMs(autoBackupMode);
       if (intervalMs <= 0) return;
 
@@ -118,8 +122,7 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
   );
 
   useEffect(() => {
-    const autoBackupMode =
-      localStorage.getItem("securep2p_auto_backup_mode") || "never";
+    const autoBackupMode = getStoredAutoBackupMode();
     const intervalMs = getAutoBackupIntervalMs(autoBackupMode);
     if (!verifiedExportSeed || intervalMs <= 0) return;
 
@@ -133,7 +136,7 @@ export const useSecurityHandlers = (): UseSecurityHandlersReturn => {
     };
 
     runAutoExportIfDue();
-    const timerId = window.setInterval(runAutoExportIfDue, ms("1m"));
+    const timerId = window.setInterval(runAutoExportIfDue, AUTO_BACKUP_TICK_MS);
     return () => window.clearInterval(timerId);
   }, [executeExportWithSeed, showToast, verifiedExportSeed]);
 

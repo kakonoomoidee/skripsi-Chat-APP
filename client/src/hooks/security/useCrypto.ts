@@ -1,10 +1,16 @@
 import { useState, useCallback, useRef } from "react";
+import type { SigningKey } from "ethers";
 import {
   generateEphemeralKeys,
   deriveSharedSecret,
   encryptMessage as encryptAES,
   decryptMessage as decryptAES,
 } from "@/utils/crypto";
+import {
+  getOrCreateLocalDbEncryptionKey,
+  isCryptoSystemMessage,
+  LOCAL_DB_ENCRYPTION_KEY_STORAGE_KEY,
+} from "@/utils/security";
 
 /**
  * Interface defining the return methods and state for the useCrypto hook.
@@ -26,24 +32,21 @@ export interface UseCryptoReturn {
  * @returns {UseCryptoReturn} Cryptographic state and helper functions.
  */
 export const useCrypto = (): UseCryptoReturn => {
-  const pendingPrivateKeys = useRef<Record<string, any>>({});
-  const [, setSharedSecrets] = useState<Record<string, string>>(
-    {},
-  );
+  const pendingPrivateKeys = useRef<Record<string, SigningKey>>({});
+  const [, setSharedSecrets] = useState<Record<string, string>>({});
   const sharedSecretsRef = useRef<Record<string, string>>({});
 
   const [localDbKey] = useState(() => {
-    let key = localStorage.getItem("securep2p_local_db_key");
-    if (!key) {
-      const array = new Uint8Array(32);
-      window.crypto.getRandomValues(array);
-      key = Array.from(array, (byte) =>
-        byte.toString(16).padStart(2, "0"),
-      ).join("");
-      localStorage.setItem("securep2p_local_db_key", key);
-      console.log("[Crypto] New local database encryption key generated.");
+    const existingKey = localStorage.getItem(
+      LOCAL_DB_ENCRYPTION_KEY_STORAGE_KEY,
+    );
+    if (existingKey) {
+      return existingKey;
     }
-    return key;
+
+    const generatedKey = getOrCreateLocalDbEncryptionKey();
+    console.log("[Crypto] New local database encryption key generated.");
+    return generatedKey;
   });
 
   /**
@@ -118,14 +121,7 @@ export const useCrypto = (): UseCryptoReturn => {
       const cipherText = encryptAES(plainText, secret);
 
       // Mute the annoying logs for system-level messages (Typing, Wallet Requests, etc)
-      const isSystemMessage =
-        plainText.includes('"type":"TYPING"') ||
-        plainText.includes('"type":"WALLET_REQUEST"') ||
-        plainText.includes('"type":"WALLET_RESPONSE"') ||
-        plainText.includes('"type":"CALL_OFFER"') ||
-        plainText.includes('"type":"CALL_ACCEPTED"') ||
-        plainText.includes('"type":"CALL_REJECTED"') ||
-        plainText.includes('"type":"CALL_ENDED"');
+      const isSystemMessage = isCryptoSystemMessage(plainText);
 
       if (!isSystemMessage) {
         console.log("-----------------------------------------");
@@ -173,14 +169,7 @@ export const useCrypto = (): UseCryptoReturn => {
       }
 
       // Mute the annoying logs for system-level messages
-      const isSystemMessage =
-        decrypted.includes('"type":"TYPING"') ||
-        decrypted.includes('"type":"WALLET_REQUEST"') ||
-        decrypted.includes('"type":"WALLET_RESPONSE"') ||
-        decrypted.includes('"type":"CALL_OFFER"') ||
-        decrypted.includes('"type":"CALL_ACCEPTED"') ||
-        decrypted.includes('"type":"CALL_REJECTED"') ||
-        decrypted.includes('"type":"CALL_ENDED"');
+      const isSystemMessage = isCryptoSystemMessage(decrypted);
 
       if (!isSystemMessage) {
         console.log("-----------------------------------------");
