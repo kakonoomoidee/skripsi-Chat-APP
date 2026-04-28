@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import ms from "ms";
 
+const RELAY_PING_TIMEOUT_MS = ms("3s");
+const RELAY_PING_INTERVAL_MS = ms("5s");
+
+const toHttpRelayUrl = (relayUrl: string): string =>
+  relayUrl.replace(/^ws/, "http");
+
 /**
  * Interface defining the return values for the relay ping status.
  */
@@ -23,19 +29,22 @@ export const useRelayPing = (activeRelay: string): UseRelayPingReturn => {
   useEffect(() => {
     let isMounted = true;
 
-    const pingRelay = async () => {
+    const pingRelay = async (): Promise<void> => {
       if (!activeRelay) return;
       if (isMounted) setIsPinging(true);
 
       try {
-        const baseUrl = activeRelay.replace(/^ws/, "http");
+        const baseUrl = toHttpRelayUrl(activeRelay);
         const httpUrl = `${baseUrl}/ping`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ms("3s"));
+        const timeoutId = window.setTimeout(
+          () => controller.abort(),
+          RELAY_PING_TIMEOUT_MS,
+        );
 
         await fetch(httpUrl, { mode: "no-cors", signal: controller.signal });
-        clearTimeout(timeoutId);
+        window.clearTimeout(timeoutId);
 
         if (isMounted) {
           setIsRelayAlive(true);
@@ -50,11 +59,11 @@ export const useRelayPing = (activeRelay: string): UseRelayPingReturn => {
     };
 
     pingRelay();
-    const intervalId = setInterval(pingRelay, ms("5s"));
+    const intervalId = window.setInterval(pingRelay, RELAY_PING_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      window.clearInterval(intervalId);
     };
   }, [activeRelay]);
 

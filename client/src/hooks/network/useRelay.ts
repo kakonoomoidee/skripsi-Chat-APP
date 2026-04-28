@@ -2,6 +2,18 @@ import { useState } from "react";
 import { db } from "@/utils/db";
 import { useLiveQuery } from "dexie-react-hooks";
 
+const ACTIVE_RELAY_STORAGE_KEY = "active_relay";
+const FALLBACK_RELAY_URL = "http://127.0.0.1:3001";
+
+const parseDefaultRelays = (rawRelays: string): string[] =>
+  rawRelays
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+const normalizeRelayUrl = (url: string): string =>
+  url.trim().replace(/\/$/, "");
+
 /**
  * Interface defining the return properties and methods of the useRelay hook.
  */
@@ -19,16 +31,24 @@ export interface UseRelayReturn {
  * @returns {UseRelayReturn} Relay state and management methods.
  */
 export const useRelay = (): UseRelayReturn => {
-  const rawEnvRelays = import.meta.env.VITE_DEFAULT_RELAYS || "http://127.0.0.1:3001";
-  
-  const baseUrls = rawEnvRelays.split(",").map((url: string) => url.trim());
+  const rawEnvRelays =
+    import.meta.env.VITE_DEFAULT_RELAYS || FALLBACK_RELAY_URL;
+
+  const baseUrls = parseDefaultRelays(rawEnvRelays);
+  const initialRelay =
+    localStorage.getItem(ACTIVE_RELAY_STORAGE_KEY) ||
+    baseUrls[0] ||
+    FALLBACK_RELAY_URL;
 
   const [activeRelay, setActiveRelay] = useState<string>(
-    localStorage.getItem("active_relay") || baseUrls[0],
+    normalizeRelayUrl(initialRelay),
   );
 
   const customRelays = useLiveQuery(() => db.relays.toArray()) || [];
-  const defaultRelays = [...baseUrls, ...customRelays.map((r) => r.url)];
+  const defaultRelays = [
+    ...baseUrls,
+    ...customRelays.map((relay) => normalizeRelayUrl(relay.url)),
+  ];
 
   /**
    * Updates the active relay server and persists the choice to local storage.
@@ -37,11 +57,13 @@ export const useRelay = (): UseRelayReturn => {
    * @returns {void}
    */
   const changeRelay = (url: string): void => {
+    const normalizedUrl = normalizeRelayUrl(url);
+
     console.log(
-      `[Relay Manager] Switching active relay from ${activeRelay} to ${url}...`,
+      `[Relay Manager] Switching active relay from ${activeRelay} to ${normalizedUrl}...`,
     );
-    setActiveRelay(url);
-    localStorage.setItem("active_relay", url);
+    setActiveRelay(normalizedUrl);
+    localStorage.setItem(ACTIVE_RELAY_STORAGE_KEY, normalizedUrl);
     console.log("[Relay Manager] Active relay switched and persisted.");
   };
 
@@ -55,7 +77,7 @@ export const useRelay = (): UseRelayReturn => {
   const addCustomRelay = async (url: string): Promise<void> => {
     console.log(`[Relay Manager] Attempting to add custom relay: ${url}`);
 
-    const formattedUrl = url.trim().replace(/\/$/, "");
+    const formattedUrl = normalizeRelayUrl(url);
 
     if (!formattedUrl.startsWith("http")) {
       console.warn(

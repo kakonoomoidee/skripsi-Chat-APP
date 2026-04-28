@@ -2,6 +2,17 @@ import { useState, useEffect, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUIStore } from "@/store";
 
+const SOCKET_EVENTS = {
+  connect: "connect",
+  disconnect: "disconnect",
+  connectError: "connect_error",
+  sessionRevoked: "session_revoked",
+} as const;
+
+interface SessionRevokedPayload {
+  reason: string;
+}
+
 /**
  * Interface defining the return values for the useSocket hook.
  */
@@ -44,6 +55,7 @@ export const useSocket = (
     if (!socket) return;
 
     console.log("[Socket Manager] Executing socket connection...");
+    setIsSessionRevoked(false);
     socket.connect();
 
     const onConnect = () => {
@@ -65,7 +77,7 @@ export const useSocket = (
       setIsConnected(false);
     };
 
-    const onSessionRevoked = (data: { reason: string }) => {
+    const onSessionRevoked = (data: SessionRevokedPayload) => {
       console.warn(
         `[Socket Manager] Session Revoked by Server: ${data.reason}`,
       );
@@ -75,19 +87,19 @@ export const useSocket = (
       setIsSessionRevoked(true);
     };
 
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("connect_error", onError);
-    socket.on("session_revoked", onSessionRevoked);
+    socket.on(SOCKET_EVENTS.connect, onConnect);
+    socket.on(SOCKET_EVENTS.disconnect, onDisconnect);
+    socket.on(SOCKET_EVENTS.connectError, onError);
+    socket.on(SOCKET_EVENTS.sessionRevoked, onSessionRevoked);
 
     return () => {
       console.log(
         "[Socket Manager] Cleaning up and terminating socket connection.",
       );
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("connect_error", onError);
-      socket.off("session_revoked", onSessionRevoked);
+      socket.off(SOCKET_EVENTS.connect, onConnect);
+      socket.off(SOCKET_EVENTS.disconnect, onDisconnect);
+      socket.off(SOCKET_EVENTS.connectError, onError);
+      socket.off(SOCKET_EVENTS.sessionRevoked, onSessionRevoked);
       socket.disconnect();
     };
   }, [socket, relayUrl, showToast]);

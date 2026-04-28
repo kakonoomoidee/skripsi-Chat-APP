@@ -1,5 +1,10 @@
 import { useRef, useCallback } from "react";
 
+const P2P_AUDIO_ELEMENT_ID = "p2p-audio-stream";
+
+const getAudioElement = (): HTMLAudioElement | null =>
+  document.getElementById(P2P_AUDIO_ELEMENT_ID) as HTMLAudioElement | null;
+
 /**
  * Hook to manage WebRTC media streams and audio tracks.
  *
@@ -12,6 +17,34 @@ export const useWebRTCMedia = (
   }>,
 ) => {
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  const attachOutgoingAudioTrack = async (
+    targetPeer: string,
+    stream: MediaStream,
+  ): Promise<void> => {
+    const pc = peerConnections.current[targetPeer.toLowerCase()];
+    if (!pc) {
+      return;
+    }
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) {
+      return;
+    }
+
+    const existingSender = pc
+      .getSenders()
+      .find(
+        (sender) => sender.track === null || sender.track?.kind === "audio",
+      );
+
+    if (existingSender) {
+      await existingSender.replaceTrack(audioTrack);
+      return;
+    }
+
+    pc.addTrack(audioTrack, stream);
+  };
 
   /**
    * Requests microphone access and attaches the active audio track to the peer connection.
@@ -28,25 +61,9 @@ export const useWebRTCMedia = (
         });
         localStreamRef.current = stream;
 
-        const pc = peerConnections.current[targetPeer.toLowerCase()];
-        if (pc) {
-          const audioTrack = stream.getAudioTracks()[0];
-          const senders = pc.getSenders();
+        await attachOutgoingAudioTrack(targetPeer, stream);
 
-          const existingSender = senders.find(
-            (s) => s.track === null || s.track?.kind === "audio",
-          );
-
-          if (existingSender) {
-            await existingSender.replaceTrack(audioTrack);
-          } else {
-            pc.addTrack(audioTrack, stream);
-          }
-        }
-
-        const audioEl = document.getElementById(
-          "p2p-audio-stream",
-        ) as HTMLAudioElement;
+        const audioEl = getAudioElement();
 
         if (audioEl) {
           audioEl.muted = false;
@@ -54,7 +71,7 @@ export const useWebRTCMedia = (
         }
 
         return true;
-      } catch (error) {
+      } catch {
         return false;
       }
     },
@@ -73,6 +90,7 @@ export const useWebRTCMedia = (
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
       }
+
       const pc = peerConnections.current[targetPeer.toLowerCase()];
       if (pc) {
         const audioSender = pc
@@ -82,9 +100,8 @@ export const useWebRTCMedia = (
           audioSender.replaceTrack(null);
         }
       }
-      const audioEl = document.getElementById(
-        "p2p-audio-stream",
-      ) as HTMLAudioElement;
+
+      const audioEl = getAudioElement();
       if (audioEl) {
         audioEl.pause();
         audioEl.srcObject = null;

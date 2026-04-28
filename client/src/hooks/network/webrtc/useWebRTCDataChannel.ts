@@ -1,20 +1,83 @@
 import { useRef, useCallback } from "react";
+import ms from "ms";
 import { db } from "@/utils/db";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
+
+const MARK_AS_READ_SIGNAL_TYPE = "MARK_AS_READ";
+const MESSAGE_DELIVERED_SIGNAL_TYPE = "MSG_DELIVERED";
+const TYPING_INDICATOR_RESET_MS = ms("2500ms");
+
+type DataChannelMessagePayload =
+  | { type: typeof CHAT_PROTOCOL_TYPES.typing }
+  | { type: "CALL_OFFER" }
+  | { type: "CALL_ACCEPTED" }
+  | { type: "CALL_REJECTED" }
+  | { type: "CALL_ENDED" }
+  | { type: typeof MARK_AS_READ_SIGNAL_TYPE }
+  | { type: typeof MESSAGE_DELIVERED_SIGNAL_TYPE; timestamp: number };
+
+const parseDataChannelPayload = (
+  rawPayload: string,
+): DataChannelMessagePayload | null => {
+  try {
+    const parsed = JSON.parse(rawPayload) as {
+      type?: unknown;
+      timestamp?: unknown;
+    };
+
+    if (parsed.type === CHAT_PROTOCOL_TYPES.typing) {
+      return { type: CHAT_PROTOCOL_TYPES.typing };
+    }
+
+    if (parsed.type === "CALL_OFFER") {
+      return { type: "CALL_OFFER" };
+    }
+
+    if (parsed.type === "CALL_ACCEPTED") {
+      return { type: "CALL_ACCEPTED" };
+    }
+
+    if (parsed.type === "CALL_REJECTED") {
+      return { type: "CALL_REJECTED" };
+    }
+
+    if (parsed.type === "CALL_ENDED") {
+      return { type: "CALL_ENDED" };
+    }
+
+    if (parsed.type === MARK_AS_READ_SIGNAL_TYPE) {
+      return { type: MARK_AS_READ_SIGNAL_TYPE };
+    }
+
+    if (
+      parsed.type === MESSAGE_DELIVERED_SIGNAL_TYPE &&
+      typeof parsed.timestamp === "number"
+    ) {
+      return {
+        type: MESSAGE_DELIVERED_SIGNAL_TYPE,
+        timestamp: parsed.timestamp,
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Interface defining the dependencies required by the useWebRTCDataChannel hook.
  */
 interface UseWebRTCDataChannelProps {
   myAddress: string | null;
-  activeChat: string | null;
   decrypt: (peerAddress: string, cipherText: string) => string;
   encryptLocalDB: (plainText: string) => string;
   encrypt: (peerAddress: string, plainText: string) => string | null;
-  setIsPeerTyping: ((val: boolean) => void) | undefined;
-  onCallOffer: (() => void) | undefined;
-  onCallAccepted: (() => void) | undefined;
-  onCallRejected: (() => void) | undefined;
-  onCallEnded: (() => void) | undefined;
+  setIsPeerTyping?: (val: boolean) => void;
+  onCallOffer?: () => void;
+  onCallAccepted?: () => void;
+  onCallRejected?: () => void;
+  onCallEnded?: () => void;
   startVoiceCall: (peerAddress: string) => Promise<boolean>;
   stopVoiceCall: (peerAddress: string) => void;
 }
@@ -27,7 +90,6 @@ interface UseWebRTCDataChannelProps {
  */
 export const useWebRTCDataChannel = ({
   myAddress,
-  activeChat,
   decrypt,
   encryptLocalDB,
   encrypt,
@@ -40,7 +102,16 @@ export const useWebRTCDataChannel = ({
   stopVoiceCall,
 }: UseWebRTCDataChannelProps) => {
   const dataChannels = useRef<{ [address: string]: RTCDataChannel }>({});
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<number | null>(null);
+
+  const clearTypingTimeout = (): void => {
+    if (typingTimeoutRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = null;
+  };
 
   /**
    * Transmits encrypted data through the established Data Channel for a given peer.
@@ -67,7 +138,7 @@ export const useWebRTCDataChannel = ({
   const sendMarkAsRead = useCallback(
     (peerAddress: string): void => {
       if (!peerAddress) return;
-      const signal = JSON.stringify({ type: "MARK_AS_READ" });
+      const signal = JSON.stringify({ type: MARK_AS_READ_SIGNAL_TYPE });
       const encrypted = encrypt(peerAddress, signal);
       if (encrypted) {
         sendDataViaWebRTC(peerAddress, encrypted);
@@ -88,76 +159,63 @@ export const useWebRTCDataChannel = ({
     async (peerAddress: string, encryptedData: string): Promise<void> => {
       try {
         const decryptedContent = decrypt(peerAddress, encryptedData);
+        const parsedPayload = parseDataChannelPayload(decryptedContent);
 
-        try {
-          const parsed = JSON.parse(decryptedContent);
+        if (parsedPayload?.type === CHAT_PROTOCOL_TYPES.typing && setIsPeerTyping) {
+          setIsPeerTyping(true);
+          clearTypingTimeout();
+          typingTimeoutRef.current = window.setTimeout(
+            () => setIsPeerTyping(false),
+            TYPING_INDICATOR_RESET_MS,
+          );
+          return;
+        }
 
-          if (parsed.type === "TYPING" && setIsPeerTyping) {
-            setIsPeerTyping(true);
-            if (typingTimeoutRef.current)
-              clearTimeout(typingTimeoutRef.current);
-            typingTimeoutRef.current = setTimeout(
-              () => setIsPeerTyping(false),
-              2500,
-            );
-            return;
-          }
+        if (parsedPayload?.type === "CALL_OFFER" && onCallOffer) {
+          onCallOffer();
+          return;
+        }
 
-          if (parsed.type === "CALL_OFFER" && onCallOffer) {
-            onCallOffer();
-            return;
-          }
+        if (parsedPayload?.type === "CALL_ACCEPTED") {
+          startVoiceCall(peerAddress).then((success: boolean) => {
+            if (success && onCallAccepted) onCallAccepted();
+          });
+          return;
+        }
 
-          if (parsed.type === "CALL_ACCEPTED") {
-            startVoiceCall(peerAddress).then((success: boolean) => {
-              if (success && onCallAccepted) onCallAccepted();
-            });
-            return;
-          }
+        if (parsedPayload?.type === "CALL_REJECTED" && onCallRejected) {
+          onCallRejected();
+          return;
+        }
 
-          if (parsed.type === "CALL_REJECTED" && onCallRejected) {
-            onCallRejected();
-            return;
-          }
+        if (parsedPayload?.type === "CALL_ENDED") {
+          stopVoiceCall(peerAddress);
+          if (onCallEnded) onCallEnded();
+          return;
+        }
 
-          if (parsed.type === "CALL_ENDED") {
-            stopVoiceCall(peerAddress);
-            if (onCallEnded) onCallEnded();
-            return;
-          }
+        if (parsedPayload?.type === MESSAGE_DELIVERED_SIGNAL_TYPE && myAddress) {
+          await db.messages
+            .where("[ownerAddress+chatId]")
+            .equals([myAddress.toLowerCase(), peerAddress.toLowerCase()])
+            .filter(
+              (msg) =>
+                msg.isMine &&
+                msg.status === "pending" &&
+                msg.timestamp <= parsedPayload.timestamp,
+            )
+            .modify({ status: "delivered" });
+          return;
+        }
 
-          /**
-           * Handles an MSG_DELIVERED ack from the peer.
-           * Upgrades all 'pending' outbound messages up to the acknowledged timestamp
-           * to 'delivered' status in the local IndexedDB.
-           */
-          if (parsed.type === "MSG_DELIVERED" && myAddress) {
-            await db.messages
-              .where("[ownerAddress+chatId]")
-              .equals([myAddress.toLowerCase(), peerAddress.toLowerCase()])
-              .filter(
-                (msg) =>
-                  msg.isMine &&
-                  msg.status === "pending" &&
-                  msg.timestamp <= parsed.timestamp,
-              )
-              .modify({ status: "delivered" });
-            return;
-          }
-
-          /**
-           * Handles a MARK_AS_READ signal from the peer indicating they have opened the chat.
-           * Upgrades all outbound messages from 'delivered' to 'read' in the local IndexedDB.
-           */
-          if (parsed.type === "MARK_AS_READ" && myAddress) {
-            await db.messages
-              .where("[ownerAddress+chatId]")
-              .equals([myAddress.toLowerCase(), peerAddress.toLowerCase()])
-              .filter((msg) => msg.isMine && msg.status !== "read")
-              .modify({ status: "read" });
-            return;
-          }
-        } catch {}
+        if (parsedPayload?.type === MARK_AS_READ_SIGNAL_TYPE && myAddress) {
+          await db.messages
+            .where("[ownerAddress+chatId]")
+            .equals([myAddress.toLowerCase(), peerAddress.toLowerCase()])
+            .filter((msg) => msg.isMine && msg.status !== "read")
+            .modify({ status: "read" });
+          return;
+        }
 
         if (!myAddress) return;
         const isReceivedImage = decryptedContent.startsWith("data:image");
@@ -173,7 +231,7 @@ export const useWebRTCDataChannel = ({
         });
 
         const deliveredSignal = JSON.stringify({
-          type: "MSG_DELIVERED",
+          type: MESSAGE_DELIVERED_SIGNAL_TYPE,
           timestamp: messageTimestamp,
         });
         const encryptedAck = encrypt(peerAddress, deliveredSignal);
@@ -191,7 +249,6 @@ export const useWebRTCDataChannel = ({
       onCallEnded,
       myAddress,
       encryptLocalDB,
-      activeChat,
       startVoiceCall,
       stopVoiceCall,
       encrypt,

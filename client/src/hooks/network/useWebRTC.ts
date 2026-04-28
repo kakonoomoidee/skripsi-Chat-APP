@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { type Socket } from "socket.io-client";
 import { useWebRTCMedia } from "./webrtc/useWebRTCMedia";
 import { useWebRTCDataChannel } from "./webrtc/useWebRTCDataChannel";
+
+const WEBRTC_SIGNAL_TYPES = {
+  ping: "ping",
+  pong: "pong",
+  offer: "offer",
+  answer: "answer",
+  iceCandidate: "ice-candidate",
+} as const;
 
 const ICE_SERVERS = {
   iceServers: [
@@ -9,15 +18,57 @@ const ICE_SERVERS = {
   ],
 };
 
+type WebRTCSignal =
+  | { type: typeof WEBRTC_SIGNAL_TYPES.ping }
+  | { type: typeof WEBRTC_SIGNAL_TYPES.pong }
+  | {
+      type: typeof WEBRTC_SIGNAL_TYPES.offer;
+      offer: RTCSessionDescriptionInit;
+      ephemeralPublicKey?: string;
+    }
+  | {
+      type: typeof WEBRTC_SIGNAL_TYPES.answer;
+      answer: RTCSessionDescriptionInit;
+      ephemeralPublicKey?: string;
+    }
+  | {
+      type: typeof WEBRTC_SIGNAL_TYPES.iceCandidate;
+      candidate: RTCIceCandidateInit;
+    };
+
+interface WebRTCSignalEvent {
+  from: string;
+  signal: WebRTCSignal;
+}
+
+export interface UseWebRTCProps {
+  socket: Socket | null;
+  myAddress: string | null;
+  activeChat: string | null;
+  decrypt: (peerAddress: string, cipherText: string) => string;
+  encryptLocalDB: (plainText: string) => string;
+  encrypt: (peerAddress: string, plainText: string) => string | null;
+  generateHandshakeKeys: (peerAddress: string) => string;
+  computeSecret?: (peerAddress: string, peerPublicKey: string) => void;
+  hasSecret: (peerAddress: string) => boolean;
+  setIsPeerTyping?: (val: boolean) => void;
+  onCallOffer?: () => void;
+  onCallAccepted?: () => void;
+  onCallRejected?: () => void;
+  onCallEnded?: () => void;
+  onPeerDisconnected?: (peerAddress: string) => void;
+  onPongReceived?: (peerAddress: string) => void;
+}
+
 /**
  * Main facade hook orchestrating WebRTC connections, signaling, and media streams.
  * Implements a ping-first reachability check: before any SDP negotiation begins,
  * the target peer is verified online via a lightweight relay ping/pong probe.
  *
- * @param {any} props - Dependencies injected from ChatContext.
+ * @param {UseWebRTCProps} props - Dependencies injected from ChatContext.
  * @returns {Object} WebRTC state and control methods.
  */
-export const useWebRTC = (props: any) => {
+export const useWebRTC = (props: UseWebRTCProps) => {
   const {
     socket,
     myAddress,
@@ -31,7 +82,6 @@ export const useWebRTC = (props: any) => {
   } = props;
 
   const peerConnections = useRef<{ [address: string]: RTCPeerConnection }>({});
-  const iceQueues = useRef<{ [address: string]: RTCIceCandidateInit[] }>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
 
   const isWebRTCConnected = activeChat
@@ -41,13 +91,32 @@ export const useWebRTC = (props: any) => {
   const { startVoiceCall, stopVoiceCall, toggleMicMute } =
     useWebRTCMedia(peerConnections);
 
-  const { dataChannels, handleIncomingMessage, sendDataViaWebRTC, sendMarkAsRead } =
-    useWebRTCDataChannel({
-      ...props,
-      encrypt,
-      startVoiceCall,
-      stopVoiceCall,
-    });
+  const {
+    dataChannels,
+    handleIncomingMessage,
+    sendDataViaWebRTC,
+    sendMarkAsRead,
+  } = useWebRTCDataChannel({
+    ...props,
+    encrypt,
+    startVoiceCall,
+    stopVoiceCall,
+  });
+
+  const disposePeerConnection = (addr: string): void => {
+    const pc = peerConnections.current[addr];
+    if (!pc) {
+      return;
+    }
+
+    pc.onconnectionstatechange = null;
+    pc.oniceconnectionstatechange = null;
+    pc.onicecandidate = null;
+    pc.ondatachannel = null;
+    pc.ontrack = null;
+    pc.close();
+    delete peerConnections.current[addr];
+  };
 
   /**
    * Attaches the remote media stream to the hidden audio element in the DOM.
@@ -58,7 +127,9 @@ export const useWebRTC = (props: any) => {
    */
   const setupAudioTrack = (pc: RTCPeerConnection): void => {
     pc.ontrack = (event) => {
-      let audioEl = document.getElementById("p2p-audio-stream") as HTMLAudioElement;
+      let audioEl = document.getElementById(
+        "p2p-audio-stream",
+      ) as HTMLAudioElement;
       if (!audioEl) {
         audioEl = document.createElement("audio");
         audioEl.id = "p2p-audio-stream";
@@ -95,16 +166,7 @@ export const useWebRTC = (props: any) => {
     (peerAddress: string): void => {
       const addr = peerAddress.toLowerCase();
 
-      const pc = peerConnections.current[addr];
-      if (pc) {
-        pc.onconnectionstatechange = null;
-        pc.oniceconnectionstatechange = null;
-        pc.onicecandidate = null;
-        pc.ondatachannel = null;
-        pc.ontrack = null;
-        pc.close();
-        delete peerConnections.current[addr];
-      }
+      disposePeerConnection(addr);
 
       const dc = dataChannels.current[addr];
       if (dc) {
@@ -164,7 +226,7 @@ export const useWebRTC = (props: any) => {
       if (!socket || !targetPeer) return;
       socket.emit("webrtc_signal", {
         to: targetPeer.toLowerCase(),
-        signal: { type: "ping" },
+        signal: { type: WEBRTC_SIGNAL_TYPES.ping },
       });
     },
     [socket],
@@ -184,17 +246,10 @@ export const useWebRTC = (props: any) => {
       if (!socket || !targetPeer || !myAddress) return;
       const addr = targetPeer.toLowerCase();
 
-      if (peerConnections.current[addr]) {
-        peerConnections.current[addr].onconnectionstatechange = null;
-        peerConnections.current[addr].oniceconnectionstatechange = null;
-        peerConnections.current[addr].onicecandidate = null;
-        peerConnections.current[addr].close();
-        delete peerConnections.current[addr];
-      }
+      disposePeerConnection(addr);
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
       peerConnections.current[addr] = pc;
-      iceQueues.current[addr] = [];
 
       pc.addTransceiver("audio", { direction: "sendrecv" });
       setupAudioTrack(pc);
@@ -202,7 +257,8 @@ export const useWebRTC = (props: any) => {
       const dc = pc.createDataChannel("secure_p2p_channel", { ordered: true });
       dataChannels.current[addr] = dc;
 
-      dc.onopen = () => setConnectedPeers((prev) => [...new Set([...prev, addr])]);
+      dc.onopen = () =>
+        setConnectedPeers((prev) => [...new Set([...prev, addr])]);
       dc.onclose = () => cleanupPeerConnection(addr);
       dc.onmessage = (e) => handleIncomingMessage(addr, e.data);
 
@@ -210,7 +266,10 @@ export const useWebRTC = (props: any) => {
         if (event.candidate)
           socket.emit("webrtc_signal", {
             to: addr,
-            signal: { type: "ice-candidate", candidate: event.candidate },
+            signal: {
+              type: WEBRTC_SIGNAL_TYPES.iceCandidate,
+              candidate: event.candidate.toJSON(),
+            },
           });
       };
 
@@ -222,7 +281,7 @@ export const useWebRTC = (props: any) => {
       socket.emit("webrtc_signal", {
         to: addr,
         signal: {
-          type: "offer",
+          type: WEBRTC_SIGNAL_TYPES.offer,
           offer,
           ephemeralPublicKey: !hasSecret(addr)
             ? generateHandshakeKeys(addr)
@@ -239,6 +298,7 @@ export const useWebRTC = (props: any) => {
       dataChannels,
       cleanupPeerConnection,
       attachStateListeners,
+      disposePeerConnection,
     ],
   );
 
@@ -257,42 +317,33 @@ export const useWebRTC = (props: any) => {
      * - ice-candidate — queues the candidate on the existing connection once remote
      *                   description is available.
      *
-     * @param {{ from: string; signal: any }} data - Signaling payload from the relay.
+     * @param {WebRTCSignalEvent} data - Signaling payload from the relay.
      * @returns {Promise<void>}
      */
-    const handleWebRTCSignal = async (data: {
-      from: string;
-      signal: any;
-    }): Promise<void> => {
+    const handleWebRTCSignal = async (
+      data: WebRTCSignalEvent,
+    ): Promise<void> => {
       const addr = data.from.toLowerCase();
       const { signal } = data;
 
-      if (signal.type === "ping") {
+      if (signal.type === WEBRTC_SIGNAL_TYPES.ping) {
         socket.emit("webrtc_signal", {
           to: addr,
-          signal: { type: "pong" },
+          signal: { type: WEBRTC_SIGNAL_TYPES.pong },
         });
         return;
       }
 
-      if (signal.type === "pong") {
+      if (signal.type === WEBRTC_SIGNAL_TYPES.pong) {
         if (onPongReceived) onPongReceived(addr);
         return;
       }
 
-      if (signal.type === "offer") {
-        if (peerConnections.current[addr]) {
-          peerConnections.current[addr].onconnectionstatechange = null;
-          peerConnections.current[addr].oniceconnectionstatechange = null;
-          peerConnections.current[addr].onicecandidate = null;
-          peerConnections.current[addr].ondatachannel = null;
-          peerConnections.current[addr].close();
-          delete peerConnections.current[addr];
-        }
+      if (signal.type === WEBRTC_SIGNAL_TYPES.offer) {
+        disposePeerConnection(addr);
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
         peerConnections.current[addr] = pc;
-        iceQueues.current[addr] = [];
 
         setupAudioTrack(pc);
 
@@ -309,7 +360,10 @@ export const useWebRTC = (props: any) => {
           if (event.candidate)
             socket.emit("webrtc_signal", {
               to: addr,
-              signal: { type: "ice-candidate", candidate: event.candidate },
+              signal: {
+                type: WEBRTC_SIGNAL_TYPES.iceCandidate,
+                candidate: event.candidate.toJSON(),
+              },
             });
         };
 
@@ -328,18 +382,20 @@ export const useWebRTC = (props: any) => {
         socket.emit("webrtc_signal", {
           to: addr,
           signal: {
-            type: "answer",
+            type: WEBRTC_SIGNAL_TYPES.answer,
             answer,
             ephemeralPublicKey: signal.ephemeralPublicKey
               ? generateHandshakeKeys(addr)
               : undefined,
           },
         });
-      } else if (signal.type === "answer") {
+      } else if (signal.type === WEBRTC_SIGNAL_TYPES.answer) {
         const pc = peerConnections.current[addr];
         if (pc)
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
-      } else if (signal.type === "ice-candidate" && signal.candidate) {
+          await pc.setRemoteDescription(
+            new RTCSessionDescription(signal.answer),
+          );
+      } else if (signal.type === WEBRTC_SIGNAL_TYPES.iceCandidate) {
         const pc = peerConnections.current[addr];
         if (pc && pc.remoteDescription)
           await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
@@ -361,6 +417,7 @@ export const useWebRTC = (props: any) => {
     cleanupPeerConnection,
     attachStateListeners,
     onPongReceived,
+    disposePeerConnection,
   ]);
 
   return {
