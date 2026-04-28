@@ -7,6 +7,8 @@ import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
  * Configures the Vite bundler for the client application.
  * Integrates React, TailwindCSS, path aliasing, and aggressive
  * JavaScript obfuscation specifically for production builds.
+ * Excludes App.tsx to preserve dynamic import paths for lazy loading.
+ *
  * @returns {import('vite').UserConfig} The parsed Vite configuration object.
  */
 export default defineConfig(function (_a) {
@@ -17,7 +19,7 @@ export default defineConfig(function (_a) {
             tailwindcss(),
             obfuscatorPlugin({
                 include: ["src/**/*.ts", "src/**/*.tsx"],
-                exclude: [/node_modules/],
+                exclude: [/node_modules/, /App\.tsx/],
                 apply: "build",
                 options: {
                     compact: true,

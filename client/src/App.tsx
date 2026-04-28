@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,22 +6,22 @@ import {
   Navigate,
 } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { useUIStore } from "@/store";
-import { getStoredAuthToken } from "@/utils/storage/session";
+import { useUIStore } from "./store";
+import { getStoredAuthToken } from "./utils/storage/session";
 
-const LandingPage = lazy(() => import("@/pages/landing/LandingClient"));
-const LoginPage = lazy(() => import("@/pages/auth/login/LoginClient"));
-const RegisterPage = lazy(() => import("@/pages/auth/register/RegisterClient"));
+const LandingPage = lazy(() => import("./pages/landing/LandingClient"));
+const LoginPage = lazy(() => import("./pages/auth/login/LoginClient"));
+const RegisterPage = lazy(() => import("./pages/auth/register/RegisterClient"));
 const ImportIdentityPage = lazy(
-  () => import("@/pages/auth/import/ImportIdentityClient"),
+  () => import("./pages/auth/import/ImportIdentityClient"),
 );
-const ChatDashboard = lazy(() => import("@/pages/chat/ChatClient"));
+const ChatDashboard = lazy(() => import("./pages/chat/ChatClient"));
 
 /**
- * 1. Main Application Router with Smart Routing
- * @returns {JSX.Element}
+ * Main Application Router with Smart Routing and Lazy Loading.
+ * @returns {React.JSX.Element} The root application router component.
  */
-function App() {
+function App(): React.JSX.Element {
   const { toast } = useUIStore();
 
   const isReturningUser =
@@ -31,28 +31,34 @@ function App() {
     <>
       <Router>
         <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500/30">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                isReturningUser ? (
-                  <Navigate to="/login" replace />
-                ) : (
-                  <LandingPage />
-                )
-              }
-            />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center min-h-screen bg-zinc-950">
+                <div className="w-8 h-8 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+              </div>
+            }
+          >
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  isReturningUser ? (
+                    <Navigate to="/login" replace />
+                  ) : (
+                    <LandingPage />
+                  )
+                }
+              />
 
-            <Route path="/landing" element={<LandingPage />} />
+              <Route path="/landing" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/import" element={<ImportIdentityPage />} />
+              <Route path="/chat" element={<ChatDashboard />} />
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/import" element={<ImportIdentityPage />} />
-
-            <Route path="/chat" element={<ChatDashboard />} />
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </div>
       </Router>
 
