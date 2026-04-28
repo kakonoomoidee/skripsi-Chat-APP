@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useChatContext } from "@/context/ChatContext";
 import { db } from "@/utils/db";
@@ -19,6 +19,7 @@ import { PeerAvatar } from "../components/ui/PeerAvatar";
 import { useUIStore } from "@/store";
 import { useChatStore } from "@/store/useChatStore";
 import { useCrypto } from "@/hooks/security/useCrypto";
+import { useDismissableLayer } from "@/hooks/ui/useDismissableLayer";
 
 /**
  * Interface for contact history stored in localStorage.
@@ -78,44 +79,17 @@ export default function Sidebar(): React.JSX.Element {
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const sessionMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        headerMenuRef.current &&
-        !headerMenuRef.current.contains(e.target as Node)
-      ) {
-        setHeaderMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  useDismissableLayer({
+    enabled: headerMenuOpen,
+    ref: headerMenuRef,
+    onDismiss: () => setHeaderMenuOpen(false),
+  });
 
-  useEffect(() => {
-    const handleMenuOutsideClick = (e: MouseEvent) => {
-      if (!openMenuFor) return;
-      if (
-        sessionMenuRef.current &&
-        !sessionMenuRef.current.contains(e.target as Node)
-      ) {
-        setOpenMenuFor(null);
-      }
-    };
-
-    const handleMenuEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpenMenuFor(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleMenuOutsideClick);
-    document.addEventListener("keydown", handleMenuEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleMenuOutsideClick);
-      document.removeEventListener("keydown", handleMenuEscape);
-    };
-  }, [openMenuFor]);
+  useDismissableLayer({
+    enabled: Boolean(openMenuFor),
+    ref: sessionMenuRef,
+    onDismiss: () => setOpenMenuFor(null),
+  });
 
   const [recentContacts, setRecentContacts] = useState<ContactHistory[]>(() => {
     try {
