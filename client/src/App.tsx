@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useUIStore } from "@/store";
+import { getStoredAuthToken } from "@/utils/session";
 
 const LandingPage = lazy(() => import("@/pages/landing/LandingClient"));
 const LoginPage = lazy(() => import("@/pages/auth/login/LoginClient"));
@@ -24,8 +25,7 @@ function App() {
   const { toast } = useUIStore();
 
   const isReturningUser =
-    !!localStorage.getItem("auth_token") ||
-    !!localStorage.getItem("chat_app_keystore");
+    !!getStoredAuthToken() || !!localStorage.getItem("chat_app_keystore");
 
   return (
     <>

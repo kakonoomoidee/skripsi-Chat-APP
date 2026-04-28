@@ -26,6 +26,7 @@ import { useMessageData } from "@/hooks/chat/useMessageData";
 export type { ConnectionState };
 import { useConnectionManager } from "@/hooks/chat/useConnectionManager";
 import { useProtocolHandler } from "@/hooks/chat/useProtocolHandler";
+import { AUTH_TOKEN_STORAGE_KEY } from "@/utils/session";
 
 /**
  * Shape of the value exposed by {@link ChatContext}.
@@ -141,7 +142,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "auth_token") window.location.reload();
+      if (e.key === AUTH_TOKEN_STORAGE_KEY) window.location.reload();
     };
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);

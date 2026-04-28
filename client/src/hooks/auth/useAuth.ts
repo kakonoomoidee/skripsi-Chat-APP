@@ -8,22 +8,23 @@ import {
   requestAuthChallenge,
 } from "@/services/api";
 import {
+  clearStoredAuthToken,
   clearStoredLastActivity,
+  getStoredAuthToken,
+  setStoredAuthToken,
   updateStoredLastActivity,
 } from "@/utils/session";
-
-const AUTH_TOKEN_KEY = "auth_token";
 const PUBLIC_KEY_PLACEHOLDER = "PUBKEY_PLACEHOLDER";
 
 type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;
 
 const saveSessionToken = (token: string): void => {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  setStoredAuthToken(token);
   updateStoredLastActivity();
 };
 
 const clearSessionToken = (): void => {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+  clearStoredAuthToken();
   clearStoredLastActivity();
 };
 
@@ -53,9 +54,7 @@ export interface UseAuthReturn {
 export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem(AUTH_TOKEN_KEY),
-  );
+  const [token, setToken] = useState<string | null>(getStoredAuthToken());
 
   /**
    * Registers a new decentralized identity via a gasless meta-transaction payload signature.
