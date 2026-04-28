@@ -8,11 +8,7 @@ import { useRelayPing } from "@/hooks/network/useRelayPing";
 import AuthRelayControl from "@/components/ui/AuthRelayControl";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
-import {
-  RelaySelector,
-  PasswordInput,
-  RelayStatusBadge,
-} from "@/components/ui";
+import { PasswordInput } from "@/components/ui";
 
 export default function LoginPage() {
   const navigate = useNavigate();

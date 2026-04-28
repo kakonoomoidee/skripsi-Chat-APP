@@ -11,9 +11,7 @@ import { copyTextWithFallback } from "@/utils/platform/clipboard";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
 import {
-  RelaySelector,
   PasswordInput,
-  RelayStatusBadge,
   SeedPhraseGrid,
   validatePasswordSecurity,
 } from "@/components/ui";

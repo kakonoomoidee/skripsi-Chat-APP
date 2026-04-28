@@ -1,22 +1,37 @@
-import React from "react";
 import { RelaySelector, RelayStatusBadge } from "@/components/ui";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
 
-interface Props {
+/**
+ * Interface defining the properties for the AuthRelayControl component.
+ *
+ * @interface AuthRelayControlProps
+ * @property {string} activeRelay - The currently active relay URL.
+ * @property {string[]} defaultRelays - List of default relay URLs.
+ * @property {(url: string) => void} changeRelay - Function to handle relay switching.
+ * @property {(url: string) => Promise<void>} addCustomRelay - Function to add a new custom relay asynchronously.
+ * @property {"sm" | "md"} [size] - Component size variant.
+ */
+interface AuthRelayControlProps {
   activeRelay: string;
   defaultRelays: string[];
   changeRelay: (url: string) => void;
-  addCustomRelay: (url: string) => void;
-  size?: "sm" | "md" | "lg";
+  addCustomRelay: (url: string) => Promise<void>;
+  size?: "sm" | "md";
 }
 
+/**
+ * Wrapper component combining the relay status badge and selector.
+ *
+ * @param {AuthRelayControlProps} props - Component properties.
+ * @returns {React.JSX.Element} The rendered relay control component.
+ */
 export default function AuthRelayControl({
   activeRelay,
   defaultRelays,
   changeRelay,
   addCustomRelay,
   size = "md",
-}: Props) {
+}: AuthRelayControlProps): React.JSX.Element {
   const { isRelayAlive, isPinging } = useRelayPing(activeRelay);
 
   return (
