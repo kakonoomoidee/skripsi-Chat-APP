@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useRegisterHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
+import AuthRelayControl from "@/components/ui/AuthRelayControl";
 import { copyTextWithFallback } from "@/utils/clipboard";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
@@ -189,16 +190,13 @@ export default function RegisterPage(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="relative pt-1">
-          <RelayStatusBadge isPinging={isPinging} isRelayAlive={isRelayAlive} />
-          <RelaySelector
-            activeRelay={activeRelay}
-            defaultRelays={defaultRelays}
-            changeRelay={changeRelay}
-            addCustomRelay={addCustomRelay}
-            size="md"
-          />
-        </div>
+        <AuthRelayControl
+          activeRelay={activeRelay}
+          defaultRelays={defaultRelays}
+          changeRelay={changeRelay}
+          addCustomRelay={addCustomRelay}
+          size="md"
+        />
 
         <button
           type="submit"

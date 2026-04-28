@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import { useRelay } from "@/hooks/network/useRelay";
 import { useLoginHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
+import AuthRelayControl from "@/components/ui/AuthRelayControl";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
 import {
@@ -51,17 +52,13 @@ export default function LoginPage() {
           disabled={isLoading || !address}
         />
 
-        <div className="relative pt-1">
-          <RelayStatusBadge isPinging={isPinging} isRelayAlive={isRelayAlive} />
-
-          <RelaySelector
-            activeRelay={activeRelay}
-            defaultRelays={defaultRelays}
-            changeRelay={changeRelay}
-            addCustomRelay={addCustomRelay}
-            size="md"
-          />
-        </div>
+        <AuthRelayControl
+          activeRelay={activeRelay}
+          defaultRelays={defaultRelays}
+          changeRelay={changeRelay}
+          addCustomRelay={addCustomRelay}
+          size="md"
+        />
 
         <button
           type="submit"
