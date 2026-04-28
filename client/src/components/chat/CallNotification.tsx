@@ -1,7 +1,7 @@
 import React from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { XIcon, PhoneIcon } from "@/components/icons";
-import { getCallDisplayInitial } from "@/utils/call";
+import { getCallDisplayInitial } from "@/utils/media/call";
 
 /**
  * Renders a floating notification modal for incoming WebRTC voice calls.

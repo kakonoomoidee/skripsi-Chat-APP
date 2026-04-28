@@ -1,9 +1,9 @@
 import type React from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { PhoneIcon, MicIcon, MicOffIcon } from "@/components/icons";
-import { formatDuration } from "@/utils/format";
+import { formatDuration } from "@/utils/core/format";
 import { useCallDuration } from "@/hooks/chat/useCallDuration";
-import { getCallDisplayInitial } from "@/utils/call";
+import { getCallDisplayInitial } from "@/utils/media/call";
 
 /**
  * Renders a full-screen overlay for active voice calls.

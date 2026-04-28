@@ -1,7 +1,7 @@
 import { useRef, useCallback } from "react";
 import ms from "ms";
-import { db } from "@/utils/db";
-import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
+import { db } from "@/utils/storage/db";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chat/chatProtocol";
 
 const MARK_AS_READ_SIGNAL_TYPE = "MARK_AS_READ";
 const MESSAGE_DELIVERED_SIGNAL_TYPE = "MSG_DELIVERED";
@@ -161,7 +161,10 @@ export const useWebRTCDataChannel = ({
         const decryptedContent = decrypt(peerAddress, encryptedData);
         const parsedPayload = parseDataChannelPayload(decryptedContent);
 
-        if (parsedPayload?.type === CHAT_PROTOCOL_TYPES.typing && setIsPeerTyping) {
+        if (
+          parsedPayload?.type === CHAT_PROTOCOL_TYPES.typing &&
+          setIsPeerTyping
+        ) {
           setIsPeerTyping(true);
           clearTypingTimeout();
           typingTimeoutRef.current = window.setTimeout(
@@ -194,7 +197,10 @@ export const useWebRTCDataChannel = ({
           return;
         }
 
-        if (parsedPayload?.type === MESSAGE_DELIVERED_SIGNAL_TYPE && myAddress) {
+        if (
+          parsedPayload?.type === MESSAGE_DELIVERED_SIGNAL_TYPE &&
+          myAddress
+        ) {
           await db.messages
             .where("[ownerAddress+chatId]")
             .equals([myAddress.toLowerCase(), peerAddress.toLowerCase()])
@@ -256,5 +262,10 @@ export const useWebRTCDataChannel = ({
     ],
   );
 
-  return { dataChannels, handleIncomingMessage, sendDataViaWebRTC, sendMarkAsRead };
+  return {
+    dataChannels,
+    handleIncomingMessage,
+    sendDataViaWebRTC,
+    sendMarkAsRead,
+  };
 };

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { XIcon } from "@/components/icons";
-import { cropImageToDataUrl } from "@/utils/imageCrop";
+import { cropImageToDataUrl } from "@/utils/media/imageCrop";
 
 /**
  * Props for the ImageCropModal component.

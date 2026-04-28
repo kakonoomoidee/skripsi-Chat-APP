@@ -13,7 +13,7 @@ import {
   getStoredAuthToken,
   setStoredAuthToken,
   updateStoredLastActivity,
-} from "@/utils/session";
+} from "@/utils/storage/session";
 const PUBLIC_KEY_PLACEHOLDER = "PUBKEY_PLACEHOLDER";
 
 type AuthWallet = ethers.Wallet | ethers.HDNodeWallet;

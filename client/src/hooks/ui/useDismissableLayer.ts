@@ -1,5 +1,8 @@
 import { useEffect, type RefObject } from "react";
-import { isEventOutsideElement, shouldCloseMenuOnEscape } from "@/utils/bubble";
+import {
+  isEventOutsideElement,
+  shouldCloseMenuOnEscape,
+} from "@/utils/chat/bubble";
 
 type DismissablePointerEvent = MouseEvent | TouchEvent;
 

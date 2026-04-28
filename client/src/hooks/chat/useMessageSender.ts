@@ -1,4 +1,4 @@
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 import { useSessionStore } from "@/store";
 import { type ReplyMessage } from "@/store/useSessionStore";
 import { getStoredWalletAddresses } from "@/services/walletBalanceService";
@@ -6,11 +6,11 @@ import {
   INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
   resolveRpcUrl,
 } from "@/services/web3WalletService";
-import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chat/chatProtocol";
 import {
   transferViaInjectedProvider,
   transferViaInternalWallet,
-} from "@/utils/transaction";
+} from "@/utils/commerce/transaction";
 
 const MAX_P2P_FILE_SIZE_BYTES = 500 * 1024;
 const AUDIO_PREFIX = "[AUDIO]";

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Socket } from "socket.io-client";
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 import { getAddressByUsername, getUsernameByAddress } from "@/services/api";
 import {
   useChatStore,

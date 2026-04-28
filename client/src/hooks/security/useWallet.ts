@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import {
   KEYSTORE_STORAGE_KEY,
   getStoredWalletAddressFromKeystore,
-} from "@/utils/security";
+} from "@/utils/crypto/security";
 
 /**
  * Interface defining the result of a wallet creation operation.

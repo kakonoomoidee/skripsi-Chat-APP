@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { WarningIcon } from "@/components/icons";
 import SeedPhraseGrid from "./SeedPhraseGrid";
-import { copyTextWithFallback } from "@/utils/clipboard";
-import { SEED_MODAL_PROCEED_DELAY_MS } from "@/utils/seedPhrase";
+import { copyTextWithFallback } from "@/utils/platform/clipboard";
+import { SEED_MODAL_PROCEED_DELAY_MS } from "@/utils/auth/seedPhrase";
 
 interface SeedPhraseModalProps {
   seedPhrase: string;

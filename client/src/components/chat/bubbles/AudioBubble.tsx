@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { formatTime } from "@/utils/format";
+import { formatTime } from "@/utils/core/format";
 import {
   PlayIcon,
   PauseIcon,
@@ -15,12 +15,12 @@ import {
 import { useSessionStore } from "@/store";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
 import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
-import { createReplyTarget } from "@/utils/bubble";
+import { createReplyTarget } from "@/utils/chat/bubble";
 import {
   AUDIO_METADATA_DELAY_MS,
   formatAudioDuration,
   generateWaveformHeights,
-} from "@/utils/audio";
+} from "@/utils/media/audio";
 
 export const AudioBubble = ({
   msg,

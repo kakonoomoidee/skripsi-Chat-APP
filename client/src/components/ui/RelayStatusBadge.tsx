@@ -1,4 +1,4 @@
-import { getRelayHealth } from "@/utils/relay";
+import { getRelayHealth } from "@/utils/network/relay";
 
 /**
  * Interface for RelayStatusBadge props

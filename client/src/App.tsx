@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useUIStore } from "@/store";
-import { getStoredAuthToken } from "@/utils/session";
+import { getStoredAuthToken } from "@/utils/storage/session";
 
 const LandingPage = lazy(() => import("@/pages/landing/LandingClient"));
 const LoginPage = lazy(() => import("@/pages/auth/login/LoginClient"));

@@ -4,14 +4,14 @@ import { useSecurityHandlers } from "@/hooks/security/useSecurityHandlers";
 import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 import GlassDropdown from "@/components/ui/GlassDropdown";
 import { SeedPhraseModalInput } from "@/components/ui";
-import { updateLastExportTime } from "@/utils/exportUtils";
+import { updateLastExportTime } from "@/utils/storage/exportUtils";
 import {
   BACKUP_OPTIONS,
   DELETE_OPTIONS,
   findOptionLabel,
   getStoredAutoBackupMode,
   setStoredAutoBackupMode,
-} from "@/utils/dataSecurity";
+} from "@/utils/storage/dataSecurity";
 import {
   ImportIcon,
   ExportIcon,

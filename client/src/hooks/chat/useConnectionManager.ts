@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "@/store/useChatStore";
-import { CHAT_PROTOCOL_TYPES } from "@/utils/chatProtocol";
+import { CHAT_PROTOCOL_TYPES } from "@/utils/chat/chatProtocol";
 import ms from "ms";
 
 const PING_TIMEOUT_MS = ms("5s");

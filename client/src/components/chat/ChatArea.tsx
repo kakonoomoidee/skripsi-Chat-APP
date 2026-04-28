@@ -7,7 +7,7 @@ import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { TransferModal } from "./modals/TransferModal";
 import { useUIStore } from "@/store";
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 import { ShieldCheckIcon, WarningIcon } from "@/components/icons";
 import { hasLinkedWallet } from "@/services/walletBalanceService";
 

@@ -3,7 +3,7 @@ import {
   getSeedPhraseProgress,
   MAX_SEED_PHRASE_WORDS,
   processSeedPhraseInput,
-} from "@/utils/seedPhrase";
+} from "@/utils/auth/seedPhrase";
 
 /**
  * Properties for the SeedPhraseModalInput component.

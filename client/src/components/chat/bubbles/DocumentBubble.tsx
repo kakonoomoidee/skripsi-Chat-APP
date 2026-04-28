@@ -1,9 +1,9 @@
-import { formatTime } from "@/utils/format";
+import { formatTime } from "@/utils/core/format";
 import { DocumentIcon, ChevronDownIcon, ReplyIcon } from "@/components/icons";
 import { useSessionStore } from "@/store";
 import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
-import { createReplyTarget } from "@/utils/bubble";
+import { createReplyTarget } from "@/utils/chat/bubble";
 
 export const DocumentBubble = ({
   msg,

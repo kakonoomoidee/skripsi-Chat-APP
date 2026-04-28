@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 import { useLiveQuery } from "dexie-react-hooks";
 
 const ACTIVE_RELAY_STORAGE_KEY = "active_relay";

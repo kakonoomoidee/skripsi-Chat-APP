@@ -3,12 +3,12 @@ import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
 import { CameraIcon } from "@/components/icons";
-import { getDisplayInitial } from "@/utils/identity";
+import { getDisplayInitial } from "@/utils/core/identity";
 import {
   getStoredAvatar,
   readFileAsDataUrl,
   setStoredAvatar,
-} from "@/utils/profile";
+} from "@/utils/storage/profile";
 
 /**
  * ProfileSettings component manages the user's avatar upload,

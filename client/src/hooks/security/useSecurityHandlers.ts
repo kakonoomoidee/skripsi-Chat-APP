@@ -1,12 +1,15 @@
 import { useState, ChangeEvent, useCallback, useEffect } from "react";
 import { ethers } from "ethers";
 import ms from "ms";
-import { db } from "@/utils/db";
-import { formatTime } from "@/utils/format";
+import { db } from "@/utils/storage/db";
+import { formatTime } from "@/utils/core/format";
 import { useWallet } from "@/hooks/security/useWallet";
 import { useUIStore, useSessionStore, useWalletStore } from "@/store";
-import { getLastExportTime, updateLastExportTime } from "@/utils/exportUtils";
-import { getStoredAutoBackupMode } from "@/utils/dataSecurity";
+import {
+  getLastExportTime,
+  updateLastExportTime,
+} from "@/utils/storage/exportUtils";
+import { getStoredAutoBackupMode } from "@/utils/storage/dataSecurity";
 
 const AUTO_BACKUP_INTERVAL_MS_BY_MODE: Record<string, number> = {
   "1": ms("24h"),

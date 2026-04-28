@@ -7,7 +7,7 @@ import { useTransferBalance } from "@/hooks/chat/useTransferBalance";
 import {
   getTransferValidationState,
   TRANSFER_REQUEST_TIMEOUT_MS,
-} from "@/utils/transfer";
+} from "@/utils/commerce/transfer";
 
 /**
  * Interface defining the properties for the TransferModal component.

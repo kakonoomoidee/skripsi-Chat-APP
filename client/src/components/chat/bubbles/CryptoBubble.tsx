@@ -1,8 +1,8 @@
-import { formatTime } from "@/utils/format";
+import { formatTime } from "@/utils/core/format";
 import { useUIStore, useSessionStore } from "@/store";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
 import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
-import { createReplyTarget } from "@/utils/bubble";
+import { createReplyTarget } from "@/utils/chat/bubble";
 import {
   ChevronDownIcon,
   ReplyIcon,

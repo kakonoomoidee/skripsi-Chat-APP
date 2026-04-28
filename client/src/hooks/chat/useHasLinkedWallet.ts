@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getStoredWalletAddresses } from "@/services/walletBalanceService";
-import { WALLET_LINK_CHECK_INTERVAL_MS } from "@/utils/chatInput";
+import { WALLET_LINK_CHECK_INTERVAL_MS } from "@/utils/chat/chatInput";
 
 const resolveHasLinkedWallet = (): boolean =>
   Boolean(getStoredWalletAddresses().activeAddress);

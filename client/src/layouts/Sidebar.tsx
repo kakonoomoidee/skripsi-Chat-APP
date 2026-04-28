@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useChatContext } from "@/context/ChatContext";
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 import {
   LockSessionIcon,
   SearchIcon,

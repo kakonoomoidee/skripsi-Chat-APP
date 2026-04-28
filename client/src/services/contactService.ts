@@ -1,4 +1,4 @@
-import { db } from "@/utils/db";
+import { db } from "@/utils/storage/db";
 
 /**
  * Fetches blocked contacts from local database.

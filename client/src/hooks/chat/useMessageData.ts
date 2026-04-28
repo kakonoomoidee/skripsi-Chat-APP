@@ -1,8 +1,8 @@
 import { useMemo, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/utils/db";
-import { type Message } from "@/utils/db";
-import { isNonRenderableProtocolMessage } from "@/utils/chatProtocol";
+import { db } from "@/utils/storage/db";
+import { type Message } from "@/utils/storage/db";
+import { isNonRenderableProtocolMessage } from "@/utils/chat/chatProtocol";
 import ms from "ms";
 
 const AUTO_DELETE_THRESHOLD_MS_BY_MODE: Record<string, number> = {

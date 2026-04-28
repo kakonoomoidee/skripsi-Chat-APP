@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CALL_DURATION_TICK_MS } from "@/utils/call";
+import { CALL_DURATION_TICK_MS } from "@/utils/media/call";
 
 /**
  * Tracks in-call elapsed time in seconds while a call is active.

@@ -7,7 +7,7 @@ import { useRelay } from "@/hooks/network/useRelay";
 import { useRegisterHandler } from "@/hooks/auth/useAuthHandlers";
 import { useRelayPing } from "@/hooks/network/useRelayPing";
 import AuthRelayControl from "@/components/ui/AuthRelayControl";
-import { copyTextWithFallback } from "@/utils/clipboard";
+import { copyTextWithFallback } from "@/utils/platform/clipboard";
 import AuthLayout from "@/layouts/AuthLayout";
 import WalletDisplay from "@/components/auth/WalletDisplay";
 import {

@@ -26,7 +26,7 @@ import { useMessageData } from "@/hooks/chat/useMessageData";
 export type { ConnectionState };
 import { useConnectionManager } from "@/hooks/chat/useConnectionManager";
 import { useProtocolHandler } from "@/hooks/chat/useProtocolHandler";
-import { AUTH_TOKEN_STORAGE_KEY } from "@/utils/session";
+import { AUTH_TOKEN_STORAGE_KEY } from "@/utils/storage/session";
 
 /**
  * Shape of the value exposed by {@link ChatContext}.

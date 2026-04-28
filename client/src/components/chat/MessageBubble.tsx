@@ -6,8 +6,8 @@ import {
   TextBubble,
   DocumentBubble,
 } from "./bubbles/index";
-import { MessageStatus } from "@/utils/db";
-import { parseMessageBubbleData } from "@/utils/messageBubble";
+import { MessageStatus } from "@/utils/storage/db";
+import { parseMessageBubbleData } from "@/utils/chat/messageBubble";
 
 /**
  * Interface defining the structure of a chat message.

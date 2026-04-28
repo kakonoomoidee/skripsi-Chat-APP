@@ -3,7 +3,7 @@ import ms from "ms";
 import {
   getStoredLastActivity,
   updateStoredLastActivity,
-} from "@/utils/session";
+} from "@/utils/storage/session";
 
 const DEFAULT_TIMEOUT_MS = ms("1h");
 const INACTIVITY_CHECK_INTERVAL_MS = ms("1m");

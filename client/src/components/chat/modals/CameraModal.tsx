@@ -8,7 +8,7 @@ import {
   requestCameraStream,
   stopMediaStream,
   type CameraFacingMode,
-} from "@/utils/camera";
+} from "@/utils/media/camera";
 
 /**
  * Fullscreen camera modal component with capture and preview functionality.

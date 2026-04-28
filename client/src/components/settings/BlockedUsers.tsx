@@ -1,8 +1,8 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { shortenAddress } from "@/utils/format";
+import { shortenAddress } from "@/utils/core/format";
 import { BanIcon } from "@/components/icons";
-import { getDisplayInitial } from "@/utils/identity";
+import { getDisplayInitial } from "@/utils/core/identity";
 import {
   getBlockedContacts,
   unblockContactToPending,

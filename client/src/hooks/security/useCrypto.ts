@@ -5,12 +5,12 @@ import {
   deriveSharedSecret,
   encryptMessage as encryptAES,
   decryptMessage as decryptAES,
-} from "@/utils/crypto";
+} from "@/utils/crypto/crypto";
 import {
   getOrCreateLocalDbEncryptionKey,
   isCryptoSystemMessage,
   LOCAL_DB_ENCRYPTION_KEY_STORAGE_KEY,
-} from "@/utils/security";
+} from "@/utils/crypto/security";
 
 /**
  * Interface defining the return methods and state for the useCrypto hook.

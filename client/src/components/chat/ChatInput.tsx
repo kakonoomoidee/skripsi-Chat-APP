@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useChatContext } from "@/context/ChatContext";
 import { useSessionStore, useUIStore } from "@/store";
-import { formatDuration } from "@/utils/format";
+import { formatDuration } from "@/utils/core/format";
 import {
   DOCUMENT_MAX_SIZE_BYTES,
   isFileSignatureSafe,
   RECORDING_TIMER_TICK_MS,
-} from "@/utils/chatInput";
+} from "@/utils/chat/chatInput";
 import {
   AttachmentIcon,
   CryptoIcon,

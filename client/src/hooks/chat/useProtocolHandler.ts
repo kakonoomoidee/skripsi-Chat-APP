@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import { db } from "@/utils/db";
-import { type Message } from "@/utils/db";
+import { db } from "@/utils/storage/db";
+import { type Message } from "@/utils/storage/db";
 import { getStoredWalletAddresses } from "@/services/walletBalanceService";
 import {
   CHAT_PROTOCOL_TYPES,
   parseChatProtocolPayload,
-} from "@/utils/chatProtocol";
+} from "@/utils/chat/chatProtocol";
 import { useChatStore } from "@/store/useChatStore";
 import { useWalletStore } from "@/store";
 

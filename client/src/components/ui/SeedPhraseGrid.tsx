@@ -1,5 +1,5 @@
 import React from "react";
-import { getSeedWords } from "@/utils/seedPhrase";
+import { getSeedWords } from "@/utils/auth/seedPhrase";
 
 interface SeedPhraseGridProps {
   phrase: string;

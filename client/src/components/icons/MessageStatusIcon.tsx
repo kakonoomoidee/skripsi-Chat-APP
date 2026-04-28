@@ -1,5 +1,5 @@
 import React from "react";
-import { MessageStatus } from "@/utils/db";
+import { MessageStatus } from "@/utils/storage/db";
 
 /**
  * Interface defining the properties for the MessageStatusIcon component.
@@ -31,13 +31,7 @@ export const MessageStatusIcon = ({
         className="w-3 h-3 inline-block ml-1 mb-0.5 text-indigo-300/50"
         aria-label="Pending"
       >
-        <circle
-          cx="8"
-          cy="8"
-          r="6.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
+        <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
         <path
           d="M8 5v3.5l2 1.5"
           stroke="currentColor"

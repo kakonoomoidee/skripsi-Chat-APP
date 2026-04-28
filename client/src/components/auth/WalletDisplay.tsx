@@ -1,4 +1,4 @@
-import { shortenAddress } from "@/utils/format";
+import { shortenAddress } from "@/utils/core/format";
 
 interface WalletDisplayProps {
   address: string | null;

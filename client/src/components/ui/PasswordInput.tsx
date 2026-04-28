@@ -4,7 +4,7 @@ import {
   getPasswordRuleStates,
   isPasswordSecure,
   stripWhitespace,
-} from "@/utils/password";
+} from "@/utils/auth/password";
 
 /**
  * Interface for PasswordInput component properties.

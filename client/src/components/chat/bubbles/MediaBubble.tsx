@@ -1,9 +1,9 @@
-import { formatTime } from "@/utils/format";
+import { formatTime } from "@/utils/core/format";
 import { useSessionStore } from "@/store";
 import { useBubbleMenu } from "@/hooks/ui/useBubbleMenu";
 import { ReplyBubbleContext } from "@/context/ReplyBubbleContext";
 import { ChevronDownIcon, ReplyIcon } from "@/components/icons";
-import { createReplyTarget } from "@/utils/bubble";
+import { createReplyTarget } from "@/utils/chat/bubble";
 
 export const MediaBubble = ({ msg }: { msg: any }) => {
   const setReplyingTo = useSessionStore((state) => state.setReplyingTo);

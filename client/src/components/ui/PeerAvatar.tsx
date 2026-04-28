@@ -1,7 +1,7 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/utils/db";
-import { getDisplayInitial } from "@/utils/identity";
+import { db } from "@/utils/storage/db";
+import { getDisplayInitial } from "@/utils/core/identity";
 
 /**
  * Props accepted by the PeerAvatar component.
