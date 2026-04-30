@@ -5,6 +5,7 @@ import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { useUIStore } from "@/store";
 import { useSessionTimeout } from "@/hooks/ui/useSessionTimeout";
 import SettingsArea from "@/components/settings/SettingsArea";
+import ms from "ms";
 
 /**
  * Responsive Layout Wrapper.
@@ -29,7 +30,7 @@ const ChatLayout = (): React.JSX.Element => {
       "Session expired due to inactivity. Please login again.",
       "error",
     );
-  }, 3600000);
+  }, ms("1h"));
 
   return (
     <div className="flex h-screen bg-zinc-950 font-sans antialiased selection:bg-indigo-500/30 overflow-hidden relative w-full">

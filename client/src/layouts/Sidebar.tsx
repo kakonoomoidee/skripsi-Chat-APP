@@ -14,8 +14,7 @@ import {
   MoreVerticalIcon,
   SettingsCogIcon,
 } from "@/components/icons";
-import { GlassBadge } from "../components/ui/GlassBadge";
-import { PeerAvatar } from "../components/ui/PeerAvatar";
+import { GlassBadge, PeerAvatar } from "@/components/ui/";
 import { useUIStore } from "@/store";
 import { useChatStore } from "@/store/useChatStore";
 import { useCrypto } from "@/hooks/security/useCrypto";
