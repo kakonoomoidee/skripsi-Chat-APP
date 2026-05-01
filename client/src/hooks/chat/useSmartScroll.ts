@@ -99,12 +99,18 @@ export const useSmartScroll = (
       scrollSettledRef.current = false;
 
       requestAnimationFrame(() => {
+        const container = scrollContainerRef.current;
         const targetEl =
           entryPointId !== null
             ? document.getElementById(`msg-${entryPointId}`)
             : null;
 
-        if (targetEl) {
+        const shouldAnchorToEntry =
+          targetEl !== null &&
+          container !== null &&
+          container.scrollHeight - targetEl.offsetTop > container.clientHeight;
+
+        if (shouldAnchorToEntry && targetEl !== null) {
           targetEl.scrollIntoView({ behavior: "instant", block: "center" });
         } else {
           bottomRef.current?.scrollIntoView({ behavior: "instant" });

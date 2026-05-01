@@ -45,7 +45,7 @@ export const MessageList = (): React.JSX.Element => {
         ref={scrollContainerRef}
         className="h-full px-4 md:px-8 py-6 overflow-y-auto custom-scrollbar"
       >
-        <div className="space-y-2">
+        <div className="min-h-full flex flex-col justify-end space-y-2">
           {messages?.map((msg) => (
             <React.Fragment key={msg.id}>
               {firstUnreadId !== undefined && msg.id === firstUnreadId && (
