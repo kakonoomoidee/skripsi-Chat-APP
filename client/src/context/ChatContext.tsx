@@ -80,6 +80,8 @@ export interface ChatContextValue {
   unreadCount: Record<string, number>;
   unreadTotal: number;
   pendingRequestsTotal: number;
+  entryPointId: number | null;
+  scrollSettledRef: React.RefObject<boolean>;
   sendMarkAsRead: (peerAddress: string) => void;
   acceptContact: (peerAddress: string) => Promise<void>;
   blockContact: (peerAddress: string) => Promise<void>;
@@ -237,14 +239,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     connectionManagerRefs.current = connectionManager;
   }, [connectionManager]);
 
-  const { messages, unreadCount, unreadTotal } = useMessageData({
+  const { messages, entryPointId, unreadCount, unreadTotal } = useMessageData({
     address,
     activeChat: chatStore.activeChat,
-    isWebRTCConnected,
-    sendMarkAsRead,
     decryptLocalDB,
     autoDeleteMode,
   });
+
+  const scrollSettledRef = useRef<boolean>(true);
 
   useProtocolHandler({
     messages,
@@ -382,6 +384,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     unreadCount,
     unreadTotal,
     pendingRequestsTotal: chatStore.pendingRequests.length,
+    entryPointId,
+    scrollSettledRef,
     sendMarkAsRead,
     acceptContact,
     blockContact,

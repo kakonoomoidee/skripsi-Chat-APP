@@ -1,22 +1,16 @@
-import { useEffect } from "react";
+import { useCallback, type RefObject } from "react";
 
 /**
- * Scrolls the target element into view whenever a dependency value changes.
+ * Returns a stable callback that smoothly scrolls the given ref into view.
+ * The hook performs no automatic scrolling on mount or on dependency changes.
  *
- * @param {React.RefObject<HTMLElement | null>} targetRef - End-of-list anchor ref.
- * @param {unknown} dependency - Value that triggers scrolling updates.
- * @returns {void}
+ * @param {RefObject<HTMLElement | null>} targetRef - Ref attached to the bottom sentinel element.
+ * @returns {() => void} Imperative scroll-to-bottom function.
  */
 export const useAutoScrollToBottom = (
-  targetRef: React.RefObject<HTMLElement | null>,
-  dependency: unknown,
-): void => {
-  useEffect(() => {
-    const targetElement = targetRef.current;
-    if (!targetElement) {
-      return;
-    }
-
-    targetElement.scrollIntoView({ behavior: "smooth" });
-  }, [targetRef, dependency]);
+  targetRef: RefObject<HTMLElement | null>,
+): () => void => {
+  return useCallback((): void => {
+    targetRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [targetRef]);
 };

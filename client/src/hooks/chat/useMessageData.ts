@@ -27,8 +27,6 @@ const resolveAutoDeleteThresholdTime = (mode: string): number | null => {
 export interface UseMessageDataProps {
   address: string | null;
   activeChat: string | null;
-  isWebRTCConnected: boolean;
-  sendMarkAsRead: (peerAddress: string) => void;
   decryptLocalDB: (cipher: string) => string;
   autoDeleteMode: string;
 }
@@ -43,8 +41,6 @@ export interface UseMessageDataProps {
 export const useMessageData = ({
   address,
   activeChat,
-  isWebRTCConnected,
-  sendMarkAsRead,
   decryptLocalDB,
   autoDeleteMode,
 }: UseMessageDataProps) => {
@@ -67,6 +63,14 @@ export const useMessageData = ({
       }))
       .filter((msg) => !isNonRenderableProtocolMessage(msg.text));
   }, [rawMessages, decryptLocalDB]);
+
+  const entryPointId = useMemo((): number | null => {
+    if (!messages.length) return null;
+    const firstUnread = messages.find((m) => !m.isMine && m.status !== "read");
+    if (firstUnread?.id !== undefined) return firstUnread.id as number;
+    const last = messages[messages.length - 1];
+    return last?.id !== undefined ? (last.id as number) : null;
+  }, [messages]);
 
   const globalUnreadMessages = useLiveQuery(() => {
     if (!address) return [];
@@ -114,23 +118,11 @@ export const useMessageData = ({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [autoDeleteMode]);
 
-  useEffect(() => {
-    if (!activeChat || !isWebRTCConnected) return;
-    if (!unreadCount[activeChat] || unreadCount[activeChat] === 0) return;
-    sendMarkAsRead(activeChat);
-    db.messages
-      .filter(
-        (msg) =>
-          msg.ownerAddress === address?.toLowerCase() &&
-          msg.chatId === activeChat.toLowerCase() &&
-          !msg.isMine &&
-          msg.status !== "read",
-      )
-      .modify({ status: "read" });
-  }, [activeChat, isWebRTCConnected, sendMarkAsRead, unreadCount, address]);
+
 
   return {
     messages,
+    entryPointId,
     unreadCount,
     unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),
   };

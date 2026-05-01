@@ -68,7 +68,7 @@ export default function Sidebar(): React.JSX.Element {
   const setConnectionStates = useChatStore(
     (state) => state.setConnectionStates,
   );
-  const showToast = useUIStore((state) => state.showToast);
+  const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { decryptLocalDB } = useCrypto();
 
   const [headerMenuOpen, setHeaderMenuOpen] = useState<boolean>(false);
@@ -392,6 +392,7 @@ export default function Sidebar(): React.JSX.Element {
                 onClick={() => {
                   setActiveAreaView("settings");
                   setHeaderMenuOpen(false);
+                  setIsMobileSidebarOpen(false);
                 }}
                 className="w-full text-left text-sm text-zinc-200 px-4 py-3 hover:bg-zinc-700/70 transition-colors flex items-center gap-2.5"
               >

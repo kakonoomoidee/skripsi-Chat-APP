@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   AudioBubble,
   CryptoBubble,
@@ -8,6 +8,7 @@ import {
 } from "./bubbles/index";
 import { MessageStatus } from "@/utils/storage/db";
 import { parseMessageBubbleData } from "@/utils/chat/messageBubble";
+import { useMessageVisibility } from "@/hooks/chat/useMessageVisibility";
 
 /**
  * Interface defining the structure of a chat message.
@@ -46,6 +47,9 @@ export interface MessageBubbleProps {
 export const MessageBubble = ({
   msg,
 }: MessageBubbleProps): React.JSX.Element => {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  useMessageVisibility(wrapperRef, msg);
+
   const {
     parsedText,
     replyData,
@@ -102,6 +106,7 @@ export const MessageBubble = ({
 
   return (
     <div
+      ref={wrapperRef}
       id={`msg-${msg.id}`}
       className={`flex w-full transition-all duration-300 rounded-2xl ${
         msg.isMine ? "justify-end" : "justify-start"
