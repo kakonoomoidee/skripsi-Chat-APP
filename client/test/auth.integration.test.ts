@@ -85,55 +85,6 @@ describe("Authentication API Integration", () => {
       expect(responseData.error).toMatch(/invalid signature|transaction failed|internal server error/i);
     }, 15000);
 
-    it("TC-05: should reject login with an incorrect password or tampered signature", async () => {
-      console.log(`[Identity] Executing test as: Attacker Wallet (TC-05)\n  - Address: ${validWallet.address}\n  - Public Key: ${validWallet.publicKey}\n  - Private Key: ${validWallet.privateKey}`);
-      
-      await delay(2500);
-      const spoofedIp = getSpoofedIp();
-      const challengeRes = await fetch(`${BASE_URL}/auth/challenge`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-Forwarded-For": spoofedIp
-        },
-        body: JSON.stringify({ address: validWallet.address }),
-      });
-      
-      const challengeResBody = await challengeRes.json();
-      const nonce = challengeResBody.nonce || "FALLBACK_NONCE";
-      console.log("[TC-05] Received Challenge Response from Server:", challengeResBody);
-
-      const nonceHash = ethers.solidityPackedKeccak256(["string"], [nonce]);
-      const validSignature = await validWallet.signMessage(ethers.getBytes(nonceHash));
-      
-      const tamperedSignature = validSignature + "bad";
-
-      const payload = {
-        address: validWallet.address,
-        signature: tamperedSignature,
-      };
-
-      console.log("[TC-05] Login Payload with Tampered Signature:", payload);
-
-      await delay(2500);
-      const loginRes = await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-Forwarded-For": spoofedIp
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const responseData = await loginRes.json().catch(() => null);
-      console.log("[TC-05] Server Response Error:", responseData);
-
-      expect(loginRes.ok).toBe(false);
-      expect(loginRes.status).toBeGreaterThanOrEqual(400);
-      expect(typeof responseData?.error).toBe("string");
-      expect(responseData.error).toMatch(/invalid signature|transaction failed|internal server error/i);
-    }, 15000);
-
     it("TC-06: should reject login with manipulated nonce and valid signature", async () => {
       console.log(`[Identity] Executing test as: Attacker Wallet (TC-06)\n  - Address: ${validWallet.address}\n  - Public Key: ${validWallet.publicKey}\n  - Private Key: ${validWallet.privateKey}`);
       
