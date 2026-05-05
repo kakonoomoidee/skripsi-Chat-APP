@@ -47,7 +47,7 @@ export default defineConfig(function (_a) {
         },
         esbuild: mode === "production"
             ? {
-                pure: ["console.log", "console.info"],
+                drop: ["console", "debugger"],
             }
             : undefined,
         build: {
