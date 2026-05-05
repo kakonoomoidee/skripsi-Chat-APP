@@ -9,13 +9,12 @@ import { ImportIcon, InfoIcon, WalletIcon, SendIcon } from "@/components/icons";
 import SeedPhraseModal from "@/components/ui/SeedPhraseModal";
 import ImportWalletModal from "./modals/ImportWalletModal";
 import WithdrawalModal from "./modals/WithdrawalModal";
-import { ClipboardDocumentIcon } from "@/components/icons";
+import { ClipboardDocumentIcon, RefreshIcon } from "@/components/icons";
+import { useWeb3WalletData } from "@/hooks/security/useWeb3WalletData";
 import {
   clearWalletLinkage,
   COPIED_STATE_RESET_MS,
   ESTIMATED_GAS_ETH,
-  fetchWalletDetailsFromProvider,
-  getFallbackWalletDetails,
   getLinkedWalletState,
   getSafeMaxWithdrawal,
   INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,
@@ -47,9 +46,12 @@ export default function Web3Wallet(): React.JSX.Element {
   const [txWalletType, setTxWalletType] = useState<
     "internal" | "external" | null
   >(null);
-  const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(
-    null,
+
+  const { walletDetails, refreshWalletData } = useWeb3WalletData(
+    txWalletAddress,
+    txWalletType,
   );
+
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
 
   const [newInternalSeed, setNewInternalSeed] = useState<string | null>(null);
@@ -64,21 +66,7 @@ export default function Web3Wallet(): React.JSX.Element {
   const [withdrawError, setWithdrawError] = useState<string>("");
   const [isWithdrawing, setIsWithdrawing] = useState<boolean>(false);
 
-  const refreshWalletDetails = async (
-    address: string,
-    isExternal: boolean,
-  ): Promise<void> => {
-    try {
-      const details = await fetchWalletDetailsFromProvider(
-        address,
-        isExternal,
-        resolveRpcUrl(),
-      );
-      setWalletDetails(details);
-    } catch {
-      setWalletDetails(getFallbackWalletDetails());
-    }
-  };
+
 
   useEffect(() => {
     const linkedWallet = getLinkedWalletState();
@@ -86,10 +74,6 @@ export default function Web3Wallet(): React.JSX.Element {
     if (linkedWallet.address && linkedWallet.type) {
       setTxWalletAddress(linkedWallet.address);
       setTxWalletType(linkedWallet.type);
-      refreshWalletDetails(
-        linkedWallet.address,
-        linkedWallet.type === "external",
-      );
     }
   }, []);
 
@@ -107,7 +91,6 @@ export default function Web3Wallet(): React.JSX.Element {
         setTxWalletAddress(address);
         setTxWalletType("internal");
         setNewInternalSeed(phrase);
-        refreshWalletDetails(address, false);
       }
     } finally {
       setIsConnecting(false);
@@ -126,7 +109,6 @@ export default function Web3Wallet(): React.JSX.Element {
 
       setTxWalletAddress(address);
       setTxWalletType("internal");
-      refreshWalletDetails(address, false);
       setIsImportModalOpen(false);
     } catch {
       setImportError("Invalid seed phrase.");
@@ -154,7 +136,6 @@ export default function Web3Wallet(): React.JSX.Element {
         setTxWalletAddress(linkedAddress);
         setTxWalletType("external");
         persistExternalWallet(linkedAddress);
-        await refreshWalletDetails(linkedAddress, true);
       }
     } catch {
     } finally {
@@ -165,7 +146,6 @@ export default function Web3Wallet(): React.JSX.Element {
   const handleDisconnectWallet = (): void => {
     setTxWalletAddress(null);
     setTxWalletType(null);
-    setWalletDetails(null);
     clearWalletLinkage();
   };
 
@@ -234,7 +214,7 @@ export default function Web3Wallet(): React.JSX.Element {
       setIsWithdrawModalOpen(false);
 
       if (txWalletAddress) {
-        refreshWalletDetails(txWalletAddress, false);
+        await refreshWalletData();
       }
     } catch (error: any) {
       setWithdrawError(error.message || "Failed to process withdrawal.");
@@ -324,12 +304,22 @@ export default function Web3Wallet(): React.JSX.Element {
                       : "External Wallet"}
                   </span>
                 </div>
-                <button
-                  onClick={handleDisconnectWallet}
-                  className="text-[10px] text-red-400 hover:text-red-300 underline underline-offset-2"
-                >
-                  Disconnect
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={refreshWalletData}
+                    className="text-[10px] font-medium text-zinc-400 hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshIcon className="w-3.5 h-3.5" />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={handleDisconnectWallet}
+                    className="text-[10px] text-red-400 hover:text-red-300 underline underline-offset-2"
+                  >
+                    Disconnect
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <div>
