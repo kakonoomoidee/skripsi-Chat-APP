@@ -22,7 +22,6 @@ import {
   persistInternalWallet,
   resolveRpcUrl,
   validateWithdrawal,
-  type WalletDetails,
 } from "@/services/web3WalletService";
 
 declare global {
@@ -65,8 +64,6 @@ export default function Web3Wallet(): React.JSX.Element {
     useState<boolean>(false);
   const [withdrawError, setWithdrawError] = useState<string>("");
   const [isWithdrawing, setIsWithdrawing] = useState<boolean>(false);
-
-
 
   useEffect(() => {
     const linkedWallet = getLinkedWalletState();
