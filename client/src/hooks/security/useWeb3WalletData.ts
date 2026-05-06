@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchWalletDetailsFromProvider,
   getFallbackWalletDetails,
@@ -12,6 +12,7 @@ import {
 export interface UseWeb3WalletDataReturn {
   walletDetails: WalletDetails | null;
   refreshWalletData: () => Promise<void>;
+  isRefreshing: boolean;
 }
 
 /**
@@ -29,6 +30,8 @@ export const useWeb3WalletData = (
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(
     null,
   );
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const isRefreshingRef = useRef<boolean>(false);
 
   /**
    * Fetches the latest wallet details from the provider.
@@ -41,6 +44,13 @@ export const useWeb3WalletData = (
       return;
     }
 
+    if (isRefreshingRef.current) {
+      return;
+    }
+
+    isRefreshingRef.current = true;
+    setIsRefreshing(true);
+
     try {
       const details = await fetchWalletDetailsFromProvider(
         address,
@@ -50,6 +60,9 @@ export const useWeb3WalletData = (
       setWalletDetails(details);
     } catch {
       setWalletDetails(getFallbackWalletDetails());
+    } finally {
+      isRefreshingRef.current = false;
+      setIsRefreshing(false);
     }
   }, [address, type]);
 
@@ -72,5 +85,6 @@ export const useWeb3WalletData = (
   return {
     walletDetails,
     refreshWalletData,
+    isRefreshing,
   };
 };
