@@ -24,7 +24,10 @@
   "author": "kakonoomoide",
   "license": "MIT",
   "dependencies": {
-    "@truffle/hdwallet-provider": "^2.1.15",
+    "@truffle/hdwallet-provider": "^2.1.15"
+  },
+  "devDependencies": {
+    "ethers": "^6.0.0",
     "dotenv": "^17.4.1"
   }
 }
