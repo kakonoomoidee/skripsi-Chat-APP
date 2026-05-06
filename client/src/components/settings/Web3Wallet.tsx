@@ -46,7 +46,7 @@ export default function Web3Wallet(): React.JSX.Element {
     "internal" | "external" | null
   >(null);
 
-  const { walletDetails, refreshWalletData } = useWeb3WalletData(
+  const { walletDetails, refreshWalletData, isRefreshing } = useWeb3WalletData(
     txWalletAddress,
     txWalletType,
   );
@@ -305,10 +305,13 @@ export default function Web3Wallet(): React.JSX.Element {
                   <button
                     type="button"
                     onClick={refreshWalletData}
-                    className="text-[10px] font-medium text-zinc-400 hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                    disabled={isRefreshing}
+                    className="text-[10px] font-medium text-zinc-400 hover:text-indigo-400 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <RefreshIcon className="w-3.5 h-3.5" />
-                    Refresh
+                    <RefreshIcon
+                      className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-indigo-400" : ""}`}
+                    />
+                    {isRefreshing ? "Refreshing..." : "Refresh"}
                   </button>
                   <button
                     onClick={handleDisconnectWallet}

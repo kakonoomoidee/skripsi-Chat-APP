@@ -423,7 +423,7 @@ export default function Sidebar(): React.JSX.Element {
               type="text"
               placeholder="Search or start new chat..."
               value={targetUsername}
-              onChange={(e) => setTargetUsername(e.target.value)}
+              onChange={(e) => setTargetUsername(e.target.value.toLowerCase())}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-zinc-600"
             />
           </div>
