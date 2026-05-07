@@ -7,6 +7,7 @@ import {
   resolveRpcUrl,
 } from "@/services/web3WalletService";
 import { CHAT_PROTOCOL_TYPES } from "@/utils/chat/chatProtocol";
+import { assertSelfTransferAllowed } from "@/utils/commerce/transfer";
 import {
   transferViaInjectedProvider,
   transferViaInternalWallet,
@@ -311,15 +312,8 @@ export const useMessageSender = ({
       );
     }
 
-    if (
-      (externalAddress &&
-        externalAddress.toLowerCase() === peerWalletAddress.toLowerCase()) ||
-      internalAddress?.toLowerCase() === peerWalletAddress.toLowerCase()
-    ) {
-      throw new Error(
-        "Self-Transfer Blocked. You cannot send crypto to yourself.",
-      );
-    }
+    assertSelfTransferAllowed(externalAddress, peerWalletAddress);
+    assertSelfTransferAllowed(internalAddress, peerWalletAddress);
 
     try {
       let txHash = "";

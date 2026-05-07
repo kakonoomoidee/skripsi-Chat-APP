@@ -4,6 +4,7 @@ import { useCrypto } from "@/hooks/security/useCrypto";
 import { useDismissablePopover } from "@/hooks/ui/useDismissablePopover";
 import { useUIStore } from "@/store";
 import { transferViaInternalWallet } from "@/utils/commerce/transaction";
+import { assertSelfTransferAllowed } from "@/utils/commerce/transfer";
 import { shortenAddress } from "@/utils/core/format";
 import { ImportIcon, InfoIcon, WalletIcon, SendIcon } from "@/components/icons";
 import SeedPhraseModal from "@/components/ui/SeedPhraseModal";
@@ -185,6 +186,9 @@ export default function Web3Wallet(): React.JSX.Element {
       ) {
         throw new Error("Seed phrase does not match active wallet.");
       }
+
+      // Validate that withdrawal destination is not the same as source wallet
+      assertSelfTransferAllowed(txWalletAddress, withdrawAddress);
 
       const encryptedPk = localStorage.getItem(
         INTERNAL_TX_PRIVATE_KEY_STORAGE_KEY,

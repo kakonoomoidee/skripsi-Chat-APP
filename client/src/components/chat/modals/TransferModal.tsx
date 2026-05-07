@@ -5,8 +5,11 @@ import { useWalletStore } from "@/store";
 import { XIcon } from "@/components/icons";
 import { useTransferBalance } from "@/hooks/chat/useTransferBalance";
 import {
-  getTransferValidationState,
+  getP2PTransferValidationState,
+  getSafeMaxTransfer,
   TRANSFER_REQUEST_TIMEOUT_MS,
+  ESTIMATED_GAS_ETH,
+  assertSelfTransferAllowed,
 } from "@/utils/commerce/transfer";
 
 /**
@@ -50,21 +53,51 @@ export const TransferModal = ({
 
   if (!isOpen || typeof document === "undefined") return null;
 
-  const { isInsufficientFunds, isDisabled } = getTransferValidationState(
-    transferAmount,
-    currentBalance,
-  );
+  const { isInsufficientFunds, isDisabled, safeMax } =
+    getP2PTransferValidationState(
+      transferAmount,
+      currentBalance,
+      ESTIMATED_GAS_ETH,
+    );
+
+  /**
+   * Sets the transfer amount to the maximum safe value: balance minus the
+   * estimated gas fee. If the balance is insufficient to cover even the fee,
+   * the amount is set to zero to prevent invalid submissions.
+   *
+   * @returns {void}
+   */
+  const handleMaxAmount = (): void => {
+    const numericBalance = Number.parseFloat(currentBalance || "0");
+    const maxSafe = getSafeMaxTransfer(numericBalance, ESTIMATED_GAS_ETH);
+    setTransferAmount(maxSafe > 0 ? maxSafe.toFixed(4) : "0");
+  };
 
   /**
    * Triggers the Web3 transaction sequence if validations pass.
+   * Also validates that sender and receiver are different addresses.
    *
    * @returns {void}
    */
   const executeTransfer = (): void => {
-    if (isDisabled) return;
-    handleSendCrypto(transferAmount);
-    setTransferAmount("");
-    onClose();
+    if (isDisabled || !peerWalletAddress) return;
+
+    try {
+      // Validate self-transfer before executing
+      assertSelfTransferAllowed(
+        localStorage.getItem("internalTxWallet") ||
+          (typeof window.ethereum !== "undefined" ? "connected" : null),
+        peerWalletAddress,
+      );
+
+      handleSendCrypto(transferAmount);
+      setTransferAmount("");
+      onClose();
+    } catch (error: any) {
+      // Self-transfer error is caught, but we keep the modal open
+      // The error is typically handled by the crypto hooks
+      console.error("Transfer validation failed:", error.message);
+    }
   };
 
   return createPortal(
@@ -150,18 +183,31 @@ export const TransferModal = ({
                   value={transferAmount}
                   onChange={(e) => setTransferAmount(e.target.value)}
                   placeholder="e.g. 0.05"
-                  className={`w-full bg-zinc-950 border focus:ring-1 rounded-xl px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700 ${
+                  className={`w-full bg-zinc-950 border focus:ring-1 rounded-xl px-3 py-2.5 pr-14 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-700 ${
                     isInsufficientFunds
                       ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/30"
                       : "border-zinc-800 focus:border-indigo-500 focus:ring-indigo-500/30"
                   }`}
                   autoComplete="off"
                 />
+                <button
+                  type="button"
+                  onClick={handleMaxAmount}
+                  disabled={!currentBalance || safeMax <= 0}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600/20 hover:bg-indigo-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[9px] font-bold text-indigo-300 px-2 py-0.5 rounded-md transition-colors border border-indigo-500/30"
+                >
+                  MAX
+                </button>
               </div>
+
+              <p className="text-[10px] text-zinc-600 flex items-center gap-1 mt-1.5 ml-1">
+                Est. network fee: ~{ESTIMATED_GAS_ETH} ETH
+              </p>
 
               {isInsufficientFunds && (
                 <p className="text-[10px] text-red-400 mt-1.5 ml-1 animate-in slide-in-from-top-1">
-                  Insufficient funds for this transaction.
+                  Insufficient funds. Max: {safeMax.toFixed(4)} ETH (after gas
+                  fee).
                 </p>
               )}
             </div>
