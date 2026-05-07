@@ -1,5 +1,5 @@
 import { db } from "@/utils/storage/db";
-import { useSessionStore } from "@/store";
+import { useSessionStore, useWalletStore } from "@/store";
 import { type ReplyMessage } from "@/store/useSessionStore";
 import { getStoredWalletAddresses } from "@/services/walletBalanceService";
 import {
@@ -95,6 +95,12 @@ export const useMessageSender = ({
 }: UseMessageSenderParams): UseMessageSenderReturn => {
   const { messageInput, setMessageInput, replyingTo, setReplyingTo } =
     useSessionStore();
+  const pendingPeerWalletRequestAddress = useWalletStore(
+    (state) => state.pendingPeerWalletRequestAddress,
+  );
+  const setPendingPeerWalletRequestAddress = useWalletStore(
+    (state) => state.setPendingPeerWalletRequestAddress,
+  );
 
   const addOutgoingMessage = async (
     chatId: string,
@@ -282,10 +288,22 @@ export const useMessageSender = ({
   const requestPeerWallet = (): void => {
     if (!activeChat || !hasSecret(activeChat) || !isWebRTCConnected) return;
 
+    if (
+      pendingPeerWalletRequestAddress &&
+      pendingPeerWalletRequestAddress === activeChat
+    ) {
+      return;
+    }
+
     const requestPayload = JSON.stringify({
       type: CHAT_PROTOCOL_TYPES.walletRequest,
     });
-    encryptAndSendPayload(activeChat, requestPayload);
+    setPendingPeerWalletRequestAddress(activeChat);
+
+    const wasSent = encryptAndSendPayload(activeChat, requestPayload);
+    if (!wasSent) {
+      setPendingPeerWalletRequestAddress(null);
+    }
   };
 
   /**
@@ -333,6 +351,7 @@ export const useMessageSender = ({
       const successPayload = JSON.stringify({
         type: CHAT_PROTOCOL_TYPES.txSuccess,
         hash: txHash,
+        amount,
       });
 
       encryptAndSendPayload(activeChat, successPayload);

@@ -1,7 +1,11 @@
 import { useRef, useCallback } from "react";
 import ms from "ms";
 import { db } from "@/utils/storage/db";
-import { CHAT_PROTOCOL_TYPES } from "@/utils/chat/chatProtocol";
+import {
+  CHAT_PROTOCOL_TYPES,
+  parseChatProtocolPayload,
+  type ChatProtocolPayload,
+} from "@/utils/chat/chatProtocol";
 
 const MARK_AS_READ_SIGNAL_TYPE = "MARK_AS_READ";
 const MESSAGE_DELIVERED_SIGNAL_TYPE = "MSG_DELIVERED";
@@ -74,6 +78,10 @@ interface UseWebRTCDataChannelProps {
   encryptLocalDB: (plainText: string) => string;
   encrypt: (peerAddress: string, plainText: string) => string | null;
   setIsPeerTyping?: (val: boolean) => void;
+  onProtocolMessage?: (
+    peerAddress: string,
+    payload: ChatProtocolPayload,
+  ) => Promise<void> | void;
   onCallOffer?: () => void;
   onCallAccepted?: () => void;
   onCallRejected?: () => void;
@@ -94,6 +102,7 @@ export const useWebRTCDataChannel = ({
   encryptLocalDB,
   encrypt,
   setIsPeerTyping,
+  onProtocolMessage,
   onCallOffer,
   onCallAccepted,
   onCallRejected,
@@ -148,8 +157,8 @@ export const useWebRTCDataChannel = ({
   );
 
   /**
-   * Handles incoming encrypted payloads, parses protocol signals, and stores messages.
-   * Upon persisting a new message, it automatically emits an MSG_DELIVERED ack to the sender.
+   * Handles incoming encrypted payloads, short-circuits protocol/system signals,
+   * and persists only renderable chat content.
    *
    * @param {string} peerAddress - The sender's address.
    * @param {string} encryptedData - The encrypted payload string.
@@ -159,20 +168,35 @@ export const useWebRTCDataChannel = ({
     async (peerAddress: string, encryptedData: string): Promise<void> => {
       try {
         const decryptedContent = decrypt(peerAddress, encryptedData);
-        const parsedPayload = parseDataChannelPayload(decryptedContent);
+        const protocolPayload = parseChatProtocolPayload(decryptedContent);
 
-        if (
-          parsedPayload?.type === CHAT_PROTOCOL_TYPES.typing &&
-          setIsPeerTyping
-        ) {
-          setIsPeerTyping(true);
-          clearTypingTimeout();
-          typingTimeoutRef.current = window.setTimeout(
-            () => setIsPeerTyping(false),
-            TYPING_INDICATOR_RESET_MS,
-          );
-          return;
+        if (protocolPayload) {
+          if (
+            protocolPayload.type === CHAT_PROTOCOL_TYPES.typing &&
+            setIsPeerTyping
+          ) {
+            setIsPeerTyping(true);
+            clearTypingTimeout();
+            typingTimeoutRef.current = window.setTimeout(
+              () => setIsPeerTyping(false),
+              TYPING_INDICATOR_RESET_MS,
+            );
+            return;
+          }
+
+          if (
+            protocolPayload.type === CHAT_PROTOCOL_TYPES.walletRequest ||
+            protocolPayload.type === CHAT_PROTOCOL_TYPES.walletResponse ||
+            protocolPayload.type === CHAT_PROTOCOL_TYPES.profileSync
+          ) {
+            if (onProtocolMessage) {
+              await onProtocolMessage(peerAddress, protocolPayload);
+            }
+            return;
+          }
         }
+
+        const parsedPayload = parseDataChannelPayload(decryptedContent);
 
         if (parsedPayload?.type === "CALL_OFFER" && onCallOffer) {
           onCallOffer();
@@ -249,6 +273,7 @@ export const useWebRTCDataChannel = ({
     [
       decrypt,
       setIsPeerTyping,
+      onProtocolMessage,
       onCallOffer,
       onCallAccepted,
       onCallRejected,

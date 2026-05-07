@@ -15,6 +15,7 @@ export interface ParsedDocumentData {
 export interface ParsedCryptoData {
   hash: string;
   amount: string;
+  receiptType?: "TX_SUCCESS" | "TRANSFER_SUCCESS" | "CRYPTO_RECEIPT";
 }
 
 export interface ParsedLegacyCryptoData {
@@ -49,15 +50,48 @@ export const parseMessageBubbleData = (
   let cryptoData: ParsedCryptoData | null = null;
 
   try {
-    const parsed = JSON.parse(rawText);
+    const parsed = JSON.parse(rawText) as {
+      type?: unknown;
+      text?: unknown;
+      replyTo?: unknown;
+      fileName?: unknown;
+      fileData?: unknown;
+      hash?: unknown;
+      amount?: unknown;
+      txAmount?: unknown;
+      value?: unknown;
+    };
 
     if (parsed.type === "DOCUMENT") {
-      documentData = { fileName: parsed.fileName, fileData: parsed.fileData };
-    } else if (parsed.type === "TX_SUCCESS") {
-      cryptoData = { hash: parsed.hash, amount: parsed.amount };
-    } else if (parsed.text !== undefined) {
+      documentData = {
+        fileName: parsed.fileName as string,
+        fileData: parsed.fileData as string,
+      };
+    } else if (
+      parsed.type === "TX_SUCCESS" ||
+      parsed.type === "TRANSFER_SUCCESS" ||
+      parsed.type === "CRYPTO_RECEIPT"
+    ) {
+      const receiptAmount =
+        typeof parsed.amount === "string"
+          ? parsed.amount
+          : typeof parsed.txAmount === "string"
+            ? parsed.txAmount
+            : typeof parsed.value === "string"
+              ? parsed.value
+              : "0";
+
+      cryptoData = {
+        hash: String(parsed.hash ?? ""),
+        amount: receiptAmount,
+        receiptType: parsed.type as
+          | "TX_SUCCESS"
+          | "TRANSFER_SUCCESS"
+          | "CRYPTO_RECEIPT",
+      };
+    } else if (typeof parsed.text === "string") {
       parsedText = parsed.text;
-      replyData = parsed.replyTo || null;
+      replyData = (parsed.replyTo as ParsedReplyData) || null;
     }
   } catch {
     parsedText = rawText;

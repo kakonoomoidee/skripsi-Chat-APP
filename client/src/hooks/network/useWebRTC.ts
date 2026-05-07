@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { type Socket } from "socket.io-client";
 import { useWebRTCMedia } from "./webrtc/useWebRTCMedia";
 import { useWebRTCDataChannel } from "./webrtc/useWebRTCDataChannel";
+import { type ChatProtocolPayload } from "@/utils/chat/chatProtocol";
 
 const WEBRTC_SIGNAL_TYPES = {
   ping: "ping",
@@ -52,6 +53,10 @@ export interface UseWebRTCProps {
   computeSecret?: (peerAddress: string, peerPublicKey: string) => void;
   hasSecret: (peerAddress: string) => boolean;
   setIsPeerTyping?: (val: boolean) => void;
+  onProtocolMessage?: (
+    peerAddress: string,
+    payload: ChatProtocolPayload,
+  ) => Promise<void> | void;
   onCallOffer?: () => void;
   onCallAccepted?: () => void;
   onCallRejected?: () => void;

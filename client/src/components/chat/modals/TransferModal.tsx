@@ -32,7 +32,8 @@ export const TransferModal = ({
   onClose,
 }: TransferModalProps): React.JSX.Element | null => {
   const { activeUsername, handleSendCrypto } = useChatContext();
-  const { peerWalletAddress } = useWalletStore();
+  const { peerWalletAddress, setPendingPeerWalletRequestAddress } =
+    useWalletStore();
 
   const [transferAmount, setTransferAmount] = useState<string>("");
   const currentBalance = useTransferBalance(isOpen);
@@ -71,6 +72,16 @@ export const TransferModal = ({
     const numericBalance = Number.parseFloat(currentBalance || "0");
     const maxSafe = getSafeMaxTransfer(numericBalance, ESTIMATED_GAS_ETH);
     setTransferAmount(maxSafe > 0 ? maxSafe.toFixed(4) : "0");
+  };
+
+  /**
+   * Closes the transfer modal and clears any pending wallet request for a retry.
+   *
+   * @returns {void}
+   */
+  const handleClose = (): void => {
+    setPendingPeerWalletRequestAddress(null);
+    onClose();
   };
 
   /**
@@ -131,7 +142,7 @@ export const TransferModal = ({
               </>
             )}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="mt-6 px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs font-medium text-zinc-300 transition-colors"
             >
               {requestTimeout ? "Close" : "Cancel"}
@@ -214,7 +225,7 @@ export const TransferModal = ({
 
             <div className="flex gap-3">
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
               >
                 Cancel

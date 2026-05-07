@@ -22,6 +22,12 @@ import { useMessageSender } from "@/hooks/chat/useMessageSender";
 import { DuplicateTabWarning } from "@/components/chat/index";
 import { useChatStore, ConnectionState } from "@/store/useChatStore";
 import { useMessageData } from "@/hooks/chat/useMessageData";
+import {
+  CHAT_PROTOCOL_TYPES,
+  type ChatProtocolPayload,
+} from "@/utils/chat/chatProtocol";
+import { getStoredWalletAddresses } from "@/services/walletBalanceService";
+import { db } from "@/utils/storage/db";
 
 export type { ConnectionState };
 import { useConnectionManager } from "@/hooks/chat/useConnectionManager";
@@ -125,7 +131,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const { showToast, setIsMobileSidebarOpen } = useUIStore();
   const { autoDeleteMode } = useSessionStore();
-  const { setPeerWalletAddress, peerWalletAddress } = useWalletStore();
+  const {
+    setPeerWalletAddress,
+    peerWalletAddress,
+    setPendingPeerWalletRequestAddress,
+  } = useWalletStore();
 
   const chatStore = useChatStore();
 
@@ -200,6 +210,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     computeSecret,
     hasSecret,
     setIsPeerTyping: chatStore.setIsPeerTyping,
+    onProtocolMessage: handleProtocolMessage,
     onCallOffer: () => setIsIncomingCall(true),
     onCallAccepted: () => {
       setIsInCall(true);
@@ -217,6 +228,62 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     onPongReceived: (addr: string) =>
       connectionManagerRefs.current.handlePongReceived?.(addr),
   });
+
+  /**
+   * Handles incoming WebRTC protocol payloads without persisting them to chat history.
+   *
+   * @param {string} peerAddress - The peer address that sent the payload.
+   * @param {ChatProtocolPayload} payload - The parsed protocol payload.
+   * @returns {Promise<void>}
+   */
+  async function handleProtocolMessage(
+    peerAddress: string,
+    payload: ChatProtocolPayload,
+  ): Promise<void> {
+    if (payload.type === CHAT_PROTOCOL_TYPES.walletResponse) {
+      if (peerWalletAddress !== payload.address) {
+        setPeerWalletAddress(payload.address);
+      }
+      setPendingPeerWalletRequestAddress(null);
+      return;
+    }
+
+    if (payload.type === CHAT_PROTOCOL_TYPES.walletRequest) {
+      const { internalAddress, externalAddress } = getStoredWalletAddresses();
+      const txAddress = internalAddress || externalAddress;
+
+      if (!txAddress) {
+        return;
+      }
+
+      const responsePayload = JSON.stringify({
+        type: CHAT_PROTOCOL_TYPES.walletResponse,
+        address: txAddress,
+      });
+      const encryptedResponse = encrypt(peerAddress, responsePayload);
+
+      if (encryptedResponse) {
+        sendDataViaWebRTC(peerAddress, encryptedResponse);
+      }
+
+      return;
+    }
+
+    if (
+      payload.type === CHAT_PROTOCOL_TYPES.profileSync &&
+      chatStore.activeChat
+    ) {
+      const existing = await db.contacts.get(
+        chatStore.activeChat.toLowerCase(),
+      );
+      if (existing) {
+        await db.contacts.put({
+          ...existing,
+          avatar: payload.avatar,
+        });
+      }
+    }
+  }
 
   useEffect(() => {
     forceDisconnectPeerRef.current = forceDisconnectPeer;

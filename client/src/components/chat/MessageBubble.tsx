@@ -75,7 +75,7 @@ export const MessageBubble = ({
       <CryptoBubble
         msg={cleanMsg}
         txType={cleanMsg.isMine ? "SENT" : "RECEIVED"}
-        txAmountOrStatus={cryptoData.amount}
+        txAmountOrStatus={cryptoData.amount || "0"}
         txHash={cryptoData.hash}
         isVerification={false}
       />

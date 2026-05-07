@@ -5,7 +5,9 @@ import { create } from "zustand";
  */
 export interface WalletState {
   peerWalletAddress: string | null;
+  pendingPeerWalletRequestAddress: string | null;
   setPeerWalletAddress: (address: string | null) => void;
+  setPendingPeerWalletRequestAddress: (address: string | null) => void;
 }
 
 /**
@@ -16,6 +18,7 @@ export interface WalletState {
  */
 export const useWalletStore = create<WalletState>((set) => ({
   peerWalletAddress: null,
+  pendingPeerWalletRequestAddress: null,
 
   setPeerWalletAddress: (address: string | null) => {
     if (address) {
@@ -26,5 +29,9 @@ export const useWalletStore = create<WalletState>((set) => ({
       console.log("[Wallet Store] Peer wallet address cleared from memory.");
     }
     set({ peerWalletAddress: address });
+  },
+
+  setPendingPeerWalletRequestAddress: (address: string | null) => {
+    set({ pendingPeerWalletRequestAddress: address });
   },
 }));
