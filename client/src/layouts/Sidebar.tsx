@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useChatContext } from "@/context/ChatContext";
 import { db } from "@/utils/storage/db";
+import { getMessagePreview } from "@/utils/chat/messagePreview";
 import {
   LockSessionIcon,
   SearchIcon,
@@ -162,22 +163,8 @@ export default function Sidebar(): React.JSX.Element {
       sortedRecentFirst.forEach((message) => {
         if (previews[message.chatId]) return;
         const decryptedText = decryptLocalDB(message.text);
-        let previewText = decryptedText;
-        try {
-          const parsed = JSON.parse(decryptedText) as {
-            type?: unknown;
-            text?: unknown;
-          };
-          if (parsed && typeof parsed === "object" && "type" in parsed) {
-            previewText = "Encrypted message...";
-          } else if (typeof parsed?.text === "string") {
-            previewText = parsed.text;
-          }
-        } catch {
-          previewText = decryptedText;
-        }
-        const normalizedText = previewText.trim();
-        previews[message.chatId] = normalizedText || "Start chatting...";
+        const previewText = getMessagePreview(decryptedText);
+        previews[message.chatId] = previewText;
       });
 
       activeSessions.forEach((session) => {
