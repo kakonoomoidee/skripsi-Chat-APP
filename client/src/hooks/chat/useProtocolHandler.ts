@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { db } from "@/utils/storage/db";
 import { type Message } from "@/utils/storage/db";
 import { getStoredWalletAddresses } from "@/services/walletBalanceService";
@@ -64,47 +64,74 @@ export const useProtocolHandler = ({
   sendDataViaWebRTC,
 }: UseProtocolHandlerProps) => {
   const { activeChat } = useChatStore();
+  const processedMessageIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    const handleProtocolMessages = async () => {
+    const handleProtocolMessages = async (): Promise<void> => {
       if (!messages || messages.length === 0) return;
-      const latestMessage = messages[messages.length - 1];
-      if (!latestMessage?.text) return;
+
       const { peerWalletAddress, setPeerWalletAddress } =
         useWalletStore.getState();
-      const parsedPayload = parseChatProtocolPayload(latestMessage.text);
-      if (!parsedPayload) return;
 
-      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletResponse) {
-        if (peerWalletAddress !== parsedPayload.address) {
-          setPeerWalletAddress(parsedPayload.address);
-        }
-        await removeProtocolMessage(latestMessage.id);
-        return;
-      }
-
-      if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletRequest) {
-        const txAddress = resolveTransactionAddress(address);
-
-        if (txAddress && activeChat) {
-          sendWalletResponse(activeChat, txAddress, encrypt, sendDataViaWebRTC);
+      for (const message of messages) {
+        if (!message.id || processedMessageIdsRef.current.has(message.id)) {
+          continue;
         }
 
-        await removeProtocolMessage(latestMessage.id);
-        return;
-      }
-
-      if (
-        parsedPayload.type === CHAT_PROTOCOL_TYPES.profileSync &&
-        activeChat
-      ) {
-        const existing = await db.contacts.get(activeChat.toLowerCase());
-        if (existing) {
-          await db.contacts.put({ ...existing, avatar: parsedPayload.avatar });
+        if (!message.text) {
+          processedMessageIdsRef.current.add(message.id);
+          continue;
         }
-        await removeProtocolMessage(latestMessage.id);
+
+        const parsedPayload = parseChatProtocolPayload(message.text);
+        if (!parsedPayload) {
+          processedMessageIdsRef.current.add(message.id);
+          continue;
+        }
+
+        if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletResponse) {
+          if (peerWalletAddress !== parsedPayload.address) {
+            setPeerWalletAddress(parsedPayload.address);
+          }
+          processedMessageIdsRef.current.add(message.id);
+          await removeProtocolMessage(message.id);
+          continue;
+        }
+
+        if (parsedPayload.type === CHAT_PROTOCOL_TYPES.walletRequest) {
+          const txAddress = resolveTransactionAddress(address);
+
+          if (txAddress && activeChat) {
+            sendWalletResponse(
+              activeChat,
+              txAddress,
+              encrypt,
+              sendDataViaWebRTC,
+            );
+          }
+
+          processedMessageIdsRef.current.add(message.id);
+          await removeProtocolMessage(message.id);
+          continue;
+        }
+
+        if (
+          parsedPayload.type === CHAT_PROTOCOL_TYPES.profileSync &&
+          activeChat
+        ) {
+          const existing = await db.contacts.get(activeChat.toLowerCase());
+          if (existing) {
+            await db.contacts.put({
+              ...existing,
+              avatar: parsedPayload.avatar,
+            });
+          }
+          processedMessageIdsRef.current.add(message.id);
+          await removeProtocolMessage(message.id);
+        }
       }
     };
+
     handleProtocolMessages();
   }, [messages, activeChat, address, encrypt, sendDataViaWebRTC]);
 };

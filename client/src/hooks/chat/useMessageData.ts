@@ -54,15 +54,26 @@ export const useMessageData = ({
       .sortBy("timestamp");
   }, [activeChat, address]) as Message[] | undefined;
 
-  const messages = useMemo(() => {
+  const decryptedMessages = useMemo(() => {
     if (!rawMessages) return [];
-    return rawMessages
-      .map((msg) => ({
-        ...msg,
-        text: decryptLocalDB(msg.text),
-      }))
-      .filter((msg) => !isNonRenderableProtocolMessage(msg.text));
+
+    return rawMessages.map((msg) => ({
+      ...msg,
+      text: decryptLocalDB(msg.text),
+    }));
   }, [rawMessages, decryptLocalDB]);
+
+  const messages = useMemo(() => {
+    return decryptedMessages.filter(
+      (msg) => !isNonRenderableProtocolMessage(msg.text),
+    );
+  }, [decryptedMessages]);
+
+  const protocolMessages = useMemo(() => {
+    return decryptedMessages.filter((msg) =>
+      isNonRenderableProtocolMessage(msg.text),
+    );
+  }, [decryptedMessages]);
 
   const entryPointId = useMemo((): number | null => {
     if (!messages.length) return null;
@@ -118,10 +129,9 @@ export const useMessageData = ({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [autoDeleteMode]);
 
-
-
   return {
     messages,
+    protocolMessages,
     entryPointId,
     unreadCount,
     unreadTotal: Object.values(unreadCount).reduce((a, b) => a + b, 0),

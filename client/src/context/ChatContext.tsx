@@ -239,17 +239,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     connectionManagerRefs.current = connectionManager;
   }, [connectionManager]);
 
-  const { messages, entryPointId, unreadCount, unreadTotal } = useMessageData({
-    address,
-    activeChat: chatStore.activeChat,
-    decryptLocalDB,
-    autoDeleteMode,
-  });
+  const { messages, protocolMessages, entryPointId, unreadCount, unreadTotal } =
+    useMessageData({
+      address,
+      activeChat: chatStore.activeChat,
+      decryptLocalDB,
+      autoDeleteMode,
+    });
 
   const scrollSettledRef = useRef<boolean>(true);
 
   useProtocolHandler({
-    messages,
+    messages: protocolMessages,
     address,
     encrypt,
     sendDataViaWebRTC,
