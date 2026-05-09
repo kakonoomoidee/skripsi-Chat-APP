@@ -103,7 +103,7 @@ export default function RelaySelector({
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <div className="flex-1 min-w-0">
             <GlassDropdown
               value={activeRelay}
@@ -116,7 +116,9 @@ export default function RelaySelector({
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className={`bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 hover:border-indigo-500/50 rounded-xl transition-all shadow-sm flex items-center justify-center font-bold ${buttonPadding}`}
+            className={`bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 hover:border-indigo-500/50 rounded-xl transition-all shadow-sm flex items-center justify-center font-bold ${buttonPadding} ${
+              size === "md" ? "h-10" : "h-8"
+            }`}
             title="Add Custom Node"
           >
             +
