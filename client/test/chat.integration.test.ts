@@ -16,30 +16,30 @@ describe("Decryption Logic Integration", () => {
   const wrongSharedSecret = ethers.sha256(ethers.toUtf8Bytes("incorrect_secret_key_987654321"));
 
   describe("Negative Testing", () => {
-    it("TC-12: should fail decryption with an incorrect shared secret", () => {
-      console.log(`[Identity] Executing test as: Attacker (TC-12)\n  - Target Plaintext: ${plainText}\n  - Valid Secret: ${correctSharedSecret}\n  - Attacker Secret: ${wrongSharedSecret}`);
+    it("TC-16: should fail decryption with an incorrect shared secret", () => {
+      console.log(`[Identity] Executing test as: Attacker (TC-16)\n  - Target Plaintext: ${plainText}\n  - Valid Secret: ${correctSharedSecret}\n  - Attacker Secret: ${wrongSharedSecret}`);
       
       const validCiphertext = encryptMessage(plainText, correctSharedSecret) || "";
-      console.log("[TC-12] Generated Valid Ciphertext:", validCiphertext);
+      console.log("[TC-16] Generated Valid Ciphertext:", validCiphertext);
       
       const decrypted = decryptMessage(validCiphertext, wrongSharedSecret);
-      console.log("[TC-12] Decryption Result with Attacker Secret:", decrypted);
+      console.log("[TC-16] Decryption Result with Attacker Secret:", decrypted);
       
       expect(["[DECRYPTION_FAILED]", "[ERROR_DECRYPTION_EXCEPTION]"]).toContain(decrypted);
     }, 15000);
 
-    it("TC-13: should fail decryption with a manipulated message", () => {
-      console.log(`[Identity] Executing test as: Attacker (TC-13)\n  - Target Plaintext: ${plainText}\n  - Valid Secret: ${correctSharedSecret}`);
+    it("TC-17: should fail decryption with a manipulated message", () => {
+      console.log(`[Identity] Executing test as: Attacker (TC-17)\n  - Target Plaintext: ${plainText}\n  - Valid Secret: ${correctSharedSecret}`);
       
       const validCiphertext = encryptMessage(plainText, correctSharedSecret) || "";
-      console.log("[TC-13] Generated Valid Ciphertext:", validCiphertext);
+      console.log("[TC-17] Generated Valid Ciphertext:", validCiphertext);
       
       // Tamper with the early bytes (after "U2FsdGVkX1" salt prefix) to ensure total failure rather than partial block decryption
       const manipulatedCiphertext = validCiphertext.substring(0, 10) + "DEADBEEF" + validCiphertext.substring(18);
-      console.log("[TC-13] Manipulated Ciphertext:", manipulatedCiphertext);
+      console.log("[TC-17] Manipulated Ciphertext:", manipulatedCiphertext);
       
       const decrypted = decryptMessage(manipulatedCiphertext, correctSharedSecret);
-      console.log("[TC-13] Decryption Result with Manipulated Ciphertext:", decrypted);
+      console.log("[TC-17] Decryption Result with Manipulated Ciphertext:", decrypted);
       
       expect(["[DECRYPTION_FAILED]", "[ERROR_DECRYPTION_EXCEPTION]"]).toContain(decrypted);
     }, 15000);

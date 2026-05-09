@@ -75,7 +75,17 @@ export const decryptMessage = (
 
   try {
     const bytes = CryptoJS.AES.decrypt(cipherText, secretKey);
-    const originalText = bytes.toString(CryptoJS.enc.Utf8);
+    
+    let originalText = "";
+    try {
+      originalText = bytes.toString(CryptoJS.enc.Utf8);
+    } catch (utf8Error: unknown) {
+      console.warn(
+        "[Crypto Engine Warning] UTF-8 decode error (possibly wrong key or corrupted ciphertext):",
+        utf8Error,
+      );
+      return "[DECRYPTION_FAILED]";
+    }
 
     if (!originalText) {
       console.warn(
