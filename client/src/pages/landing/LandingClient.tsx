@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import ms from "ms";
 import packageJson from "../../../package.json";
+import LandingFooter from "./components/LandingFooter";
 import {
   ChevronRightIcon,
   LoginIcon,
@@ -514,32 +515,7 @@ export default function LandingClient() {
       </section>
 
       {/* FOOTER */}
-      <footer className="py-12 border-t border-zinc-800 z-10 bg-zinc-950">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="SecureP2P Logo"
-              className="w-6 h-6 object-contain opacity-80"
-            />
-            <span className="font-bold text-zinc-300 tracking-wide text-lg">
-              SecureP2P
-            </span>
-            <span className="text-[11px] font-semibold tracking-wide text-indigo-200 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full">
-              {appVersion}
-            </span>
-          </div>
-          <div className="text-center md:text-right text-zinc-500 text-sm">
-            <p>
-              Designed & Developed by{" "}
-              <span className="text-zinc-300 font-medium">Rizki Ramadan</span>
-            </p>
-            <p className="mt-1">
-              Undergraduate Thesis Project &copy; {new Date().getFullYear()}
-            </p>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter appVersion={appVersion} />
     </div>
   );
 }
