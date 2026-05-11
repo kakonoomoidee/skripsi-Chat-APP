@@ -9,7 +9,9 @@
   <img src="https://img.shields.io/badge/WebRTC-P2P_Tunnel-FF6600?style=for-the-badge&logo=webrtc&logoColor=white" alt="WebRTC" />
   <img src="https://img.shields.io/badge/Solidity-Smart_Contract-363636?style=for-the-badge&logo=solidity&logoColor=white" alt="Solidity" />
   <img src="https://img.shields.io/badge/Ethers.js-Web3-2748A5?style=for-the-badge&logo=ethereum&logoColor=white" alt="Ethers.js" />
-
+  <a href="#custom-non-commercial--absolute-privacy-license">
+    <img src="https://img.shields.io/badge/License-Absolute_Privacy-darkred?style=for-the-badge" alt="License" />
+  </a>
   <br/>
   <br/>
 
@@ -53,6 +55,135 @@ By completely removing the central database from the equation, SecureP2P leverag
 2.  **Signaling Phase**: User A wants to chat with User B. They exchange WebRTC Offers/Answers and ECDH Ephemeral Keys via the Socket.io Relay Servers.
 3.  **Direct Connection**: Once the WebRTC tunnel is established, the Relay Server is completely dropped from the communication loop.
 4.  **E2EE Transfer**: Text and Base64 images are encrypted via AES-256 and transmitted directly.
+
+## 🧱 Blockchain / Smart Contract Documentation
+
+### Identity Registry (Purpose)
+
+The `IdentityRegistry` contract is the on-chain source of truth for user identity in SecureP2P Chat. It binds a unique `username` and ECDH `publicKey` to a wallet address and exposes verifiable lookups that the relay server uses during authentication and discovery. This enables gasless onboarding via meta-transactions, prevents username collisions, and allows clients to resolve identities without any centralized database.
+
+**Key responsibilities:**
+
+- ✅ Enforce unique usernames and one-to-one address ownership.
+- ✅ Store the user’s ECDH public key for per-session key exchange.
+- ✅ Verify login signatures for challenge-response authentication.
+- ✅ Provide on-chain lookup methods for address ↔ username resolution.
+
+## 🛰️ Relay Server Documentation
+
+The relay server is a **stateless signaling layer**. It never stores chat content and only brokers WebRTC setup data.
+
+### REST API Endpoints
+
+**Base URL:** `https://<relay-host>`
+
+| Method | Endpoint                  | Description                                               |
+| ------ | ------------------------- | --------------------------------------------------------- |
+| POST   | `/auth/challenge`         | Issues a short-lived nonce for wallet-based login.        |
+| POST   | `/auth/login`             | Verifies signature and returns a JWT for Socket.io auth.  |
+| POST   | `/auth/register`          | Registers a user on-chain (gasless meta-tx).              |
+| GET    | `/auth/address/:username` | Resolves wallet address from a username.                  |
+| GET    | `/auth/user/:address`     | Resolves username from a wallet address.                  |
+| GET    | `/ping`                   | Simple liveness check.                                    |
+| GET    | `/health`                 | Returns relay, chain, and contract health status.         |
+| POST   | `/admin/register-relay`   | Registers this relay in the on-chain registry.            |
+| POST   | `/internal/gossip`        | Internal relay-to-relay signaling sync (requires secret). |
+
+> The `/internal/gossip` endpoint is for relay federation only and should be blocked from public access.
+
+### Socket.io Events (WebRTC Signaling)
+
+**Authentication:** clients connect with `socket.handshake.auth.token` (JWT from `/auth/login`).
+
+**Client → Server:**
+
+- `handshake_init` — start ECDH handshake (payload: `{ to, ephemeralPublicKey }`).
+- `handshake_response` — respond to handshake (payload: `{ to, ephemeralPublicKey }`).
+- `webrtc_signal` — send SDP offers/answers or ICE candidates (payload: `{ to, signal }`).
+
+**Server → Client:**
+
+- `handshake_offer` — forwarded handshake request (payload: `{ from, ephemeralPublicKey }`).
+- `handshake_answer` — forwarded handshake response (payload: `{ from, ephemeralPublicKey }`).
+- `webrtc_signal` — forwarded WebRTC signaling data (payload: `{ from, signal }`).
+- `session_revoked` — forced logout if the same wallet logs in elsewhere.
+
+### REST Response Examples
+
+**GET `/health`**
+
+```json
+{
+  "relay": {
+    "status": "ok",
+    "relayUrl": "https://relay-1.example.com",
+    "knownRelays": 2,
+    "activeConnections": 5,
+    "uptime": "0d 2h 11m 40s"
+  },
+  "network": {
+    "totalNodes": 2,
+    "connectedRelays": [
+      "https://relay-2.example.com",
+      "https://relay-3.example.com"
+    ]
+  },
+  "chain": {
+    "rpcUrl": "http://127.0.0.1:8545",
+    "rpcOk": true,
+    "chainId": 1337,
+    "latestBlock": 128,
+    "clientVersion": "Geth/v1.10.26"
+  },
+  "contracts": [
+    {
+      "name": "Identity Registry",
+      "address": "0x1234567890abcdef1234567890abcdef12345678",
+      "deployed": true
+    },
+    {
+      "name": "Relay Registry",
+      "address": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+      "deployed": true
+    }
+  ]
+}
+```
+
+## 🖥️ Client Documentation
+
+### `src` Folder Structure
+
+```
+src/
+  assets/
+  components/
+  context/
+  hooks/
+  layouts/
+  pages/
+  services/
+  store/
+  utils/
+```
+
+- **assets/** — Static images, fonts, and UI assets used across the app.
+- **components/** — Reusable UI components grouped by feature (auth, chat, settings, UI).
+- **context/** — React context providers for cross-cutting state (chat, reply bubbles).
+- **hooks/** — Feature-scoped hooks for auth, chat, security, network, and UI logic.
+- **layouts/** — App-level layouts that compose shared structure like sidebars and auth shells.
+- **pages/** — Route-level screens for auth, chat, and landing views.
+- **services/** — API and Web3 service clients (wallet, contacts, relay APIs).
+- **store/** — State management and persistence helpers (Zustand stores and session state).
+- **utils/** — Low-level utilities for crypto, storage, network, media, and platform glue.
+
+### Zero Data Retention + WebRTC Tunneling (Client Flow)
+
+- ✅ The client **never posts messages to the relay**. It uses the relay only to exchange WebRTC offers/answers and ephemeral ECDH keys.
+- ✅ After the handshake, peers derive a **session AES-256 key** locally and drop the relay from the data path.
+- ✅ All message payloads are **encrypted locally** before transmission and decrypted only on the recipient device.
+- ✅ Chat history is stored **locally in IndexedDB** and can be encrypted/exported; no server-side persistence exists.
+- ✅ If the relay disconnects, the **P2P data channel remains active** as long as both peers stay connected.
 
 ## 🚀 Installation & Setup
 
@@ -210,5 +341,49 @@ sudo nginx -t && sudo systemctl reload nginx
 This application is developed as an academic prototype for a university thesis. While it implements industry-standard cryptographic libraries, the smart contracts and signaling logic have not undergone professional security audits.
 
 ---
+
+## Environment Variables (.env)
+
+Create a `.env` file in each workspace with the following minimum structure.
+
+**apps/relay-server/.env**
+
+```env
+PORT=3001
+REDIS_URL=redis://127.0.0.1:6379
+RPC_URL=http://127.0.0.1:8545
+CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+RELAY_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000
+```
+
+**apps/client/.env**
+
+```env
+VITE_DEFAULT_RELAY_URL=https://relay-1.example.com
+VITE_RPC_URL=http://127.0.0.1:8545
+VITE_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+```
+
+## Testing Guide
+
+**Smart Contracts (Hardhat):**
+
+```bash
+cd apps/blockchain
+npm test
+```
+
+**Client (Vitest):**
+
+```bash
+cd apps/client
+npm run test
+```
+
+## Custom Non-Commercial & Absolute Privacy License
+
+**Rule 1 (Non-Commercial):** You may study, modify, and distribute this code for community or academic research purposes. You are strictly forbidden to sell, re-license, or monetize the application or any derivative work in any form.
+
+**Rule 2 (Absolute Decentralization / Zero Data Retention Clause):** This repository is explicitly built for zero data retention. You are strictly forbidden to modify the server code to add any central database (such as MySQL or MongoDB) or to create endpoints designed to intercept, store, or track user message history, media, or cryptographic keys. User privacy is non-negotiable.
 
 _Developed with ☕ by kakonoomoide_
