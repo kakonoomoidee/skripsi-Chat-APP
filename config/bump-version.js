@@ -6,12 +6,13 @@
  * apps/config/bump-version.js
  *
  * Usage:
- * node bump-version.js patch
- * node bump-version.js minor
- * node bump-version.js major
+ * node bump-version.js patch [tag]
+ * node bump-version.js minor [tag]
+ * node bump-version.js major [tag]
  *
  * Example:
  * 1.10.0 + patch = 1.10.1
+ * 1.10.0 + patch backburner = 1.10.1-backburner
  * 1.10.0 + minor = 1.11.0
  * 1.10.0 + major = 2.0.0
  *
@@ -33,13 +34,10 @@ const { execSync } = require("child_process");
 // =====================================
 const ROOT = path.resolve(__dirname, "..");
 
-const apps = [
-  "blockchain",
-  "client",
-  "relay-server"
-];
+const apps = ["blockchain", "client", "relay-server"];
 
 const type = process.argv[2]; // patch / minor / major
+const customTag = process.argv[3];
 
 // =====================================
 // LOGGING
@@ -72,8 +70,22 @@ if (!["patch", "minor", "major"].includes(type)) {
 // =====================================
 // VERSION HELPERS
 // =====================================
-function bumpVersion(version, mode) {
-  let [major, minor, patch] = version.split(".").map(Number);
+/**
+ * Bumps a SemVer version and optionally appends a prerelease tag.
+ * @param {string} version - The current version string from package.json.
+ * @param {string} mode - The bump type: patch, minor, or major.
+ * @param {string|undefined} tag - Optional prerelease tag to append.
+ * @returns {string} The bumped version string.
+ */
+function bumpVersion(version, mode, tag) {
+  const baseVersion = version.split("-")[0];
+  const match = baseVersion.match(/^(\d+)\.(\d+)\.(\d+)$/);
+
+  if (!match) {
+    throw new Error(`Invalid version format: ${version}`);
+  }
+
+  let [major, minor, patch] = match.slice(1).map(Number);
 
   if (mode === "patch") {
     patch += 1;
@@ -90,7 +102,13 @@ function bumpVersion(version, mode) {
     patch = 0;
   }
 
-  return `${major}.${minor}.${patch}`;
+  const bumped = `${major}.${minor}.${patch}`;
+
+  if (tag) {
+    return `${bumped}-${tag}`;
+  }
+
+  return bumped;
 }
 
 function getCurrentVersion() {
@@ -109,11 +127,7 @@ function updatePackage(appName, newVersion) {
     const json = JSON.parse(fs.readFileSync(file, "utf8"));
     json.version = newVersion;
 
-    fs.writeFileSync(
-      file,
-      JSON.stringify(json, null, 2) + "\n",
-      "utf8"
-    );
+    fs.writeFileSync(file, JSON.stringify(json, null, 2) + "\n", "utf8");
 
     success(`${appName}: updated to ${newVersion}`);
   } catch (err) {
@@ -130,7 +144,7 @@ function runInstall(appName) {
 
     execSync("npm install", {
       cwd: path.join(ROOT, appName),
-      stdio: "inherit"
+      stdio: "inherit",
     });
 
     success(`${appName}: npm install done`);
@@ -149,13 +163,13 @@ function gitCommit(oldVersion, newVersion) {
     log("Running git add .");
     execSync("git add .", {
       cwd: ROOT,
-      stdio: "inherit"
+      stdio: "inherit",
     });
 
     log(`Running git commit`);
     execSync(`git commit -m "${message}"`, {
       cwd: ROOT,
-      stdio: "inherit"
+      stdio: "inherit",
     });
 
     success(`Git commit created: ${message}`);
@@ -173,11 +187,12 @@ function gitCommit(oldVersion, newVersion) {
   console.log("===================================\n");
 
   const oldVersion = getCurrentVersion();
-  const newVersion = bumpVersion(oldVersion, type);
+  const newVersion = bumpVersion(oldVersion, type, customTag);
 
   log(`Version mode : ${type}`);
   log(`Old version  : ${oldVersion}`);
-  log(`New version  : ${newVersion}\n`);
+  log(`New version  : ${newVersion}`);
+  log(`Tag          : ${customTag || "none"}\n`);
 
   for (const app of apps) {
     updatePackage(app, newVersion);
