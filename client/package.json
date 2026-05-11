@@ -1,7 +1,7 @@
 {
   "name": "securep2p-client",
   "private": true,
-  "version": "1.12.0",
+  "version": "1.12.1-Natrium",
   "description": "Frontend client for SecureP2P chat application built with Vite, React, and WebRTC.",
   "type": "module",
   "scripts": {
