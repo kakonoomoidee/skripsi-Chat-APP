@@ -99,10 +99,17 @@ const initRelayService = () => {
  */
 const getKnownRelaysCount = () => knownRelays.length;
 
+/**
+ * Retrieves the current list of known relay URLs.
+ * @returns {string[]} The array of known relay URLs.
+ */
+const getKnownRelaysArray = () => [...knownRelays];
+
 module.exports = {
   syncRelaysFromBlockchain,
   checkAndAutoRegister,
   gossipToOtherRelays,
   initRelayService,
   getKnownRelaysCount,
+  getKnownRelaysArray,
 };
