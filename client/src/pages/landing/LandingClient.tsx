@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import ms from "ms";
+import packageJson from "../../../package.json";
 import {
   ChevronRightIcon,
   LoginIcon,
@@ -24,6 +25,7 @@ export default function LandingClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const fullText = "Leaving A Trace.";
+  const appVersion = `v${packageJson.version}`;
 
   // Looping Typewriter Effect
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function LandingClient() {
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-linear-to-b from-red-500/10 to-zinc-950 border border-red-500/20 p-10 rounded-4xl relative overflow-hidden group hover:border-red-500/40 transition-colors duration-500">
               <div className="absolute top-0 right-0 p-6 w-48 h-48 text-red-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500 transform origin-top-right">
-              <ServerCrossIcon className="w-full h-full" />
+                <ServerCrossIcon className="w-full h-full" />
               </div>
               <h3 className="text-2xl font-bold mb-6 text-red-400 flex items-center gap-3">
                 <div className="w-6 h-6">
@@ -522,6 +524,9 @@ export default function LandingClient() {
             />
             <span className="font-bold text-zinc-300 tracking-wide text-lg">
               SecureP2P
+            </span>
+            <span className="text-[11px] font-semibold tracking-wide text-indigo-200 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+              {appVersion}
             </span>
           </div>
           <div className="text-center md:text-right text-zinc-500 text-sm">
