@@ -150,7 +150,6 @@ export default function Web3Wallet(): React.JSX.Element {
     setImportSeedPhrase("");
   };
 
-
   /**
    * Validates the withdrawal inputs against the safe maximum (balance minus gas)
    * before opening the seed-phrase confirmation modal.
