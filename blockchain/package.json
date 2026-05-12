@@ -1,6 +1,6 @@
 {
   "name": "securep2p-blockchain",
-  "version": "1.12.2-Aries",
+  "version": "1.12.3-Aries",
   "description": "Smart contracts and Truffle configuration for SecureP2P decentralized identity and relay management.",
   "main": "truffle-config.js",
   "scripts": {

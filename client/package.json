@@ -1,7 +1,7 @@
 {
   "name": "securep2p-client",
   "private": true,
-  "version": "1.12.2-Aries",
+  "version": "1.12.3-Aries",
   "description": "Frontend client for SecureP2P chat application built with Vite, React, and WebRTC.",
   "type": "module",
   "scripts": {
