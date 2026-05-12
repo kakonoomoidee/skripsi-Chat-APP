@@ -57,6 +57,7 @@ export default function Web3Wallet(): React.JSX.Element {
   const [newInternalSeed, setNewInternalSeed] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [importError, setImportError] = useState<string>("");
+  const [importSeedPhrase, setImportSeedPhrase] = useState<string>("");
 
   const [copiedWalletAddr, setCopiedWalletAddr] = useState<boolean>(false);
   const [withdrawAddress, setWithdrawAddress] = useState<string>("");
@@ -108,6 +109,7 @@ export default function Web3Wallet(): React.JSX.Element {
       setTxWalletAddress(address);
       setTxWalletType("internal");
       setIsImportModalOpen(false);
+      setImportSeedPhrase("");
     } catch {
       setImportError("Invalid seed phrase.");
     } finally {
@@ -145,7 +147,9 @@ export default function Web3Wallet(): React.JSX.Element {
     setTxWalletAddress(null);
     setTxWalletType(null);
     clearWalletLinkage();
+    setImportSeedPhrase("");
   };
+
 
   /**
    * Validates the withdrawal inputs against the safe maximum (balance minus gas)
@@ -465,9 +469,12 @@ export default function Web3Wallet(): React.JSX.Element {
         onClose={() => {
           setIsImportModalOpen(false);
           setImportError("");
+          setImportSeedPhrase("");
         }}
         onImport={handleImportInternalWallet}
         importError={importError}
+        seedPhrase={importSeedPhrase}
+        onSeedPhraseChange={setImportSeedPhrase}
       />
 
       <WithdrawalModal

@@ -1,7 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { SeedPhraseModalInput } from "@/components/ui";
-import { useSeedInputModal } from "@/hooks/ui/useSeedInputModal";
 
 export interface ImportWalletModalProps {
   isOpen: boolean;
@@ -9,6 +8,8 @@ export interface ImportWalletModalProps {
   onClose: () => void;
   onImport: (phrase: string) => void;
   importError: string;
+  seedPhrase: string;
+  onSeedPhraseChange: (value: string) => void;
 }
 
 /**
@@ -23,9 +24,10 @@ export default function ImportWalletModal({
   onClose,
   onImport,
   importError,
+  seedPhrase,
+  onSeedPhraseChange,
 }: ImportWalletModalProps): React.JSX.Element | null {
-  const { seedInput, setSeedInput, clearSeedInput, canSubmit } =
-    useSeedInputModal();
+  const canSubmit = Boolean(seedPhrase.trim());
 
   if (!isOpen || typeof document === "undefined") return null;
 
@@ -37,8 +39,8 @@ export default function ImportWalletModal({
         </h3>
 
         <SeedPhraseModalInput
-          value={seedInput}
-          onChange={setSeedInput}
+          value={seedPhrase}
+          onChange={onSeedPhraseChange}
           disabled={isConnecting}
         />
 
@@ -50,7 +52,6 @@ export default function ImportWalletModal({
         <div className="flex gap-3 mt-4">
           <button
             onClick={() => {
-              clearSeedInput();
               onClose();
             }}
             className="flex-1 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:bg-zinc-800 transition-colors"
@@ -58,7 +59,7 @@ export default function ImportWalletModal({
             Cancel
           </button>
           <button
-            onClick={() => onImport(seedInput)}
+            onClick={() => onImport(seedPhrase)}
             disabled={!canSubmit || isConnecting}
             className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50"
           >
