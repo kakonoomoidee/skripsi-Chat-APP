@@ -6,9 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "start:relayprod1": "cross-env PORT=3001 RELAY_PUBLIC_URL=https://10.64.24.248:4431 RELAYER_PRIVATE_KEY=0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3 node server.js",
-    "start:relayprod2": "cross-env PORT=3002 RELAY_PUBLIC_URL=https://10.64.24.248:4432 RELAYER_PRIVATE_KEY=0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f node server.js",
-    "start:relayprod3": "cross-env PORT=3003 RELAY_PUBLIC_URL=https://10.64.24.248:4433 RELAYER_PRIVATE_KEY=0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c673636790f1b8ad91193c05875ef1 node server.js",
+    "start:relayprod1": "cross-env PORT=3001 RELAY_PUBLIC_URL=https://10.64.24.248:4431 RELAYER_PRIVATE_KEY=0x7bbbc8af12df0f9bace251b96a581aea92d21d46d19fc16f050f3e216b3b3284 node server.js",
+    "start:relayprod2": "cross-env PORT=3002 RELAY_PUBLIC_URL=https://10.64.24.248:4432 RELAYER_PRIVATE_KEY=0x0e760fcf12ece7408de41f8f3510201c9f74cd685383d714ebc578198b9d4b56 node server.js",
+    "start:relayprod3": "cross-env PORT=3003 RELAY_PUBLIC_URL=https://10.64.24.248:4433 RELAYER_PRIVATE_KEY=0xf408f30363934f5574257a8d2cf77a69660a3018ba408ab2aa8299567d0bc340 node server.js",
     "start:relaydev1": "cross-env PORT=3001 RELAY_PUBLIC_URL=http://localhost:3001 RELAYER_PRIVATE_KEY=0x5ed4ff1a209b5c3279a8c72644bc4f453f9979a4f296024ad987aba6e9cf8b8d node server.js",
     "start:relaydev2": "cross-env PORT=3002 RELAY_PUBLIC_URL=http://localhost:3002 RELAYER_PRIVATE_KEY=0xa1007c6a2c6d5c7815c6da6f530d6cf8a04a1454e09592ce36b0f57bd2f0823c node server.js",
     "start:relaydev3": "cross-env PORT=3003 RELAY_PUBLIC_URL=http://localhost:3003 RELAYER_PRIVATE_KEY=0x576ab2cae6c01f0a567b3cc45d4ffa2f23d1c6f73a31754ded668d43e3cef3ce node server.js"
