@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { RelaySelector, RelayStatusBadge } from "@/components/ui";
-import { useRelayPing } from "@/hooks/network/useRelayPing";
+import { pingRelayNode } from "@/utils/network/relay";
 
 /**
  * Interface defining the properties for the AuthRelayControl component.
@@ -32,7 +33,38 @@ export default function AuthRelayControl({
   addCustomRelay,
   size = "md",
 }: AuthRelayControlProps): React.JSX.Element {
-  const { isRelayAlive, isPinging } = useRelayPing(activeRelay);
+  const [isRelayAlive, setIsRelayAlive] = useState<boolean>(false);
+  const [isPinging, setIsPinging] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsPinging(true);
+    setIsRelayAlive(false);
+
+    if (!activeRelay) {
+      setIsPinging(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    pingRelayNode(activeRelay)
+      .then((isAlive) => {
+        if (!isMounted) return;
+        setIsRelayAlive(isAlive);
+        setIsPinging(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setIsRelayAlive(false);
+        setIsPinging(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeRelay]);
 
   return (
     <div className="relative pt-1">
