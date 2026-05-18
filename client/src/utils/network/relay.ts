@@ -3,7 +3,7 @@ export type RelayHealth = "pinging" | "online" | "offline";
 const RELAY_PING_TIMEOUT_MS = 5000;
 
 /**
- * Attempts to verify relay reachability via WebSocket.
+ * Attempts to verify relay reachability via HTTP(S) or WebSocket.
  *
  * @param {string} url - Relay endpoint URL.
  * @returns {Promise<boolean>} True when the relay responds, otherwise false.
@@ -12,15 +12,36 @@ export const pingRelayNode = async (url: string): Promise<boolean> => {
   if (!url) return false;
 
   const normalized = url.trim();
-  const wsUrl = normalized
-    .replace(/^https:\/\//i, "wss://")
-    .replace(/^http:\/\//i, "ws://");
+  if (/^https?:/i.test(normalized)) {
+    try {
+      const baseUrl = normalized.replace(/\/$/, "");
+      const httpUrl = `${baseUrl}/ping`;
 
-  if (!/^wss?:/i.test(wsUrl)) return false;
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        RELAY_PING_TIMEOUT_MS,
+      );
+
+      const response = await fetch(httpUrl, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      window.clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  if (!/^wss?:/i.test(normalized)) return false;
 
   return new Promise((resolve) => {
     let settled = false;
-    const socket = new WebSocket(wsUrl);
+    const socket = new WebSocket(normalized);
     const timeoutId = window.setTimeout(() => {
       if (settled) return;
       settled = true;
