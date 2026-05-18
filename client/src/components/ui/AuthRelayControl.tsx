@@ -38,31 +38,40 @@ export default function AuthRelayControl({
 
   useEffect(() => {
     let isMounted = true;
+    let intervalId: number | null = null;
 
-    setIsPinging(true);
-    setIsRelayAlive(false);
-
-    if (!activeRelay) {
-      setIsPinging(false);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    pingRelayNode(activeRelay)
-      .then((isAlive) => {
+    const runPing = (): void => {
+      if (!activeRelay) {
         if (!isMounted) return;
-        setIsRelayAlive(isAlive);
         setIsPinging(false);
-      })
-      .catch(() => {
-        if (!isMounted) return;
         setIsRelayAlive(false);
-        setIsPinging(false);
-      });
+        return;
+      }
+
+      if (isMounted) {
+        setIsPinging(true);
+        setIsRelayAlive(false);
+      }
+
+      pingRelayNode(activeRelay)
+        .then((isAlive) => {
+          if (!isMounted) return;
+          setIsRelayAlive(isAlive);
+          setIsPinging(false);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setIsRelayAlive(false);
+          setIsPinging(false);
+        });
+    };
+
+    runPing();
+    intervalId = window.setInterval(runPing, 15000);
 
     return () => {
       isMounted = false;
+      if (intervalId !== null) window.clearInterval(intervalId);
     };
   }, [activeRelay]);
 
