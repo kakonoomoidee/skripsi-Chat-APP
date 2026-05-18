@@ -257,7 +257,7 @@ Use PM2 to keep all backend services alive in the background.
 
 ```bash
 # Ganache
-pm2 start ganache --name "ganache" -- -h 127.0.0.1 -p 8545 -m "check tongue that exhaust miss voyage maple velvet wheel learn food scare"
+pm2 start ganache --name "ganache" -- -h 0.0.0.0 -p 8545 -m "check tongue that exhaust miss voyage maple velvet wheel learn food scare"
 
 # Relay Server 1
 pm2 start npm --name "relay1" -- run start:relayprod1
