@@ -26,8 +26,7 @@ export const pingRelayNode = async (url: string): Promise<boolean> => {
       settled = true;
       try {
         socket.close();
-      } catch {
-      }
+      } catch {}
       resolve(false);
     }, RELAY_PING_TIMEOUT_MS);
 
@@ -37,8 +36,7 @@ export const pingRelayNode = async (url: string): Promise<boolean> => {
       window.clearTimeout(timeoutId);
       try {
         socket.close();
-      } catch {
-      }
+      } catch {}
       resolve(result);
     };
 
