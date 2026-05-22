@@ -22,11 +22,11 @@ interface LogEntry {
 }
 
 const LOG_COLORS: Record<LogEntry["type"], string> = {
-  info: "text-zinc-400",
-  success: "text-emerald-400",
-  key: "text-amber-400",
-  cipher: "text-cyan-400",
-  warning: "text-yellow-500",
+  info: "text-zinc-500",
+  success: "text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]",
+  key: "text-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]",
+  cipher: "text-cyan-400 font-bold tracking-widest drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]",
+  warning: "text-rose-400 border-l-2 border-rose-500/50 pl-3 py-1 bg-rose-500/5",
 };
 
 /**
@@ -92,7 +92,7 @@ export default function ECDHSection() {
       },
       {
         entry: {
-          text: `--- Public keys exchanged over insecure channel ---`,
+          text: `--- PUBLIC KEYS EXCHANGED OVER INSECURE CHANNEL ---`,
           type: "warning",
         },
         delay: 700,
@@ -113,21 +113,21 @@ export default function ECDHSection() {
       },
       {
         entry: {
-          text: `MATCH CONFIRMED: ${sAlice} === ${sBob}`,
+          text: `[SYSTEM] MATCH CONFIRMED: ${sAlice} === ${sBob}`,
           type: "success",
         },
         delay: 700,
       },
       {
         entry: {
-          text: `Encrypting "${message}" with AES-256 using key ${sAlice} ...`,
+          text: `[AES-GCM] Encrypting payload with derived symmetric key...`,
           type: "info",
         },
         delay: 600,
       },
       {
-        entry: { text: `Ciphertext: 0x${ciphertext}`, type: "cipher" },
-        delay: 500,
+        entry: { text: `CIPHERTEXT OUTPUT: 0x${ciphertext}`, type: "cipher" },
+        delay: 800,
       },
     ];
 
@@ -150,75 +150,95 @@ export default function ECDHSection() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="text-center max-w-2xl mx-auto">
-        <h3 className="text-2xl md:text-3xl font-bold text-cyan-400 mb-3">
+    <div className="space-y-10">
+      <div className="text-center max-w-3xl mx-auto space-y-4">
+        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
           ECDH Key Exchange + AES-256
         </h3>
-        <p className="text-zinc-400 text-sm leading-relaxed">
+        <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           Two parties independently compute an identical shared secret without
           ever transmitting it. This secret then serves as the symmetric key for
-          AES-256 encryption of all messages.
+          military-grade AES-256 encryption.
         </p>
       </div>
 
-      <div className="max-w-2xl mx-auto space-y-4">
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
-          <label className="text-[11px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-3 block">
-            Plaintext Message
-          </label>
-          <input
-            id="ecdh-message-input"
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Enter a message to encrypt..."
-            maxLength={64}
-            disabled={isRunning}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-white font-mono focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder:text-zinc-700 disabled:opacity-50"
-          />
-        </div>
+      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="md:col-span-5 flex flex-col gap-6">
+          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 flex-1 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+              Plaintext Message
+            </label>
+            <textarea
+              id="ecdh-message-input"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Enter sensitive payload to encrypt..."
+              maxLength={120}
+              disabled={isRunning}
+              rows={4}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-cyan-300 font-mono text-sm focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner resize-none disabled:opacity-50"
+            />
+          </div>
 
-        <div className="flex gap-4 justify-center">
-          <button
-            id="ecdh-derive-btn"
-            onClick={handleDerive}
-            disabled={!message.trim() || isRunning}
-            className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] disabled:shadow-none"
-          >
-            {isRunning ? "Processing..." : "Derive Secret & Encrypt"}
-          </button>
-          {logs.length > 0 && !isRunning && (
+          <div className="flex flex-col gap-3">
             <button
-              onClick={handleReset}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-6 py-3 rounded-xl font-medium transition-colors"
+              id="ecdh-derive-btn"
+              onClick={handleDerive}
+              disabled={!message.trim() || isRunning}
+              className="w-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-cyan-500/20 hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] disabled:shadow-none"
             >
-              Reset
+              {isRunning ? "PROCESSING PIPELINE..." : "DERIVE SECRET & ENCRYPT"}
             </button>
-          )}
+            {logs.length > 0 && !isRunning && (
+              <button
+                onClick={handleReset}
+                className="w-full bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-400 px-6 py-4 rounded-xl font-medium transition-all"
+              >
+                Clear Terminal
+              </button>
+            )}
+          </div>
         </div>
 
-        {logs.length > 0 && (
+        <div className="md:col-span-7 bg-[#050505] border border-white/5 rounded-3xl overflow-hidden relative shadow-[0_0_40px_rgba(0,0,0,0.8)] flex flex-col h-[400px]">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/50 to-blue-600/50" />
+          <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Protocol Terminal</span>
+            </div>
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50" />
+            </div>
+          </div>
+          
           <div
             ref={logRef}
-            className="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 font-mono text-xs md:text-sm max-h-80 overflow-y-auto space-y-1.5 animate-in fade-in duration-300"
+            className="flex-1 p-6 font-mono text-[13px] md:text-sm overflow-y-auto space-y-3 relative"
           >
+            {logs.length === 0 && !isRunning && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                <span className="text-zinc-600">Awaiting execution...</span>
+              </div>
+            )}
             {logs.map((log, idx) => (
               <div
                 key={idx}
-                className={`${LOG_COLORS[log.type]} animate-in slide-in-from-left-2 fade-in duration-200`}
+                className={`${LOG_COLORS[log.type]} animate-in slide-in-from-bottom-2 fade-in duration-300`}
               >
-                <span className="text-zinc-700 select-none mr-2">{">"}</span>
+                {log.type !== "warning" && <span className="text-zinc-600 select-none mr-3">{">"}</span>}
                 {log.text}
               </div>
             ))}
             {isRunning && (
-              <div className="text-zinc-600 animate-pulse">
-                <span className="text-zinc-700 select-none mr-2">{">"}</span>_
+              <div className="text-cyan-500/50 animate-pulse mt-2">
+                <span className="text-zinc-600 select-none mr-3">{">"}</span>_
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

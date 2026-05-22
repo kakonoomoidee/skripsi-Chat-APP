@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 /**
- * Interactive demonstration of Elliptic Curve Cryptography key generation using Canvas API.
+ * Interactive demonstration of Elliptic Curve Cryptography using Canvas API.
  * @returns {JSX.Element}
  */
 export default function ECCSection() {
@@ -21,7 +21,16 @@ export default function ECCSection() {
   ) => {
     ctx.clearRect(0, 0, width, height);
 
-    ctx.strokeStyle = "#3f3f46";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < width; i += scale) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+    }
+    for (let i = 0; i < height; i += scale) {
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, offsetY);
@@ -30,7 +39,9 @@ export default function ECCSection() {
     ctx.lineTo(offsetX, height);
     ctx.stroke();
 
-    ctx.strokeStyle = "#818cf8";
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(99, 102, 241, 0.5)";
+    ctx.strokeStyle = "#818cf8"; 
     ctx.lineWidth = 2;
     ctx.beginPath();
     let first = true;
@@ -71,18 +82,23 @@ export default function ECCSection() {
       }
     }
     ctx.stroke();
+    ctx.shadowBlur = 0; 
 
     const gX = 1;
     const gY = 1;
     const pxG = offsetX + gX * scale;
     const pyG = offsetY - gY * scale;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#34d399";
     ctx.fillStyle = "#34d399";
     ctx.beginPath();
-    ctx.arc(pxG, pyG, 4, 0, Math.PI * 2);
+    ctx.arc(pxG, pyG, 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = "12px monospace";
-    ctx.fillText("G(1, 1)", pxG + 8, pyG - 8);
+    ctx.shadowBlur = 0;
+    
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.font = "11px monospace";
+    ctx.fillText("G(1, 1)", pxG + 10, pyG - 10);
   };
 
   useEffect(() => {
@@ -155,18 +171,18 @@ export default function ECCSection() {
       const currentStepIdx = Math.min(Math.floor(elapsed / durationPerBounce), steps.length - 1);
       const stepElapsed = elapsed - currentStepIdx * durationPerBounce;
 
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.5;
       for (let i = 0; i < currentStepIdx; i++) {
         const step = steps[i];
 
-        ctx.strokeStyle = "rgba(244, 63, 94, 0.4)";
+        ctx.strokeStyle = "rgba(244, 63, 94, 0.6)";
         ctx.beginPath();
         ctx.moveTo(offsetX + step.start.x * scale, offsetY - step.start.y * scale);
         ctx.lineTo(offsetX + step.intersect.x * scale, offsetY - step.intersect.y * scale);
         ctx.stroke();
 
         ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = "rgba(52, 211, 153, 0.4)";
+        ctx.strokeStyle = "rgba(52, 211, 153, 0.6)";
         ctx.beginPath();
         ctx.moveTo(offsetX + step.intersect.x * scale, offsetY - step.intersect.y * scale);
         ctx.lineTo(offsetX + step.end.x * scale, offsetY - step.end.y * scale);
@@ -174,9 +190,12 @@ export default function ECCSection() {
         ctx.setLineDash([]);
 
         ctx.fillStyle = "#34d399";
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#34d399";
         ctx.beginPath();
         ctx.arc(offsetX + step.end.x * scale, offsetY - step.end.y * scale, 3, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
 
       if (elapsed < totalDuration) {
@@ -190,18 +209,21 @@ export default function ECCSection() {
         const endPx = offsetX + step.end.x * scale;
         const endPy = offsetY - step.end.y * scale;
 
+        ctx.shadowBlur = 5;
         if (stepElapsed < halfDuration) {
           const p = stepElapsed / halfDuration;
           const curPx = startPx + (intPx - startPx) * p;
           const curPy = startPy + (intPy - startPy) * p;
 
-          ctx.strokeStyle = "rgba(244, 63, 94, 0.8)";
+          ctx.shadowColor = "rgba(244, 63, 94, 1)";
+          ctx.strokeStyle = "rgba(244, 63, 94, 1)";
           ctx.beginPath();
           ctx.moveTo(startPx, startPy);
           ctx.lineTo(curPx, curPy);
           ctx.stroke();
         } else {
-          ctx.strokeStyle = "rgba(244, 63, 94, 0.8)";
+          ctx.shadowColor = "rgba(244, 63, 94, 1)";
+          ctx.strokeStyle = "rgba(244, 63, 94, 1)";
           ctx.beginPath();
           ctx.moveTo(startPx, startPy);
           ctx.lineTo(intPx, intPy);
@@ -212,13 +234,15 @@ export default function ECCSection() {
           const curPy = intPy + (endPy - intPy) * p;
 
           ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = "rgba(52, 211, 153, 0.8)";
+          ctx.shadowColor = "rgba(52, 211, 153, 1)";
+          ctx.strokeStyle = "rgba(52, 211, 153, 1)";
           ctx.beginPath();
           ctx.moveTo(intPx, intPy);
           ctx.lineTo(curPx, curPy);
           ctx.stroke();
           ctx.setLineDash([]);
         }
+        ctx.shadowBlur = 0;
         animationRef.current = requestAnimationFrame(animate);
       } else {
         setPublicKey(current);
@@ -226,10 +250,13 @@ export default function ECCSection() {
 
         const px = offsetX + current.x * scale;
         const py = offsetY - current.y * scale;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#10b981";
         ctx.fillStyle = "#10b981";
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
     };
 
@@ -251,12 +278,12 @@ export default function ECCSection() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="text-center max-w-2xl mx-auto">
-        <h3 className="text-2xl md:text-3xl font-bold text-indigo-400 mb-3">
+    <div className="space-y-10">
+      <div className="text-center max-w-3xl mx-auto space-y-4">
+        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.3)]">
           Elliptic Curve Cryptography
         </h3>
-        <p className="text-zinc-400 text-sm leading-relaxed">
+        <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           A Public Key is derived from a Private Key through scalar
           multiplication with a fixed Generator Point (G) on an elliptic curve.
           This one-way mathematical function is computationally infeasible to
@@ -264,10 +291,11 @@ export default function ECCSection() {
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 items-start">
-        <div className="w-full md:w-1/3 space-y-6">
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 hover:border-indigo-500/30 transition-colors">
-            <label className="text-[11px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block">
+      <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+        <div className="w-full lg:w-1/3 space-y-6 flex flex-col justify-between">
+          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
               Private Key (bounces)
             </label>
             <input
@@ -281,56 +309,57 @@ export default function ECCSection() {
                 setPublicKey(null);
               }}
               placeholder="e.g. 5"
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-white font-mono text-lg focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder:text-zinc-700"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-indigo-300 font-mono text-xl focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner"
             />
-            <p className="text-[11px] text-zinc-600 mt-2">
-              Number of point additions starting from G(1, 1).
+            <p className="text-[11px] text-zinc-500 mt-4 leading-relaxed font-light">
+              Number of geometric point additions starting from G(1, 1).
             </p>
           </div>
           
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <button
               id="ecc-generate-btn"
               onClick={handleGenerate}
               disabled={!privateKey || parseInt(privateKey, 10) <= 0 || isAnimating}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)] disabled:shadow-none"
+              className="group relative w-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-indigo-500/20 hover:shadow-[0_0_30px_rgba(99,102,241,0.2)] disabled:shadow-none overflow-hidden"
             >
-              {isAnimating ? "Calculating..." : "Generate Public Key"}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full" />
+              {isAnimating ? "CALCULATING..." : "GENERATE PUBLIC KEY"}
             </button>
             {(publicKey || isAnimating) && (
               <button
                 onClick={handleReset}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-6 py-3 rounded-xl font-medium transition-colors"
+                className="w-full bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-400 px-6 py-4 rounded-xl font-medium transition-all"
               >
-                Reset
+                Reset Canvas
               </button>
             )}
           </div>
           
           {publicKey !== null && (
-            <div className="bg-zinc-900/40 border border-indigo-500/20 rounded-2xl p-6 animate-in slide-in-from-bottom-2 fade-in duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <span className="text-indigo-400 font-semibold text-sm">
-                  Final Public Key
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden animate-in zoom-in-95 fade-in duration-500">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] rounded-full pointer-events-none" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+                <span className="text-emerald-400/80 font-bold text-xs uppercase tracking-widest">
+                  Derived Public Key
                 </span>
               </div>
-              <p className="text-emerald-400 text-lg font-mono mb-1">
-                x: {publicKey.x.toFixed(4)}
-              </p>
-              <p className="text-emerald-400 text-lg font-mono mb-2">
-                y: {publicKey.y.toFixed(4)}
-              </p>
+              <div className="space-y-1 font-mono text-lg text-emerald-300/90 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">
+                <p>X: {publicKey.x.toFixed(4)}</p>
+                <p>Y: {publicKey.y.toFixed(4)}</p>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="w-full md:w-2/3 bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+        <div className="w-full lg:w-2/3 relative rounded-[2rem] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] group bg-black/50">
+          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
           <canvas
             ref={canvasRef}
             width={600}
             height={400}
-            className="w-full h-auto bg-zinc-950 rounded-xl"
+            className="w-full h-full block"
           />
         </div>
       </div>

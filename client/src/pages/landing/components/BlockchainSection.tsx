@@ -148,55 +148,61 @@ export default function BlockchainSection() {
       done: phase !== "idle" && phase !== "creating",
     },
     {
-      label: "Sign Tx",
+      label: "Sign Payload",
       active: phase === "signing",
       done: ["mining", "confirmed", "appended"].includes(phase),
     },
     {
-      label: "Mine Block",
+      label: "PoW Mining",
       active: phase === "mining",
       done: phase === "confirmed" || phase === "appended",
     },
     {
-      label: "Append",
+      label: "Consensus",
       active: phase === "confirmed",
       done: phase === "appended",
     },
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="text-center max-w-2xl mx-auto">
-        <h3 className="text-2xl md:text-3xl font-bold text-emerald-400 mb-3">
-          Blockchain Identity Registry
+    <div className="space-y-10">
+      <div className="text-center max-w-3xl mx-auto space-y-4">
+        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+          Distributed Registry
         </h3>
-        <p className="text-zinc-400 text-sm leading-relaxed">
-          Register your username on the blockchain. The transaction is signed
-          with your private key, mined via Proof-of-Work, and permanently
-          appended to the distributed ledger.
+        <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
+          Register your global identity. The transaction is signed locally, mined via
+          Proof-of-Work to prevent spam, and permanently secured on the immutable
+          public ledger.
         </p>
       </div>
 
-      <div className="max-w-xl mx-auto">
-        <div className="flex items-center justify-between">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-full px-6 py-4 backdrop-blur-md">
           {phaseSteps.map((step, idx) => (
-            <div key={step.label} className="flex items-center flex-1">
-              <div className="flex flex-col items-center">
+            <div key={step.label} className="flex items-center flex-1 last:flex-none">
+              <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-inner ${
                     step.done
-                      ? "bg-emerald-500 text-zinc-950"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
                       : step.active
-                        ? "bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 animate-pulse"
-                        : "bg-zinc-800 text-zinc-600 border border-zinc-700"
+                        ? "bg-emerald-500/10 border-2 border-emerald-400 text-emerald-300 animate-[pulse_2s_infinite] shadow-[0_0_20px_rgba(16,185,129,0.6)]"
+                        : "bg-black/50 text-zinc-600 border border-white/10"
                   }`}
                 >
-                  {step.done ? "\u2713" : idx + 1}
+                  {step.done ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  ) : (
+                    idx + 1
+                  )}
                 </div>
                 <span
-                  className={`text-[10px] mt-1.5 font-semibold transition-colors whitespace-nowrap ${
-                    step.done || step.active
-                      ? "text-emerald-400"
+                  className={`text-[10px] uppercase tracking-widest font-bold transition-colors hidden md:block ${
+                    step.done
+                      ? "text-emerald-500/80"
+                      : step.active
+                      ? "text-emerald-300 drop-shadow-[0_0_5px_rgba(52,211,153,0.8)]"
                       : "text-zinc-600"
                   }`}
                 >
@@ -205,8 +211,8 @@ export default function BlockchainSection() {
               </div>
               {idx < phaseSteps.length - 1 && (
                 <div
-                  className={`flex-1 h-px mx-2 transition-colors duration-500 ${
-                    step.done ? "bg-emerald-500/60" : "bg-zinc-800"
+                  className={`flex-1 h-px mx-4 transition-all duration-700 ${
+                    step.done ? "bg-gradient-to-r from-emerald-500/50 to-emerald-500/10 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-white/5"
                   }`}
                 />
               )}
@@ -215,149 +221,136 @@ export default function BlockchainSection() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
-          <label className="text-[11px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-3 block">
-            Username to Register
-          </label>
-          <input
-            id="blockchain-username-input"
-            type="text"
-            value={username}
-            onChange={(e) =>
-              setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))
-            }
-            placeholder="e.g. satoshi_nakamoto"
-            maxLength={24}
-            disabled={phase !== "idle" && phase !== "appended"}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-white font-mono focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-700 disabled:opacity-50"
-          />
+      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8">
+        <div className="md:col-span-5 flex flex-col gap-6">
+          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 flex-1 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Register Username
+            </label>
+            <input
+              id="blockchain-username-input"
+              type="text"
+              value={username}
+              onChange={(e) =>
+                setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))
+              }
+              placeholder="e.g. satoshi_nakamoto"
+              maxLength={24}
+              disabled={phase !== "idle" && phase !== "appended"}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-emerald-300 font-mono text-lg focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner disabled:opacity-50"
+            />
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <button
+              id="blockchain-mine-btn"
+              onClick={handleMine}
+              disabled={
+                !username.trim() || (phase !== "idle" && phase !== "appended")
+              }
+              className="w-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] disabled:shadow-none"
+            >
+              {phase === "mining" ? "COMPUTING HASH..." : "SIGN & MINE BLOCK"}
+            </button>
+            {phase === "appended" && (
+              <button
+                onClick={handleReset}
+                className="w-full bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-400 px-6 py-4 rounded-xl font-medium transition-all"
+              >
+                Reset Ledger
+              </button>
+            )}
+          </div>
         </div>
 
-        {phase !== "idle" && (
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 font-mono text-xs md:text-sm space-y-3 animate-in fade-in duration-300">
-            <div>
-              <span className="text-zinc-600">Tx: </span>
-              <span className="text-amber-400">
-                {`{ type: "REGISTER", username: "${username}", from: "0x${simulateHash(username).substring(0, 8)}..." }`}
-              </span>
-            </div>
-            {signature && (
-              <div>
-                <span className="text-zinc-600">Sig: </span>
-                <span className="text-purple-400">
-                  0x{signature.substring(0, 32)}...
-                </span>
-              </div>
-            )}
-            {(phase === "mining" ||
-              phase === "confirmed" ||
-              phase === "appended") && (
-              <>
-                <div className="border-t border-zinc-800 pt-3">
-                  <span className="text-zinc-600">Nonce: </span>
-                  <span
-                    className={
-                      phase === "mining"
-                        ? "text-yellow-400"
-                        : "text-emerald-400"
-                    }
-                  >
-                    {displayNonce}
+        <div className="md:col-span-7 flex flex-col gap-6">
+          <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 font-mono text-[13px] h-56 overflow-y-auto relative shadow-inner">
+             {phase === "idle" ? (
+               <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                 <span className="text-zinc-600">Awaiting transaction...</span>
+               </div>
+             ) : (
+              <div className="space-y-4 animate-in fade-in duration-500">
+                <div className="bg-white/[0.02] p-3 rounded-lg border border-white/5">
+                  <span className="text-zinc-600 mr-2">Tx Payload:</span>
+                  <span className="text-amber-300/80 break-all">
+                    {`{ action: "REGISTER", id: "${username}", from: "0x${simulateHash(username).substring(0, 8)}..." }`}
                   </span>
                 </div>
-                <div>
-                  <span className="text-zinc-600">Hash: </span>
-                  <span
-                    className={
-                      currentHash.startsWith("0000")
-                        ? "text-emerald-400"
-                        : "text-red-400"
-                    }
-                  >
-                    {currentHash || "computing..."}
-                  </span>
-                  {currentHash.startsWith("0000") && (
-                    <span className="text-emerald-500 ml-2 font-bold">
-                      VALID
+                
+                {signature && (
+                  <div className="bg-white/[0.02] p-3 rounded-lg border border-white/5 animate-in slide-in-from-left-2 duration-300">
+                    <span className="text-zinc-600 mr-2">Digital Sig:</span>
+                    <span className="text-purple-400 break-all">
+                      0x{signature.substring(0, 48)}...
                     </span>
-                  )}
-                </div>
-                <div>
-                  <span className="text-zinc-600">Target: </span>
-                  <span className="text-zinc-500">
-                    hash must start with &quot;0000&quot;
-                  </span>
-                </div>
-              </>
-            )}
-            {phase === "appended" && (
-              <div className="border-t border-zinc-800 pt-3 text-emerald-400 font-semibold">
-                Block #{chain.length - 1} successfully appended to chain!
+                  </div>
+                )}
+                
+                {(phase === "mining" || phase === "confirmed" || phase === "appended") && (
+                  <div className="bg-emerald-500/5 p-4 rounded-lg border border-emerald-500/20 shadow-inner">
+                    <div className="grid grid-cols-12 gap-2 mb-2">
+                      <div className="col-span-3 text-zinc-500">Nonce</div>
+                      <div className={`col-span-9 ${phase === "mining" ? "text-amber-400" : "text-emerald-400"}`}>
+                        {displayNonce.toString().padStart(6, "0")}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-12 gap-2">
+                      <div className="col-span-3 text-zinc-500">SHA-256</div>
+                      <div className="col-span-9 flex items-center gap-3">
+                        <span className={currentHash.startsWith("0000") ? "text-emerald-400 font-bold" : "text-zinc-400"}>
+                          {currentHash || "computing..."}
+                        </span>
+                        {currentHash.startsWith("0000") && (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30 tracking-widest">
+                            TARGET MET
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        <div className="flex gap-4 justify-center">
-          <button
-            id="blockchain-mine-btn"
-            onClick={handleMine}
-            disabled={
-              !username.trim() || (phase !== "idle" && phase !== "appended")
-            }
-            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] disabled:shadow-none"
-          >
-            {phase === "mining" ? "Mining..." : "Sign Tx & Mine Block"}
-          </button>
-          {phase === "appended" && (
-            <button
-              onClick={handleReset}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-6 py-3 rounded-xl font-medium transition-colors"
-            >
-              Reset Chain
-            </button>
-          )}
-        </div>
-
-        {chain.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-[11px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">
-              Chain State
+          <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
+            <h4 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-zinc-600" />
+              Live Chain State
             </h4>
-            <div className="flex gap-3 overflow-x-auto pb-2">
+            
+            <div className="flex gap-4 overflow-x-auto pb-4">
               {chain.map((block, idx) => (
                 <div
                   key={block.index}
-                  className={`flex-shrink-0 w-52 bg-zinc-900/60 border rounded-xl p-4 text-xs font-mono transition-all duration-500 ${
+                  className={`flex-shrink-0 w-64 bg-[#0a0a0a] border rounded-2xl p-5 text-xs font-mono transition-all duration-700 relative overflow-hidden ${
                     idx === chain.length - 1 && phase === "appended"
-                      ? "border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-in slide-in-from-right-4 fade-in duration-500"
-                      : "border-zinc-800"
+                      ? "border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.15)] animate-in slide-in-from-right-8 fade-in zoom-in-95"
+                      : "border-white/10 opacity-70"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-emerald-400 font-bold">
-                      Block #{block.index}
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 blur-2xl rounded-full" />
+                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3 relative z-10">
+                    <span className="text-emerald-400 font-black tracking-widest">
+                      BLOCK #{block.index.toString().padStart(3, "0")}
                     </span>
-                    <span className="text-zinc-600">{block.timestamp}</span>
+                    <span className="text-zinc-600 text-[10px]">{block.timestamp}</span>
                   </div>
-                  <div className="space-y-1 text-[10px]">
-                    <div>
-                      <span className="text-zinc-600">Data: </span>
-                      <span className="text-zinc-300">{block.data}</span>
+                  <div className="space-y-2 text-[10px] relative z-10">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-600 uppercase tracking-wider">Payload</span>
+                      <span className="text-zinc-300 truncate">{block.data}</span>
                     </div>
-                    <div>
-                      <span className="text-zinc-600">Nonce: </span>
-                      <span className="text-zinc-400">{block.nonce}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-600 uppercase tracking-wider">Hash</span>
+                      <span className="text-emerald-400/80 truncate">{block.hash}</span>
                     </div>
-                    <div>
-                      <span className="text-zinc-600">Hash: </span>
-                      <span className="text-emerald-400/80">{block.hash}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-600">Prev: </span>
-                      <span className="text-zinc-500">
-                        {block.prevHash.substring(0, 16)}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-zinc-600 uppercase tracking-wider">Prev Hash</span>
+                      <span className="text-zinc-500 truncate">
+                        {block.prevHash}
                       </span>
                     </div>
                   </div>
@@ -365,7 +358,7 @@ export default function BlockchainSection() {
               ))}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

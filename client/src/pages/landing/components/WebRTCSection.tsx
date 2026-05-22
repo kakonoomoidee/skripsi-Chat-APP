@@ -132,169 +132,179 @@ export default function WebRTCSection() {
     phase === "complete";
 
   const nodeBase =
-    "w-20 h-20 md:w-24 md:h-24 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 flex-shrink-0";
+    "w-20 h-20 md:w-24 md:h-24 rounded-full border-2 flex flex-col items-center justify-center transition-all duration-700 flex-shrink-0 backdrop-blur-md relative overflow-hidden";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <style>{`
         @keyframes packetSlide {
-          0% { left: 0; }
-          100% { left: calc(100% - 3rem); }
+          0% { left: 0; opacity: 0; transform: scale(0.8) translateY(-50%); }
+          10% { opacity: 1; transform: scale(1) translateY(-50%); }
+          90% { opacity: 1; transform: scale(1) translateY(-50%); }
+          100% { left: calc(100% - 4rem); opacity: 0; transform: scale(0.8) translateY(-50%); }
         }
       `}</style>
 
-      <div className="text-center max-w-2xl mx-auto">
-        <h3 className="text-2xl md:text-3xl font-bold text-purple-400 mb-3">
+      <div className="text-center max-w-3xl mx-auto space-y-4">
+        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
           WebRTC Peer-to-Peer
         </h3>
-        <p className="text-zinc-400 text-sm leading-relaxed">
+        <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           The relay server facilitates only the initial signaling handshake.
           Once the DataChannel is established, all data flows directly between
-          peers with zero server storage.
+          peers with absolute zero server storage.
         </p>
       </div>
 
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-3xl p-6 md:p-10 mb-6">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-600 font-semibold mb-6 text-center">
-            Signaling Path
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8 md:p-14 mb-8 relative shadow-2xl overflow-hidden">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-purple-500/5 blur-[100px] pointer-events-none" />
+          
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold mb-8 text-center flex items-center justify-center gap-3">
+            <span className="w-12 h-px bg-white/10" />
+            Signaling Handshake
+            <span className="w-12 h-px bg-white/10" />
           </p>
-          <div className="flex items-center justify-between gap-2 md:gap-4 mb-10 relative">
+          
+          <div className="flex items-center justify-between gap-4 mb-16 relative z-10">
             <div
-              className={`${nodeBase} ${sigActive || phase === "transmitting" || phase === "complete" ? "border-purple-500 bg-zinc-900 shadow-[0_0_20px_rgba(168,85,247,0.15)]" : "border-zinc-700 bg-zinc-900/50"}`}
+              className={`${nodeBase} ${sigActive || tunnelActive ? "border-purple-500 bg-purple-500/10 shadow-[0_0_30px_rgba(168,85,247,0.3)]" : "border-white/10 bg-black/40"}`}
             >
-              <span className="text-lg font-bold text-purple-300">A</span>
-              <span className="text-[9px] text-zinc-500 font-semibold mt-0.5">
-                Alice
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent opacity-50" />
+              <span className="text-2xl font-black text-purple-200 drop-shadow-md z-10">A</span>
+              <span className="text-[10px] text-purple-300/60 font-semibold mt-1 uppercase tracking-widest z-10">Alice</span>
             </div>
 
             <div className="flex-1 relative flex items-center">
               <div
-                className={`w-full transition-colors duration-500 ${sigActive ? "border-amber-500/60" : "border-zinc-800"}`}
+                className={`w-full transition-colors duration-500 ${sigActive ? "border-amber-500/60" : "border-white/10"}`}
                 style={{ borderTop: "2px dashed" }}
               />
               {sigDot === "left" && (
-                <div className="absolute top-1/2 left-[10%] -translate-y-1/2 w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-ping" />
+                <div className="absolute top-1/2 left-[10%] -translate-y-1/2 w-4 h-4 rounded-full bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,1)] animate-ping" />
               )}
               {sigDot === "center" && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-ping" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,1)] animate-ping" />
               )}
             </div>
 
             <div
-              className={`${nodeBase} ${sigActive ? "border-amber-500 bg-zinc-900 shadow-[0_0_20px_rgba(245,158,11,0.15)]" : "border-zinc-700 bg-zinc-900/50"}`}
+              className={`${nodeBase} ${sigActive ? "border-amber-500 bg-amber-500/10 shadow-[0_0_30px_rgba(245,158,11,0.3)]" : "border-white/10 bg-black/40"}`}
             >
-              <span className="text-lg font-bold text-amber-400">R</span>
-              <span className="text-[9px] text-zinc-500 font-semibold mt-0.5 text-center leading-tight">
-                Relay
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent opacity-50" />
+              <span className="text-2xl font-black text-amber-200 drop-shadow-md z-10">R</span>
+              <span className="text-[10px] text-amber-300/60 font-semibold mt-1 uppercase tracking-widest z-10">Relay</span>
               {phase === "complete" && (
-                <span className="text-[8px] text-red-400 font-mono mt-0.5">
-                  0 bytes
-                </span>
+                <div className="absolute -bottom-6 text-[9px] text-rose-400 font-mono tracking-widest bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 whitespace-nowrap">
+                  0 BYTES STORED
+                </div>
               )}
             </div>
 
             <div className="flex-1 relative flex items-center">
               <div
-                className={`w-full transition-colors duration-500 ${sigActive ? "border-amber-500/60" : "border-zinc-800"}`}
+                className={`w-full transition-colors duration-500 ${sigActive ? "border-amber-500/60" : "border-white/10"}`}
                 style={{ borderTop: "2px dashed" }}
               />
               {sigDot === "right" && (
-                <div className="absolute top-1/2 right-[10%] -translate-y-1/2 w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-ping" />
+                <div className="absolute top-1/2 right-[10%] -translate-y-1/2 w-4 h-4 rounded-full bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,1)] animate-ping" />
               )}
             </div>
 
             <div
-              className={`${nodeBase} ${phase === "transmitting" || phase === "complete" ? "border-cyan-500 bg-zinc-900 shadow-[0_0_20px_rgba(6,182,212,0.15)]" : sigActive ? "border-amber-500/50 bg-zinc-900/70" : "border-zinc-700 bg-zinc-900/50"}`}
+              className={`${nodeBase} ${tunnelActive ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.3)]" : sigActive ? "border-amber-500/40 bg-amber-500/5" : "border-white/10 bg-black/40"}`}
             >
-              <span className="text-lg font-bold text-cyan-300">B</span>
-              <span className="text-[9px] text-zinc-500 font-semibold mt-0.5">
-                Bob
-              </span>
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent opacity-50" />
+              <span className="text-2xl font-black text-cyan-200 drop-shadow-md z-10">B</span>
+              <span className="text-[10px] text-cyan-300/60 font-semibold mt-1 uppercase tracking-widest z-10">Bob</span>
             </div>
           </div>
 
           <p
-            className={`text-[10px] uppercase tracking-[0.25em] font-semibold mb-4 text-center transition-colors duration-500 ${tunnelActive ? "text-emerald-500/80" : "text-zinc-700"}`}
+            className={`text-[10px] uppercase tracking-[0.3em] font-bold mb-6 text-center transition-colors duration-500 flex items-center justify-center gap-3 ${tunnelActive ? "text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]" : "text-zinc-600"}`}
           >
-            Direct P2P Tunnel
+            <span className={`w-12 h-px ${tunnelActive ? "bg-emerald-500/50" : "bg-white/10"}`} />
+            Direct P2P Data Channel
+            <span className={`w-12 h-px ${tunnelActive ? "bg-emerald-500/50" : "bg-white/10"}`} />
           </p>
-          <div className="flex items-center gap-2 md:gap-4">
+          
+          <div className="flex items-center gap-4 relative z-10 max-w-xl mx-auto">
             <div
-              className={`w-4 h-4 rounded-full flex-shrink-0 transition-all duration-500 ${tunnelActive ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]" : "bg-zinc-800"}`}
+              className={`w-5 h-5 rounded-full flex-shrink-0 transition-all duration-700 ${tunnelActive ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]" : "bg-white/5 border border-white/10"}`}
             />
-            <div className="flex-1 relative h-7 flex items-center">
+            <div className="flex-1 relative h-10 flex items-center bg-black/40 rounded-full border border-white/5 shadow-inner px-2">
               <div
-                className={`h-0.5 w-full rounded-full transition-all duration-700 ${tunnelActive ? "bg-emerald-500/50" : "bg-zinc-800/50"}`}
+                className={`h-1 w-full rounded-full transition-all duration-1000 ${tunnelActive ? "bg-emerald-500/40 shadow-[0_0_10px_rgba(52,211,153,0.3)]" : "bg-white/5"}`}
               />
               {(phase === "transmitting" || phase === "complete") && (
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 h-5 rounded-md bg-emerald-500 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                  className="absolute top-1/2 -translate-y-1/2 h-6 rounded-md bg-gradient-to-r from-emerald-400 to-emerald-500 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.8)] border border-white/20"
                   style={{
-                    width: "3rem",
+                    width: "4rem",
                     animation: packetLaunched
-                      ? "packetSlide 1.2s ease-out forwards"
+                      ? "packetSlide 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards"
                       : "none",
                     left: packetLaunched ? undefined : "0%",
                   }}
                 >
-                  <span className="text-[7px] font-mono font-bold text-zinc-950 tracking-wider">
+                  <span className="text-[9px] font-mono font-black text-emerald-950 tracking-widest uppercase">
                     PKT
                   </span>
                 </div>
               )}
             </div>
             <div
-              className={`w-4 h-4 rounded-full flex-shrink-0 transition-all duration-500 ${tunnelActive ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]" : "bg-zinc-800"}`}
+              className={`w-5 h-5 rounded-full flex-shrink-0 transition-all duration-700 ${tunnelActive ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]" : "bg-white/5 border border-white/10"}`}
             />
           </div>
         </div>
 
-        <div className="flex gap-4 justify-center mb-6">
-          <button
-            id="webrtc-transmit-btn"
-            onClick={handleTransmit}
-            disabled={
-              phase !== "idle" && phase !== "complete"
-            }
-            className="bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] disabled:shadow-none"
-          >
-            {phase === "idle" || phase === "complete"
-              ? "Transmit P2P Packet"
-              : "Transmitting..."}
-          </button>
-          {phase === "complete" && (
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          <div className="w-full md:w-1/3 flex flex-col gap-3">
             <button
-              onClick={handleReset}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-6 py-3 rounded-xl font-medium transition-colors"
+              id="webrtc-transmit-btn"
+              onClick={handleTransmit}
+              disabled={phase !== "idle" && phase !== "complete"}
+              className="w-full bg-purple-500/10 text-purple-300 border border-purple-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-purple-500/20 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] disabled:shadow-none"
             >
-              Reset
+              {phase === "idle" || phase === "complete"
+                ? "ESTABLISH TUNNEL"
+                : "TRANSMITTING..."}
             </button>
-          )}
-        </div>
+            {phase === "complete" && (
+              <button
+                onClick={handleReset}
+                className="w-full bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-400 px-6 py-4 rounded-xl font-medium transition-all"
+              >
+                Reset Network
+              </button>
+            )}
+          </div>
 
-        {logs.length > 0 && (
           <div
             ref={logRef}
-            className="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 font-mono text-xs md:text-sm max-h-64 overflow-y-auto space-y-1.5 animate-in fade-in duration-300"
+            className="w-full md:w-2/3 bg-[#050505] border border-white/5 rounded-2xl p-6 font-mono text-[13px] md:text-sm h-48 overflow-y-auto space-y-2 relative shadow-inner"
           >
+            {logs.length === 0 && (
+               <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                 <span className="text-zinc-600">Network idle...</span>
+               </div>
+            )}
             {logs.map((log, idx) => {
               const color =
                 log.type === "success"
-                  ? "text-emerald-400"
+                  ? "text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"
                   : log.type === "key"
-                    ? "text-purple-400"
+                    ? "text-purple-400 drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]"
                     : log.type === "warning"
-                      ? "text-red-400"
-                      : "text-zinc-400";
+                      ? "text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded"
+                      : "text-zinc-500";
               return (
                 <div
                   key={idx}
                   className={`${color} animate-in slide-in-from-left-2 fade-in duration-200`}
                 >
-                  <span className="text-zinc-700 select-none mr-2">
+                  <span className="text-zinc-600 select-none mr-3">
                     {">"}
                   </span>
                   {log.text}
@@ -302,7 +312,7 @@ export default function WebRTCSection() {
               );
             })}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
