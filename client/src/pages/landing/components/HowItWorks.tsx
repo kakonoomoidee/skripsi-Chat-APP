@@ -9,9 +9,9 @@ type TabId = "ecc" | "ecdh" | "webrtc" | "blockchain";
 
 const TAB_CONFIG: { id: TabId; label: string; number: string }[] = [
   { id: "ecc", label: "Elliptic Curve", number: "01" },
-  { id: "ecdh", label: "Key Exchange", number: "02" },
+  { id: "blockchain", label: "Ledger", number: "02" },
   { id: "webrtc", label: "P2P Tunnel", number: "03" },
-  { id: "blockchain", label: "Ledger", number: "04" },
+  { id: "ecdh", label: "Key Exchange", number: "04" },
 ];
 
 const TAB_ACCENT: Record<TabId, string> = {
@@ -29,11 +29,11 @@ export default function HowItWorks() {
   const [activeTab, setActiveTab] = useState<TabId>("ecc");
 
   return (
-    <div className="bg-black min-h-screen text-[#f5f5f4] flex flex-col font-sans selection:bg-indigo-500/30 overflow-hidden relative">
+    <div className="bg-zinc-950 min-h-screen text-zinc-100 flex flex-col font-sans selection:bg-indigo-500/30 overflow-hidden relative">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-20 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] opacity-10 pointer-events-none bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-cyan-900 via-transparent to-transparent" />
 
-      <header className="px-8 py-5 flex justify-between items-center bg-black/40 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
+      <header className="px-8 py-5 flex justify-between items-center bg-zinc-950/80 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
         <Link
           to="/landing"
           className="text-xl font-bold tracking-tight flex items-center gap-3 group"
@@ -75,7 +75,7 @@ export default function HowItWorks() {
 
       <nav className="px-6 mb-12 relative z-20">
         <div className="max-w-4xl mx-auto">
-          <div className="flex flex-nowrap md:flex-wrap gap-3 overflow-x-auto pb-4 md:pb-0 justify-start md:justify-center">
+          <div className="flex flex-nowrap md:flex-wrap gap-3 overflow-x-auto py-4 px-2 justify-start md:justify-center no-scrollbar">
             {TAB_CONFIG.map((tab) => {
               const isActive = activeTab === tab.id;
               return (

@@ -265,7 +265,7 @@ export default function BlockchainSection() {
         </div>
 
         <div className="md:col-span-7 flex flex-col gap-6">
-          <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 font-mono text-[13px] h-56 overflow-y-auto relative shadow-inner">
+          <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 font-mono text-[13px] h-56 overflow-y-auto relative shadow-inner custom-scrollbar">
              {phase === "idle" ? (
                <div className="absolute inset-0 flex items-center justify-center opacity-30">
                  <span className="text-zinc-600">Awaiting transaction...</span>
@@ -321,7 +321,7 @@ export default function BlockchainSection() {
               Live Chain State
             </h4>
             
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
               {chain.map((block, idx) => (
                 <div
                   key={block.index}

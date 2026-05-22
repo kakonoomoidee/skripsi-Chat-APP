@@ -82,23 +82,27 @@ export default function LandingClient() {
       </style>
 
       {/* HEADER */}
-      <header className="px-6 py-4 border-b border-zinc-800/80 flex justify-between items-center bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="text-xl font-bold tracking-tight flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="SecureP2P Logo"
-            className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(79,70,229,0.8)]"
-          />
+      <header className="fixed top-6 left-1/2 -translate-x-1/2 w-[95%] max-w-6xl z-50 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.8)] flex justify-between items-center transition-all duration-500">
+        <div className="text-xl font-bold tracking-tight flex items-center gap-3 group cursor-pointer">
+          <div className="relative">
+            <div className="absolute inset-0 bg-indigo-500 blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
+            <img
+              src="/logo.png"
+              alt="SecureP2P Logo"
+              className="w-8 h-8 object-contain relative z-10 transform group-hover:scale-110 transition-transform duration-300"
+            />
+          </div>
           <span>
             Secure<span className="text-indigo-400">P2P</span>
           </span>
         </div>
-        <nav className="hidden md:flex items-center gap-8">
+        
+        <nav className="hidden md:flex items-center gap-2 bg-white/[0.02] border border-white/5 rounded-full px-2 py-1">
           <a
             href="http://10.64.24.248:8080/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+            className="px-4 py-2 rounded-full text-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-medium"
           >
             Explorer
           </a>
@@ -106,7 +110,7 @@ export default function LandingClient() {
             href="https://github.com/kakonoomoidee/skripsi-Chat-APP"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+            className="px-4 py-2 rounded-full text-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-medium"
           >
             Source Code
           </a>
@@ -114,22 +118,29 @@ export default function LandingClient() {
             href="https://youtu.be/96Tsss3J0Qk"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+            className="px-4 py-2 rounded-full text-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-medium"
           >
             Watch Demo
           </a>
           <Link
             to="/how-it-works"
-            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+            className="px-4 py-2 rounded-full text-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-medium"
           >
             How It Works
           </Link>
         </nav>
+
         <Link
           to="/login"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-[0_0_15px_rgba(79,70,229,0.4)]"
+          className="group relative bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold transition-all transform hover:scale-105 overflow-hidden"
         >
-          Launch App
+          <div className="absolute inset-0 bg-gradient-to-r from-zinc-200 via-white to-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="relative z-10 flex items-center gap-2">
+            Launch App
+            <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </span>
         </Link>
       </header>
 

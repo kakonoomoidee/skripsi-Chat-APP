@@ -216,7 +216,7 @@ export default function ECDHSection() {
           
           <div
             ref={logRef}
-            className="flex-1 p-6 font-mono text-[13px] md:text-sm overflow-y-auto space-y-3 relative"
+            className="flex-1 p-6 font-mono text-[13px] md:text-sm overflow-y-auto space-y-3 relative custom-scrollbar"
           >
             {logs.length === 0 && !isRunning && (
               <div className="absolute inset-0 flex items-center justify-center opacity-30">

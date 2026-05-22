@@ -4,6 +4,19 @@ import { useState, useEffect, useRef } from "react";
  * Interactive demonstration of Elliptic Curve Cryptography using Canvas API.
  * @returns {JSX.Element}
  */
+const generateHexKey = (x: number, y: number, prefix: string = "0x04") => {
+  const seed = Math.abs(Math.sin(x * 12.9898 + y * 78.233)) * 43758.5453;
+  let hex = seed.toString(16).replace('.', '').padEnd(64, 'c').substring(0, 64);
+  return `${prefix}${hex.substring(0, 6)}...${hex.substring(58)}`;
+};
+
+const generatePrivKeyHex = (k: string) => {
+  const seed = parseInt(k) * 1234567.89;
+  let hex = seed.toString(16).replace('.', '').padEnd(64, 'e').substring(0, 64);
+  return `0x${hex.substring(0, 6)}...${hex.substring(58)}`;
+};
+
+
 export default function ECCSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [privateKey, setPrivateKey] = useState("");
@@ -291,7 +304,7 @@ export default function ECCSection() {
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
         <div className="w-full lg:w-1/3 space-y-6 flex flex-col justify-between">
           <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
             <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
@@ -309,7 +322,7 @@ export default function ECCSection() {
                 setPublicKey(null);
               }}
               placeholder="e.g. 5"
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-indigo-300 font-mono text-xl focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-indigo-300 font-mono text-xl focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
             />
             <p className="text-[11px] text-zinc-500 mt-4 leading-relaxed font-light">
               Number of geometric point additions starting from G(1, 1).
@@ -339,15 +352,47 @@ export default function ECCSection() {
           {publicKey !== null && (
             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden animate-in zoom-in-95 fade-in duration-500">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] rounded-full pointer-events-none" />
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] animate-pulse" />
                 <span className="text-emerald-400/80 font-bold text-xs uppercase tracking-widest">
-                  Derived Public Key
+                  ECC Session Parameters
                 </span>
               </div>
-              <div className="space-y-1 font-mono text-lg text-emerald-300/90 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">
-                <p>X: {publicKey.x.toFixed(4)}</p>
-                <p>Y: {publicKey.y.toFixed(4)}</p>
+              
+              <div className="space-y-4 font-mono text-sm text-zinc-300">
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <span className="text-zinc-500">Generator (G)</span>
+                  <span className="text-zinc-200">X: 1.0000, Y: 1.0000</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <span className="text-zinc-500">Private Key (k)</span>
+                  <span className="text-indigo-300 font-bold">{privateKey}</span>
+                </div>
+                <div className="flex flex-col gap-2 pt-1 pb-3 border-b border-white/5">
+                  <span className="text-emerald-400/80 text-[10px] uppercase tracking-wider font-sans font-bold">Public Key (P = k * G)</span>
+                  <div className="bg-black/30 rounded-xl p-3 border border-emerald-500/20 text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] flex justify-between">
+                    <span>X: {publicKey.x.toFixed(4)}</span>
+                    <span>Y: {publicKey.y.toFixed(4)}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <p className="text-[9px] text-emerald-500/70 mb-3 tracking-[0.2em] uppercase font-sans font-bold">Compressed Hash Equivalents</p>
+                  <div className="space-y-2 text-[11px]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-500">Generator Point</span>
+                      <span className="text-zinc-400 font-mono">{generateHexKey(1, 1, "0x02")}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-500">Private Key</span>
+                      <span className="text-indigo-300 font-mono">{generatePrivKeyHex(privateKey)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-500">Public Key</span>
+                      <span className="text-emerald-400 font-mono">{generateHexKey(publicKey.x, publicKey.y, publicKey.y % 2 === 0 ? "0x02" : "0x03")}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -283,7 +283,7 @@ export default function WebRTCSection() {
 
           <div
             ref={logRef}
-            className="w-full md:w-2/3 bg-[#050505] border border-white/5 rounded-2xl p-6 font-mono text-[13px] md:text-sm h-48 overflow-y-auto space-y-2 relative shadow-inner"
+            className="w-full md:w-2/3 bg-[#050505] border border-white/5 rounded-2xl p-6 font-mono text-[13px] md:text-sm h-48 overflow-y-auto space-y-2 relative shadow-inner custom-scrollbar"
           >
             {logs.length === 0 && (
                <div className="absolute inset-0 flex items-center justify-center opacity-30">
