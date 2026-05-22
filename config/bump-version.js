@@ -242,7 +242,7 @@ function gitCommitAndPush(oldVersion, newVersion) {
     console.log("");
   }
 
-  gitCommit(oldVersion, newVersion);
+  gitCommitAndPush(oldVersion, newVersion);
 
   console.log("\n===================================");
   success("All tasks completed");
