@@ -127,7 +127,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
   });
 
   describe("User Registration Tests", () => {
-    it("TC-14 | Should register user with valid signature", async () => {
+    it("TC-18 | Should register user with valid signature", async () => {
       // Arrange - Use ethers.js wallet for realistic signing
       const messageHash = createRegistrationMessageHash(
         walletBob.address,
@@ -200,7 +200,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
       }
 
       console.log(
-        "✓ TC-14 passed: Wallet Bob successfully registered with valid signature",
+        "✓ TC-18 passed: Wallet Bob successfully registered with valid signature",
       );
       console.log("  - Signer Address:", walletBob.address);
       console.log("  - Username:", BOB_USERNAME);
@@ -214,7 +214,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
       );
     });
 
-    it("TC-15 | Should reject registration with fake signature from different address", async () => {
+    it("TC-19 | Should reject registration with fake signature from different address", async () => {
       // Arrange - Use a fresh address so failure is only from invalid signature
       const walletVictim = ethers.Wallet.createRandom();
       const messageHash = createRegistrationMessageHash(
@@ -244,7 +244,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
       );
 
       console.log(
-        "✓ TC-15 passed: Registration rejected with fake signature from different address",
+        "✓ TC-19 passed: Registration rejected with fake signature from different address",
       );
       console.log("  - Expected Signer:", walletVictim.address);
       console.log("  - Actual Signer:", walletAttacker.address);
@@ -252,7 +252,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
       console.log("  - Contract Revert Message:", errMsg15);
     });
 
-    it("TC-16 | Should reject registration with already taken username", async () => {
+    it("TC-20 | Should reject registration with already taken username", async () => {
       // Arrange - First, register Alice with her username using real wallet
       const aliceMessageHash = createRegistrationMessageHash(
         walletAlice.address,
@@ -310,7 +310,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
       );
 
       console.log(
-        "✓ TC-16 passed: Registration rejected with duplicate username",
+        "✓ TC-20 passed: Registration rejected with duplicate username",
       );
       console.log("  - Duplicate Username:", ALICE_USERNAME);
       console.log("  - Original Owner:", walletAlice.address);
@@ -376,7 +376,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
   });
 
   describe("Login Verification Tests", () => {
-    it("TC-17 | Should verify login with valid nonce and correct signature", async () => {
+    it("TC-21 | Should verify login with valid nonce and correct signature", async () => {
       // Arrange - Wallet Bob is already registered from TC-14
       const messageHash = createLoginMessageHash(LOGIN_NONCE);
       const messageBytes = ethers.getBytes(messageHash);
@@ -401,7 +401,7 @@ contract("IdentityRegistry Complete Test Suite", (accounts) => {
         "Login verification should return true for valid signature",
       );
       console.log(
-        "✓ TC-17 passed: Login verified successfully with valid nonce and signature",
+        "✓ TC-21 passed: Login verified successfully with valid nonce and signature",
       );
       console.log("  - Signer Address:", walletBob.address);
       console.log("  - Nonce Challenge:", LOGIN_NONCE);

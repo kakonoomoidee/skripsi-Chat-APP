@@ -16,7 +16,7 @@ const executeSelfTransferValidation = (
 };
 
 describe("Transfer Logic Unit Tests", () => {
-  it("TC-20: should throw and halt execution when sender and receiver are identical", () => {
+  it("TC-24: should throw and halt execution when sender and receiver are identical", () => {
     const senderAddress = "0xAbC1234567890dEfABC1234567890DefABC12345";
     const receiverAddress = "0xaBc1234567890DEfAbc1234567890dEFabC12345";
 
