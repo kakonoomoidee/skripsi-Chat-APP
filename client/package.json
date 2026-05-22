@@ -1,7 +1,7 @@
 {
   "name": "securep2p-client",
   "private": true,
-  "version": "1.12.4-nebula",
+  "version": "1.13.0-tvrstsp",
   "description": "Frontend client for SecureP2P chat application built with Vite, React, and WebRTC.",
   "type": "module",
   "scripts": {
