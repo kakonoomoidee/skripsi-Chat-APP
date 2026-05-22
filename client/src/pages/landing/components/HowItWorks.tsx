@@ -1,9 +1,9 @@
-import { Link } from "react-router-dom";
 import { useState } from "react";
 import ECCSection from "./ECCSection";
 import ECDHSection from "./ECDHSection";
 import WebRTCSection from "./WebRTCSection";
 import BlockchainSection from "./BlockchainSection";
+import LandingNavbar from "./LandingNavbar";
 
 type TabId = "ecc" | "ecdh" | "webrtc" | "blockchain";
 
@@ -33,32 +33,9 @@ export default function HowItWorks() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-20 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] opacity-10 pointer-events-none bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-cyan-900 via-transparent to-transparent" />
 
-      <header className="px-8 py-5 flex justify-between items-center bg-zinc-950/80 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
-        <Link
-          to="/landing"
-          className="text-xl font-bold tracking-tight flex items-center gap-3 group"
-        >
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500 blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
-            <img
-              src="/logo.png"
-              alt="SecureP2P Logo"
-              className="w-8 h-8 object-contain relative z-10"
-            />
-          </div>
-          <span className="text-white drop-shadow-md">
-            Secure<span className="text-indigo-400">P2P</span>
-          </span>
-        </Link>
-        <Link
-          to="/landing"
-          className="text-xs uppercase tracking-[0.2em] text-zinc-400 hover:text-indigo-300 transition-colors font-semibold"
-        >
-          Return to Hub
-        </Link>
-      </header>
+      <LandingNavbar />
 
-      <section className="pt-20 pb-12 px-6 text-center relative z-10">
+      <section className="pt-32 pb-12 px-6 text-center relative z-10">
         <div className="inline-block mb-4 px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-md">
           <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-400 font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
             Protocol Architecture
