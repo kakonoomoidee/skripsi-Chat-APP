@@ -93,6 +93,38 @@ export default function LandingClient() {
             Secure<span className="text-indigo-400">P2P</span>
           </span>
         </div>
+        <nav className="hidden md:flex items-center gap-8">
+          <a
+            href="http://10.64.24.248:8080/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+          >
+            Explorer
+          </a>
+          <a
+            href="https://github.com/kakonoomoidee/skripsi-Chat-APP"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+          >
+            Source Code
+          </a>
+          <a
+            href="https://youtu.be/96Tsss3J0Qk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+          >
+            Watch Demo
+          </a>
+          <Link
+            to="/how-it-works"
+            className="text-sm text-zinc-400 hover:text-indigo-400 transition-colors font-medium"
+          >
+            How It Works
+          </Link>
+        </nav>
         <Link
           to="/login"
           className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-[0_0_15px_rgba(79,70,229,0.4)]"

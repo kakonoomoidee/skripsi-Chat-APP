@@ -16,6 +16,9 @@ const ImportIdentityPage = lazy(
   () => import("./pages/auth/import/ImportIdentityClient"),
 );
 const ChatDashboard = lazy(() => import("./pages/chat/ChatClient"));
+const HowItWorksPage = lazy(
+  () => import("./pages/landing/components/HowItWorks"),
+);
 
 /**
  * Main Application Router with Smart Routing and Lazy Loading.
@@ -51,6 +54,7 @@ function App(): React.JSX.Element {
               />
 
               <Route path="/landing" element={<LandingPage />} />
+              <Route path="/how-it-works" element={<HowItWorksPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/import" element={<ImportIdentityPage />} />
