@@ -154,27 +154,69 @@ function runInstall(appName) {
 }
 
 // =====================================
-// GIT COMMIT
+// GIT COMMIT + TAG + PUSH
 // =====================================
-function gitCommit(oldVersion, newVersion) {
+
+function gitCommitAndPush(oldVersion, newVersion) {
   const message = `core: update ${oldVersion} -> ${newVersion}`;
 
   try {
     log("Running git add .");
+
     execSync("git add .", {
       cwd: ROOT,
       stdio: "inherit",
     });
 
-    log(`Running git commit`);
+    log("Running git commit");
+
     execSync(`git commit -m "${message}"`, {
       cwd: ROOT,
       stdio: "inherit",
     });
 
     success(`Git commit created: ${message}`);
+
+    // =========================
+    // CREATE TAG
+    // =========================
+
+    log(`Creating tag ${newVersion}`);
+
+    execSync(`git tag -a ${newVersion} -m "Release ${newVersion}"`, {
+      cwd: ROOT,
+      stdio: "inherit",
+    });
+
+    success(`Tag created: ${newVersion}`);
+
+    // =========================
+    // PUSH COMMIT
+    // =========================
+
+    log("Pushing commits");
+
+    execSync("git push origin HEAD", {
+      cwd: ROOT,
+      stdio: "inherit",
+    });
+
+    success("Commits pushed");
+
+    // =========================
+    // PUSH TAG
+    // =========================
+
+    log(`Pushing tag ${newVersion}`);
+
+    execSync(`git push origin ${newVersion}`, {
+      cwd: ROOT,
+      stdio: "inherit",
+    });
+
+    success(`Tag pushed: ${newVersion}`);
   } catch (err) {
-    fail("Git commit failed");
+    fail(err.message);
   }
 }
 
