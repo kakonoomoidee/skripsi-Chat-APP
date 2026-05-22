@@ -146,9 +146,14 @@ export default function WebRTCSection() {
       `}</style>
 
       <div className="text-center max-w-3xl mx-auto space-y-4">
-        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-          WebRTC Peer-to-Peer
-        </h3>
+        <div className="flex justify-center items-center gap-3 mb-2">
+          <svg className="w-8 h-8 text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            WebRTC Peer-to-Peer
+          </h3>
+        </div>
         <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           The relay server facilitates only the initial signaling handshake.
           Once the DataChannel is established, all data flows directly between
@@ -157,7 +162,8 @@ export default function WebRTCSection() {
       </div>
 
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8 md:p-14 mb-8 relative shadow-2xl overflow-hidden">
+        <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/5 rounded-[2rem] p-8 md:p-14 mb-8 relative shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-b from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-purple-500/5 blur-[100px] pointer-events-none" />
           
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold mb-8 text-center flex items-center justify-center gap-3">
@@ -265,8 +271,9 @@ export default function WebRTCSection() {
               id="webrtc-transmit-btn"
               onClick={handleTransmit}
               disabled={phase !== "idle" && phase !== "complete"}
-              className="w-full bg-purple-500/10 text-purple-300 border border-purple-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-purple-500/20 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] disabled:shadow-none"
+              className="group relative w-full bg-purple-500/10 text-purple-300 border border-purple-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-6 py-3 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-purple-500/20 hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:shadow-none overflow-hidden"
             >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               {phase === "idle" || phase === "complete"
                 ? "ESTABLISH TUNNEL"
                 : "TRANSMITTING..."}
@@ -283,7 +290,7 @@ export default function WebRTCSection() {
 
           <div
             ref={logRef}
-            className="w-full md:w-2/3 bg-[#050505] border border-white/5 rounded-2xl p-6 font-mono text-[13px] md:text-sm h-48 overflow-y-auto space-y-2 relative shadow-inner custom-scrollbar"
+            className="w-full md:w-2/3 bg-black/60 border border-white/5 rounded-2xl p-6 font-mono text-[13px] md:text-sm h-48 overflow-y-auto space-y-2 relative shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] custom-scrollbar"
           >
             {logs.length === 0 && (
                <div className="absolute inset-0 flex items-center justify-center opacity-30">

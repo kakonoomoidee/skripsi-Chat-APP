@@ -152,9 +152,14 @@ export default function ECDHSection() {
   return (
     <div className="space-y-10">
       <div className="text-center max-w-3xl mx-auto space-y-4">
-        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-          ECDH Key Exchange + AES-256
-        </h3>
+        <div className="flex justify-center items-center gap-3 mb-2">
+          <svg className="w-8 h-8 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+            ECDH Key Exchange + AES-256
+          </h3>
+        </div>
         <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           Two parties independently compute an identical shared secret without
           ever transmitting it. This secret then serves as the symmetric key for
@@ -163,10 +168,11 @@ export default function ECDHSection() {
       </div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-5 flex flex-col gap-6">
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 flex-1 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
-            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+        <div className="md:col-span-5 flex flex-col gap-5">
+          <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 flex-1 shadow-[0_8px_32px_rgba(0,0,0,0.8)] relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-3 block flex items-center gap-2 relative z-10">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
               Plaintext Message
             </label>
             <textarea
@@ -177,7 +183,7 @@ export default function ECDHSection() {
               maxLength={120}
               disabled={isRunning}
               rows={4}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-cyan-300 font-mono text-sm focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner resize-none disabled:opacity-50"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-cyan-300 font-mono text-sm focus:border-cyan-500/50 focus:outline-none focus:ring-4 focus:ring-cyan-500/20 transition-all placeholder:text-zinc-700/50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] resize-none disabled:opacity-50 relative z-10"
             />
           </div>
 
@@ -186,8 +192,9 @@ export default function ECDHSection() {
               id="ecdh-derive-btn"
               onClick={handleDerive}
               disabled={!message.trim() || isRunning}
-              className="w-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-cyan-500/20 hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] disabled:shadow-none"
+              className="group relative w-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-6 py-3 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-cyan-500/20 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] disabled:shadow-none overflow-hidden"
             >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               {isRunning ? "PROCESSING PIPELINE..." : "DERIVE SECRET & ENCRYPT"}
             </button>
             {logs.length > 0 && !isRunning && (

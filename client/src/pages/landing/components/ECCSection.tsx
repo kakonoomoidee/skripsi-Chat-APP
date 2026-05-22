@@ -293,9 +293,14 @@ export default function ECCSection() {
   return (
     <div className="space-y-10">
       <div className="text-center max-w-3xl mx-auto space-y-4">
-        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-          Elliptic Curve Cryptography
-        </h3>
+        <div className="flex justify-center items-center gap-3 mb-2">
+          <svg className="w-8 h-8 text-indigo-400 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+          <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+            Elliptic Curve Cryptography
+          </h3>
+        </div>
         <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           A Public Key is derived from a Private Key through scalar
           multiplication with a fixed Generator Point (G) on an elliptic curve.
@@ -304,11 +309,12 @@ export default function ECCSection() {
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        <div className="w-full lg:w-1/3 space-y-6 flex flex-col justify-between">
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
-            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="w-full lg:w-1/3 space-y-4 flex flex-col justify-between">
+          <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.8)] relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-3 block flex items-center gap-2 relative z-10">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
               Private Key (bounces)
             </label>
             <input
@@ -322,21 +328,21 @@ export default function ECCSection() {
                 setPublicKey(null);
               }}
               placeholder="e.g. 5"
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-indigo-300 font-mono text-xl focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-indigo-300 font-mono text-xl focus:border-indigo-500/50 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700/50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] relative z-10"
             />
-            <p className="text-[11px] text-zinc-500 mt-4 leading-relaxed font-light">
+            <p className="text-[10px] text-zinc-500 mt-3 leading-relaxed font-light">
               Number of geometric point additions starting from G(1, 1).
             </p>
           </div>
           
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <button
               id="ecc-generate-btn"
               onClick={handleGenerate}
               disabled={!privateKey || parseInt(privateKey, 10) <= 0 || isAnimating}
-              className="group relative w-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-indigo-500/20 hover:shadow-[0_0_30px_rgba(99,102,241,0.2)] disabled:shadow-none overflow-hidden"
+              className="group relative w-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-6 py-3 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-indigo-500/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] disabled:shadow-none overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               {isAnimating ? "CALCULATING..." : "GENERATE PUBLIC KEY"}
             </button>
             {(publicKey || isAnimating) && (

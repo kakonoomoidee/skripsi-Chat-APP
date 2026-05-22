@@ -30,6 +30,7 @@ export default function HowItWorks() {
 
   return (
     <div className="bg-zinc-950 min-h-screen text-zinc-100 flex flex-col font-sans selection:bg-indigo-500/30 overflow-hidden relative">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f1a_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f1a_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-20 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] opacity-10 pointer-events-none bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-cyan-900 via-transparent to-transparent" />
 

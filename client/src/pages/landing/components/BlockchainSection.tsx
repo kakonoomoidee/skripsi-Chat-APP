@@ -167,9 +167,14 @@ export default function BlockchainSection() {
   return (
     <div className="space-y-10">
       <div className="text-center max-w-3xl mx-auto space-y-4">
-        <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-          Distributed Registry
-        </h3>
+        <div className="flex justify-center items-center gap-3 mb-2">
+          <svg className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <h3 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+            Distributed Registry
+          </h3>
+        </div>
         <p className="text-zinc-400/80 text-sm md:text-base leading-relaxed font-light">
           Register your global identity. The transaction is signed locally, mined via
           Proof-of-Work to prevent spam, and permanently secured on the immutable
@@ -221,11 +226,12 @@ export default function BlockchainSection() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8">
-        <div className="md:col-span-5 flex flex-col gap-6">
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-7 flex-1 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
-            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-4 block flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="md:col-span-5 flex flex-col gap-5">
+          <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 flex-1 shadow-[0_8px_32px_rgba(0,0,0,0.8)] relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-3 block flex items-center gap-2 relative z-10">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
               Register Username
             </label>
             <input
@@ -238,7 +244,7 @@ export default function BlockchainSection() {
               placeholder="e.g. satoshi_nakamoto"
               maxLength={24}
               disabled={phase !== "idle" && phase !== "appended"}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-emerald-300 font-mono text-lg focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-zinc-700/50 shadow-inner disabled:opacity-50"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-emerald-300 font-mono text-lg focus:border-emerald-500/50 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 transition-all placeholder:text-zinc-700/50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] disabled:opacity-50 relative z-10"
             />
           </div>
 
@@ -249,8 +255,9 @@ export default function BlockchainSection() {
               disabled={
                 !username.trim() || (phase !== "idle" && phase !== "appended")
               }
-              className="w-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-8 py-4 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] disabled:shadow-none"
+              className="group relative w-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-zinc-600 px-6 py-3 rounded-xl font-bold tracking-wide transition-all duration-300 hover:bg-emerald-500/20 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] disabled:shadow-none overflow-hidden"
             >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               {phase === "mining" ? "COMPUTING HASH..." : "SIGN & MINE BLOCK"}
             </button>
             {phase === "appended" && (
@@ -265,7 +272,7 @@ export default function BlockchainSection() {
         </div>
 
         <div className="md:col-span-7 flex flex-col gap-6">
-          <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 font-mono text-[13px] h-56 overflow-y-auto relative shadow-inner custom-scrollbar">
+          <div className="bg-black/60 border border-white/5 rounded-2xl p-6 font-mono text-[13px] h-56 overflow-y-auto relative shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] custom-scrollbar">
              {phase === "idle" ? (
                <div className="absolute inset-0 flex items-center justify-center opacity-30">
                  <span className="text-zinc-600">Awaiting transaction...</span>
